@@ -14,7 +14,6 @@ import { EDIT_TYPE_ADD, EDIT_TYPE_DELETE } from "../../constants/constants";
 import useChartZoom from "../../hooks/useChartZoom";
 import useMarkingUnusableMode from "../../hooks/useMarkingUnusableMode";
 import useKeyboardShortcuts from "../../utils/key-input-utils";
-import "../../styles.scss";
 
 Highcharts.SVGRenderer.prototype.symbols.cross = function (x, y, w, h) {
   return ["M", x, y, "L", x + w, y + h, "M", x + w, y, "L", x, y + h, "z"];
