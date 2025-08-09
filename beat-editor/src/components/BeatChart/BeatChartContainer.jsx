@@ -6,7 +6,6 @@ import {
   EDIT_TYPE_UNUSABLE,
 } from "../../constants/constants";
 import axios from "axios";
-import "../../styles.scss";
 
 function BeatChartContainer() {
   const [fileData, setFileData] = useState([]);
