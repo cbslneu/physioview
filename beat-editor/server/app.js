@@ -11,9 +11,6 @@ app.use(bodyParser.json());
 // Enable CORS for all origins
 app.use(cors());
 
-// Serve static files from public directory
-app.use(express.static(path.join(__dirname, 'public')));
-
 // Endpoint for fetching JSON files
 app.get('/fetch-file', async (req, res) => {
     const dataDir = path.join(__dirname, '..', 'data');

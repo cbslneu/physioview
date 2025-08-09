@@ -1,7 +1,7 @@
 # Beat Editor 📈
 
 ### Installation for Manual Beat Editor
-**Manual Beat Editor requires Node (v20.x.x +), please be sure to install before proceeding with the installation below**
+**Manual Beat Editor requires Node (v22.x.x +), please be sure to install before proceeding with the installation below**
 <br>
 <br> *Run the following code below to check if Node is installed on your machine:*
 ```
@@ -33,6 +33,9 @@ cd server
 ```
 2. Run the following line to start the backend
 ```
-npm run
+npm start
 ```
-3. Open up another terminal tab or window and navigate back to `beat-editor`, once there run the line from the step above to start the frontend code.
+3. Open up another terminal tab or window and navigate back to `beat-editor`, once there run the line from the following line to start the frontend code.
+```
+npm run dev
+```
