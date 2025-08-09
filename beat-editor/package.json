@@ -16,8 +16,7 @@
     "sass": "^1.77.8"
   },
   "scripts": {
-    "start": "cross-env BROWSER=none vite dev",
-    "dev": "vite",
+    "dev": "cross-env BROWSER=none vite",
     "test": "vitest",
     "build": "vite build",
     "preview": "vite preview"
