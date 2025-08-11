@@ -46,6 +46,7 @@ body {
 
 .chart-buttons-wrapper {
   display: flex;
+  margin-bottom: 15px;
   justify-content: space-between;
   align-items: center; /* Align buttons and h3 vertically in the center */
   width: 100%;
@@ -55,10 +56,6 @@ body {
   display: flex;
   gap: 10px;
   margin-bottom: 20px; /* Space below the buttons */
-}
-
-.chart-name {
-  margin-top: -20px;
 }
 
 .chart-info {
