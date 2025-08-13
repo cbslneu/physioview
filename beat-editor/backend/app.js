@@ -13,8 +13,8 @@ app.use(cors());
 
 // Endpoint for fetching JSON files
 app.get('/fetch-file', async (req, res) => {
-    const dataDir = path.join(__dirname, '..', 'data');
-    const savedDir = path.join(__dirname, '..', 'saved');
+    const dataDir = path.join(__dirname, 'data');
+    const savedDir = path.join(__dirname, 'saved');
     try {
         const dataFiles = await fs.promises.readdir(dataDir);
         const fileDirJsonFiles = dataFiles.filter(file => file.endsWith('_edit.json'));
@@ -61,13 +61,13 @@ app.get('/fetch-file', async (req, res) => {
 // Endpoint for saving JSON file
 app.post('/saved', async (req, res) => {
     const { fileName, data } = req.body;
-    const savedFilePath = path.join(__dirname, "..", "saved");
+    const savedFilePath = path.join(__dirname, "saved");
     // Checks if /saved exists, if not make it
     if (!fs.existsSync(savedFilePath)) {
         fs.mkdirSync(savedFilePath);
     }
 
-    const filePath = path.join(__dirname, '..', 'saved', `${fileName}_edited.json`);
+    const filePath = path.join(__dirname, 'saved', `${fileName}_edited.json`);
 
     try {
         const { addModeCoordinates, deleteModeCoordinates, unusableSegments } = data;

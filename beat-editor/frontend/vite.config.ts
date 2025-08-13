@@ -8,15 +8,13 @@ export default defineConfig({
     },
     server: {
         port: 3000,
-        host: 'localhost',
+        host: '0.0.0.0',
+        watch: {
+            usePolling: true
+        },
         fs: {
             strict: false,
             allow: ['..']
         }
-    },
-    test: {
-        globals: true,
-        environment: "jsdom",
-        setupFiles: "./src/setupTests.js"
-    },
+    }
 });

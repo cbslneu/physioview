@@ -390,7 +390,6 @@ const BeatChart = ({
             deleteModeCoordinates={deleteModeCoordinates}
             unusableSegments={unusableSegments}
           />
-        
         <KeyboardShortcuts />
         </div>
       </div>
