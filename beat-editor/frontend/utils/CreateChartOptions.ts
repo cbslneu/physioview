@@ -27,13 +27,13 @@ const createChartOptions = ({
           type: isMarkingUnusableMode ? undefined : "x",
         },
         panning: {
-          enabled: !isMarkingUnusableMode, // Enable panning
+          enabled: true, // Disable panning in Mark Unusable mode 
         },
         panKey: "shift",
         events: {
           click: function (event) {
             if (
-              (isAddMode || isDeleteMode || isMarkingUnusableMode) &&
+              (isAddMode || isDeleteMode) &&
               !event.shiftKey
             ) {
               const chartClickEvent: ChartClickEvent = {

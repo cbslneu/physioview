@@ -46,12 +46,12 @@ const useMarkingUnusableMode = (
       }
 
       const handleMouseDown = (event: MouseEvent) => {
-        if (isMarkingUnusableMode) {
+        if (isMarkingUnusableMode && !event.shiftKey) {
           const target = event.target as HTMLElement;
-          if (target && target.textContent?.includes('Reset zoom')) {
+          if (target && target.textContent?.includes("Reset zoom")) {
             return;
           }
-          
+
           event.preventDefault();
 
           const chartPosition = getChartPosition(event);
@@ -64,8 +64,12 @@ const useMarkingUnusableMode = (
         }
       };
 
+      const preventContextMenu = (event: Event) => event.preventDefault();
+
+      document.addEventListener("contextmenu", preventContextMenu);
+
       const handleMouseMove = (event: MouseEvent) => {
-        if (isMarkingUnusableMode && isDraggingRef.current) {
+        if (isMarkingUnusableMode && isDraggingRef.current && !event.shiftKey) {
           const chartPosition = getChartPosition(event);
           let dragEnd = chart.xAxis[0].toValue(chartPosition.x);
 
@@ -148,8 +152,9 @@ const useMarkingUnusableMode = (
           chart.xAxis[0].removePlotBand("draggingPlotBand");
           dragPlotBandRef.current = null;
         }
-
+        
         // Cleanup event listeners
+        document.removeEventListener("contextmenu", preventContextMenu);
         chart.container.removeEventListener("mousedown", handleMouseDown);
         chart.container.removeEventListener("mousemove", handleMouseMove);
         window.removeEventListener("mouseup", handleMouseUp);
