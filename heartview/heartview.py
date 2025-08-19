@@ -3,6 +3,9 @@ from tqdm import tqdm
 from scipy.signal import resample as scipy_resample
 from plotly.subplots import make_subplots
 from heartview.pipeline.ACC import compute_magnitude
+from heartview.pipeline.SQA import Cardio, EDA
+from heartview.pipeline.PPG import BeatDetectors
+from heartview.pipeline.EDA import Filters as edaFilters
 import warnings
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
