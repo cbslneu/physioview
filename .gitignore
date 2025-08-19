@@ -18,5 +18,4 @@ docs/_build/
 
 # Ignore all Beat Editor files except the sample
 beat-editor/data/*
-!beat-editor/data/sample_edit.json
 beat-editor/saved/

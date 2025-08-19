@@ -1,6 +1,6 @@
 from pathlib import Path
 from dash import Dash, DiskcacheManager
-from heartview.dashboard.utils import _clear_temp, _make_subdirs
+from heartview.dashboard.utils import _clear_temp, _make_subdirs, _clear_edits
 from heartview.dashboard.layout import layout
 from heartview.dashboard.callbacks import get_callbacks
 import dash_bootstrap_components as dbc
@@ -23,5 +23,6 @@ get_callbacks(app)
 if __name__ == '__main__':
     _make_subdirs()
     _clear_temp()
+    _clear_edits()
     cache.clear()
     app.run_server()

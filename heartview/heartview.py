@@ -1,3 +1,4 @@
+from typing import Dict, List, Literal, Optional, Tuple, Union
 from zipfile import ZipFile, ZipExtFile
 from tqdm import tqdm
 from scipy.signal import resample as scipy_resample
@@ -6,6 +7,7 @@ from heartview.pipeline.ACC import compute_magnitude
 from heartview.pipeline.SQA import Cardio, EDA
 from heartview.pipeline.PPG import BeatDetectors
 from heartview.pipeline.EDA import Filters as edaFilters
+from heartview._plotting import *
 import warnings
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
@@ -26,7 +28,7 @@ class Actiwave:
         Data Format (.edf).
     """
 
-    def __init__(self, file):
+    def __init__(self, file: str):
         """
         Initialize the Actiwave object.
 
@@ -43,7 +45,10 @@ class Actiwave:
         else:
             self.file = file
 
-    def preprocess(self, time_aligned = False):
+    def preprocess(
+        self,
+        time_aligned: bool = False
+    ) -> Union[tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
         """
         Pre-process electrocardiograph (ECG) and acceleration data from
         an Actiwave Cardio file.
@@ -106,7 +111,7 @@ class Actiwave:
         else:
             return ecg, acc
 
-    def get_ecg_fs(self):
+    def get_ecg_fs(self) -> float:
         """
         Get the sampling rate of ECG data from an Actiwave Cardio device.
 
@@ -128,7 +133,7 @@ class Actiwave:
         finally:
             f.close()
 
-    def get_acc_fs(self):
+    def get_acc_fs(self) -> float:
         """
         Get the sampling rate of accelerometer data from an Actiwave Cardio
         device.
@@ -170,7 +175,7 @@ class Empatica:
             for key, value in kwargs.items():
                 setattr(self, key, value)
 
-    def __init__(self, file):
+    def __init__(self, file: str):
         """
         Initialize the Empatica object.
 
@@ -186,7 +191,7 @@ class Empatica:
         else:
             self.file = file
 
-    def preprocess(self, time_aligned = False):
+    def preprocess(self, time_aligned: bool = False) -> 'Empatica.Data':
         """
         Pre-process all data from the Empatica E4.
 
@@ -327,7 +332,7 @@ class Empatica:
                                 'eda_fs': eda_fs})
         return data
 
-    def get_acc(self):
+    def get_acc(self) -> 'Empatica.Data':
         """
         Get the pre-processed acceleration data and its start time and
         sampling rate from the Empatica E4.
@@ -367,7 +372,7 @@ class Empatica:
                                     'fs': acc_fs})
             return acc_data
 
-    def get_bvp(self):
+    def get_bvp(self) -> 'Empatica.Data':
         """
         Get the raw blood volume pulse (BVP) data and its start time and
         sampling rate from the Empatica E4.
@@ -403,7 +408,7 @@ class Empatica:
                                     'fs': bvp_fs})
             return bvp_data
 
-    def get_eda(self):
+    def get_eda(self) -> 'Empatica.Data':
         """
         Get the raw electrodermal activity (EDA) data and its recording
         start time and sampling rate from the Empatica E4.
@@ -439,7 +444,7 @@ class Empatica:
                                     'fs': eda_fs})
             return eda_data
 
-    def get_hr(self):
+    def get_hr(self) -> 'Empatica.Data':
         """
         Get the pre-processed heart rate (HR) data, start time of the
         first HR measurement, and sampling rate from the Empatica E4.
@@ -475,7 +480,7 @@ class Empatica:
                                    'fs': hr_fs})
             return hr_data
 
-    def get_ibi(self):
+    def get_ibi(self) -> 'Empatica.Data':
         """
         Get the pre-processed interbeat interval (IBI) data and the start
         time of the first interval from the Empatica E4.
@@ -513,7 +518,7 @@ class Empatica:
             ibi_data = self.Data(**{'ibi': ibi, 'start': ibi_start})
             return ibi_data
 
-    def get_temp(self):
+    def get_temp(self) -> 'Empatica.Data':
         """
         Get the raw skin temperature data and its recording start time and
         sampling rate from the Empatica E4.
@@ -549,8 +554,13 @@ class Empatica:
                                      'fs': temp_fs})
             return temp_data
 
-    def get_e4_beats(self, bvp_data, ibi_data, start_time,
-                     show_progress = True):
+    def get_e4_beats(
+        self,
+        bvp_data: pd.DataFrame,
+        ibi_data: pd.DataFrame,
+        start_time: int,
+        show_progress: bool = True
+    ) -> list[int]:
         """
         Get locations of beats from Empatica E4 interbeat interval (IBI)
         data relative to its blood volume pulse (BVP) data.
@@ -588,10 +598,18 @@ class Empatica:
             e4_beats.append(closest_ix)
         return e4_beats
 
-    def compute_sqa(self, kind, seg_size = 60, initial_hr = 'auto',
-                    min_hr = 40, min_eda = 0.05, max_eda = 40,
-                    rolling_window = None, rolling_step = 15,
-                    show_progress = True):
+    def compute_sqa(
+        self,
+        kind: str,
+        seg_size: int = 60,
+        initial_hr: Union[int, float, Literal['auto']] = 'auto',
+        min_hr: int = 40,
+        min_eda: float = 0.05,
+        max_eda: float = 40.0,
+        rolling_window: int = None,
+        rolling_step: int = 15,
+        show_progress: bool = True
+    ) -> pd.DataFrame:
         """
         Compute signal quality assessment metrics (SQA) for PPG and/or EDA
         data from Empatica E4 devices.
@@ -681,7 +699,12 @@ class Empatica:
             if eda_metrics is not None:
                 return eda_metrics
 
-    def plot_signals(self, segment = 1, seg_size = 60, interactive = True):
+    def plot_signals(
+        self,
+        segment: int = 1,
+        seg_size: int = 60,
+        interactive: bool = True
+    ) -> go.Figure:
         """
         Display a plot of a segment of signals recorded with the Empatica E4
         device.
@@ -813,7 +836,7 @@ class Empatica:
                 start_time = self._get_e4_start_time(file)
         timestamps = pd.date_range(
             start = pd.to_datetime(start_time, unit = 's'),
-            periods = len(data), freq = f'{1 / fs}S')
+            periods = len(data), freq = f'{1 / fs}s')
         timestamps = pd.Series(timestamps, name = 'Timestamp')
         data = pd.merge(timestamps, data,
                         left_index = True, right_index = True)
@@ -841,13 +864,17 @@ class Empatica:
         return start
 
 # ======================== Other Data Pre-Processing =========================
-def get_duration(data, fs, unit = 'sec'):
+def get_duration(
+    data: Union[pd.DataFrame, pd.Series, np.ndarray],
+    fs: int,
+    unit: str = 'sec'
+) -> float:
     """
     Get the duration of a signal.
 
     Parameters
     ----------
-    data : array_like
+    data : array-like
         An array or DataFrame containing the signal.
     fs : int
         The sampling rate of the data.
@@ -858,7 +885,7 @@ def get_duration(data, fs, unit = 'sec'):
     Returns
     -------
     dur : float
-        The duration of the signal.
+        The duration of the signal in the requested unit.
     """
 
     dur = len(data) / fs
@@ -872,13 +899,17 @@ def get_duration(data, fs, unit = 'sec'):
             return round(((dur / 60) / 60), 2)
     return round(dur, 2)
 
-def segment_data(data, fs, seg_size):
+def segment_data(
+    data: pd.DataFrame,
+    fs: int,
+    seg_size: int
+) -> pd.DataFrame:
     """
     Segment data into specific window sizes.
 
     Parameters
     ----------
-    data : pd.DataFrame
+    data : pandas.DataFrame
         The DataFrame containing the data to be segmented.
     fs : int
         The sampling rate of the data.
@@ -888,7 +919,7 @@ def segment_data(data, fs, seg_size):
 
     Returns
     -------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         The original DataFrame with data segmented with labels in a
         'Segment' column.
     """
@@ -900,14 +931,19 @@ def segment_data(data, fs, seg_size):
         segment += 1
     return df
 
-def compute_ibis(data, fs, beats_ix, ts_col = None):
+def compute_ibis(
+    data: pd.DataFrame,
+    fs: int,
+    beats_ix: np.ndarray,
+    ts_col: Optional[str] = None
+) -> pd.DataFrame:
     """
     Compute interbeat intervals from beat locations in electrocardiograph
      (ECG) or photoplethysmograph (PPG) data.
 
     Parameters
     ----------
-    data : pd.DataFrame
+    data : pandas.DataFrame
         The DataFrame containing the pre-processed ECG/PPG data.
     fs : int
         The sampling rate of the ECG/PPG data.
@@ -919,7 +955,7 @@ def compute_ibis(data, fs, beats_ix, ts_col = None):
 
     Returns
     -------
-    ibi : pd.DataFrame
+    ibi : pandas.DataFrame
         A DataFrame containing timestamps and IBI values.
     """
 
@@ -933,463 +969,386 @@ def compute_ibis(data, fs, beats_ix, ts_col = None):
         ibi.loc[ix, 'IBI'] = ibis[n]
     return ibi
 
-def plot_cardio_signals(signal, fs, ibi, signal_type, x = 'Timestamp',
-                        y = 'Filtered', acc = None, seg_num = 1,
-                        seg_size = 60, title = None):
+SignalType = Literal['ECG', 'PPG', 'BVP', 'EDA', 'HR', 'RESP', 'TEMP']
+def plot_signal(
+    *,
+    signal: pd.DataFrame,
+    signal_type: Union[SignalType, List[SignalType]],
+    axes: Tuple[str, Union[str, List[str]]],
+    fs: int,
+    peaks_map: Optional[Dict[str, Union[str, str]]] = None,
+    peaks_label: Optional[str] = None,
+    peaks_color: Optional[str] = None,
+    artifacts_map: Optional[Dict[str, Union[str, str]]] = None,
+    edits_map: Optional[Dict[str, Union[str, str]]] = None,
+    acc: Optional[pd.DataFrame] = None,
+    ibi: Optional[pd.DataFrame] = None,
+    seg_number: Optional[int] = 1,
+    seg_size: Optional[int] = 60,
+    n_segments: Optional[int] = 1,
+    fig_title: Optional[str] = None,
+    fig_height: Optional[int] = 450
+) -> go.Figure:
     """
-    Create subplots of the electrocardiograph (ECG) or photoplethysmograph
-    (PPG), interbeat interval (IBI), and acceleration data (if any).
+    Create a Plotly figure with primary and optional secondary physiological
+    signals, including optional peaks and artifact markers.
 
     Parameters
     ----------
     signal : pandas.DataFrame
-        A DataFrame containing the pre-processed ECG or PPG data with beat
-        and artifact occurrences in a "Beat" and "Artifact" column.
+        A DataFrame containing the primary signal data to plot.
+    signal_type : str or list of str
+        The name(s) of the primary signal type(s) to plot. Possible values
+        include 'ECG', 'PPG', 'BVP', 'EDA', 'HR', 'RESP', and 'TEMP'.
+    axes : tuple of (str, str or list of str)
+        A tuple of column names for the x- and y-axis signal(s) in
+        `signal`.
     fs : int
-        The sampling rate of the ECG or PPG data.
-    ibi : pandas.DataFrame
-        A DataFrame containing IBI values in an "IBI" column.
-    signal_type : str
-        The type of cardiovascular data being plotted. This must be either
-        'ECG' or 'PPG'.
-    x : str, optional
-        The name of the column of values in the `signal` DataFrame to plot
-        along the x-axis; by default, 'Timestamp'.
-    y : str, optional
-        The column name of values to plot along the y-axis; by default,
-        'Filtered'.
+        The sampling rate (Hz) of the signal data.
+    peaks_map : dict of {str: str}, optional
+        A dictionary mapping a signal type to the name of a column in `signal`
+        containing binary (0/1) peak annotations; by default, None (i.e.,
+        no peaks are plotted). Example: `{'ECG': 'Beat'}` will plot beat
+        markers from the 'Beat' column on the ECG subplot.
+    peaks_label : str, optional
+        A label for the peak annotations on the signal subplot.
+    peaks_color : str, optional
+        A color for the peak annotations on the signal subplot.
+    artifacts_map : dict of {str: str}, optional
+        A dictionary mapping a signal type to the name of a column in `signal`
+        containing binary (0/1) artifact annotations; by default, None (i.e.,
+        no artifacts are plotted). Example: `{'ECG': 'Artifact'}` will plot
+        artifact markers from the 'Artifact' column on the ECG subplot.
+    edits_map : dict of {str: str}, optional
+        A dictionary mapping a signal type to one or more edit types and
+        their corresponding binary (0/1) annotation columns in `signal`; by
+        default, None (i.e., no edits are plotted). Format:
+        {signal_type: {edit_label: column_name, ...}}. For example:
+        {'ECG': {'Added': 'Added Beat',
+                 'Deleted': 'Deleted Beat',
+                 'Unusable': 'Unusable'}}.
     acc : pandas.DataFrame, optional
-        A DataFrame containing pre-processed acceleration data with
-        magnitude values in a "Magnitude" column.
-    seg_num : int
-        The segment to plot.
-    seg_size : int
-        The size of the segment, in seconds; by default, 60.
+        DataFrame containing accelerometer data. If present, plotted
+        as a secondary signal in the first subplot. Must contain
+        'Magnitude' or another numeric column.
+    ibi : pandas.DataFrame, optional
+        DataFrame containing inter-beat interval (IBI) data. If present,
+        plotted as a secondary signal in the last subplot. Must contain
+        'IBI' or another numeric column.
+    seg_number : int, optional
+        The positional number of the segment to plot; by default, 1 (first
+        segment).
+    seg_size : int, optional
+        The length of each segment in seconds; by default, 60.
+    n_segments : int, optional
+        The number of consecutive segments to plot starting from
+        `seg_number`; by default, 1.
+    fig_title : str, optional
+        The title of the figure.
+    fig_height : int, optional
+        The height of the Plotly figure in pixels; by default, 450.
 
     Returns
     -------
-    fig : plotly.graph_objects.Figure
-        A figure containing subplots of ECG or PPG data with beat annotations
-        and its corresponding IBI data.
+    fig : go.Figure
+        The Plotly figure containing the plotted signals.
 
-    See Also
+    Examples
     --------
-    heartview.compute_ibis : Compute IBIs in a DataFrame time-aligned to its
-    corresponding cardiovascular data.
+    >>> from heartview import heartview
+    >>> # data has columns: 'Timestamp', 'II', 'GSR', 'Beat', 'SCR', 'Artifact'
+    >>> fig = heartview.plot_signal(
+    >>>     signal = data,
+    >>>     signal_type = ['ECG', 'EDA'],
+    >>>     axes = ('Timestamp', ['II', 'GSR']),
+    >>>     fs = 256,
+    >>>     peaks_map = {'ECG': 'Beat', 'EDA', 'SCR'},
+    >>>     artifacts_map = {'ECG': 'Artifact'},
+    >>>     acc = acc_data,
+    >>>     ibi = ibi_data)
+    >>> fig.show()
     """
 
-    seg_start = int((seg_num - 1) * seg_size * fs)
-    seg_end = int(seg_start + (fs * seg_size))
-    for df in [signal, ibi]:
-        df[x] = pd.to_datetime(df[x])
-    signal_segment = signal.iloc[seg_start:seg_end]
-    ibi_segment = ibi.iloc[seg_start:seg_end].dropna()
+    # Validate axes
+    ax_x, ax_y = axes[0], axes[1]
+    ax_y = ax_y if isinstance(ax_y, list) else [ax_y]
+    if ax_x not in signal.columns:
+        raise KeyError(f'{ax_x} not found in `signal` columns.')
+    for y in ax_y:
+        if y not in signal.columns:
+            raise KeyError(f'{y} not found in `signal` columns.')
 
-    x_array = signal_segment[x]
-    if not pd.api.types.is_datetime64_any_dtype(x_array):
-        artifact_hover = '<b>Potential Artifact</b> <extra></extra>'
-        beat_hover = '<b>Beat</b> <extra></extra>'
-    else:
-        artifact_hover = '<b>Potential Artifact</b>: %{x|%H:%M:%S.%3f} ' \
-                         '<extra></extra>'
-        beat_hover = '<b>Beat</b>: %{x|%H:%M:%S.%3f} <extra></extra>'
-    if signal_type == 'PPG' or signal_type == 'BVP':
-        y_axis = 'bvp'
-    else:
-        y_axis = 'mV'
+    # Validate peaks map keys
+    if peaks_map is not None:
+        for sig, col in peaks_map.items():
+            if sig not in signal_type:
+                raise KeyError(
+                    f"'{sig}' in `peaks_map` not found in `signal_type`.")
 
+    def __row_params(
+        n_primary: int = 1,
+        has_acc: bool = False,
+        has_ibi: bool = True,
+        primary_total: float = 0.6,
+        secondary_total_each: float = 0.2
+    ) -> list[float]:
+        """Set row_ids and row_heights for subplots with at least one primary
+        signal and optional secondary signals."""
+        row_heights: list[float] = []
+
+        # Add subplot row for acceleration signal, if any
+        if has_acc:
+            row_heights.append(secondary_total_each)
+
+        # Add middle subplot row(s) for primary signal(s)
+        if n_primary > 0:
+            primary_each = primary_total / n_primary
+            row_heights.extend([primary_each] * n_primary)
+
+        # Add last subplot row for IBI signal, if any
+        if has_ibi:
+            row_heights.append(secondary_total_each)
+
+        row_ids = list(range(1, len(row_heights) + 1))
+        return row_heights, row_ids
+
+    # Count and extract secondary signals
+    has_acc, has_ibi = False, False
+    n_secondary = 0
     if acc is not None:
-        fig = make_subplots(rows = 3, cols = 1,
-                            shared_xaxes = True,
-                            vertical_spacing = 0.02,
-                            row_heights = [0.25, 0.50, 0.25])
+        has_acc = True
+        n_secondary += 1
+        if 'Magnitude' not in acc.columns:
+            num_cols = acc.select_dtypes(
+                include = 'number').columns.tolist()
+            acc_col = num_cols[0]
+            warnings.warn(f"'Magnitude' not found in `acc` columns. Using "
+                          f"{acc_col} instead.")
+        else:
+            acc_col = 'Magnitude'
+    if ibi is not None:
+        has_ibi = True
+        n_secondary += 1
+        ibi_col = 'IBI'
+        if ibi_col not in ibi.columns:
+            num_cols = ibi.select_dtypes(
+                include = 'number').columns.tolist()
+            ibi_col = num_cols[0] if num_cols else None
+            warnings.warn(f"'IBI' not found in `ibi` columns. Using "
+                          f"{ibi_col} instead.")
 
-        # ACC subplot
-        acc = scipy_resample(acc['Magnitude'], len(signal))
-        acc_segment = acc[seg_start:seg_end]
+    # Segment data
+    seg_len = int(seg_size * fs)
+    seg_start = int((seg_number - 1) * seg_len)
+    seg_end = seg_start + int(n_segments * seg_len)
+    sig_seg = signal.iloc[seg_start:seg_end].copy()
+
+    # Create a subplot for each signal type(s)
+    signal_type = signal_type if isinstance(signal_type, list) else [signal_type]
+    n_primary = len(signal_type)
+    row_heights, row_ids = __row_params(n_primary, has_acc, has_ibi)
+    fig = make_subplots(
+        rows = n_primary + n_secondary, cols = 1,
+        shared_xaxes = True, vertical_spacing = 0.02,
+        row_heights = row_heights,
+    )
+
+    # Plot ACC signal in the first subplot if provided
+    start_row = 1
+    if acc is not None:
+        if len(acc) != len(signal):
+            warnings.warn('`acc` and `signal` have unmatched lengths. '
+                          'Resampling `acc`.')
+            acc_y = scipy_resample(acc[acc_col], len(signal))
+        else:
+            acc_y = acc[acc_col]
+        acc_y_seg = acc_y[seg_start:seg_end].copy()
+        fig = _acc_subplot(sig_seg[ax_x], acc_y_seg, fig)
+        start_row = 2
+
+    # Plot primary signals
+    for i, stype in enumerate(signal_type):
+        row_id = start_row + i
+        unit = _DEFAULT_SIGNAL_PARAMS.get(stype, None)['unit']
+        color = _DEFAULT_SIGNAL_PARAMS.get(stype, None)['color']
+        has_peaks = (peaks_map is not None)
+        has_artifacts = (artifacts_map is not None)
+        has_edits = (edits_map is not None)
+        if (has_edits and 'Unusable' in list(edits_map.values())[0].keys()
+                and 'Unusable' in sig_seg.columns):
+            sig_traces = dict(
+                x = sig_seg[ax_x],
+                y = sig_seg[ax_y[i]].where(sig_seg.Unusable != 1, np.nan)
+                # x = sig_seg.loc[sig_seg.Unusable != 1, ax_x],
+                # y = sig_seg.loc[sig_seg.Unusable != 1, ax_y[i]]
+            )
+        else:
+            sig_traces = dict(x = sig_seg[ax_x], y = sig_seg[ax_y[i]])
+
         fig.add_trace(
             go.Scatter(
-                x = x_array,
-                y = acc_segment,
-                name = 'ACC',
-                line = dict(color = 'forestgreen', width = 1.5),
-                hovertemplate = '<b>ACC</b>: %{y:.2f} m/s² <extra></extra>'),
-            row = 1, col = 1)
+                **sig_traces,
+                mode = 'lines',
+                connectgaps = False,
+                line = dict(color = color),
+                hovertemplate = f'%{{x}}<br>%{{y:.2f}} {unit}<extra></extra>',
+                name = stype
+            ),
+            row = row_id, col = 1)
+
+        # Plot peaks if provided
+        if has_peaks:
+            label = (
+                peaks_label
+                or _DEFAULT_SIGNAL_PARAMS.get(stype, {}).get('peak')
+            )
+            hover = f'<b>{label}</b><extra></extra>'
+            peaks_col = peaks_map.get(stype, None)
+            _peak_color = '#f9c669' if peaks_color is None else peaks_color
+            fig.add_trace(
+                go.Scatter(
+                    x = sig_seg.loc[sig_seg[peaks_col] == 1, ax_x],
+                    y = sig_seg.loc[sig_seg[peaks_col] == 1, ax_y[i]],
+                    name = label,
+                    mode = 'markers',
+                    showlegend = True,
+                    marker = dict(color = _peak_color, size = 8),
+                    hovertemplate = hover
+                ),
+                row = row_id, col = 1
+            )
+
+        # Plot artifactual beats if provided
+        if has_artifacts:
+            artifacts_col = artifacts_map.get(stype, None)
+            fig.add_trace(
+                go.Scatter(
+                    x = sig_seg.loc[sig_seg[artifacts_col] == 1, ax_x],
+                    y = sig_seg.loc[sig_seg[artifacts_col] == 1, ax_y[i]],
+                    name = 'Potential Artifact',
+                    mode = 'markers',
+                    showlegend = True,
+                    marker = dict(color = 'red', size = 8),
+                    hovertemplate = f'<b>Potential Artifact</b><extra></extra>'
+                ),
+                row = row_id, col = 1
+            )
+
+        # Plot edits if provided
+        if has_edits:
+            edits_cfg = edits_map.get(stype, None)
+            for edit_type, col in edits_cfg.items():
+                if col not in sig_seg.columns:
+                    continue
+                style = _EDIT_STYLES.get(edit_type, None)
+                hover_label = style['name']
+                hover = f'<b>{hover_label}</b><extra></extra>'
+                edit_mask = pd.to_numeric(
+                    sig_seg[col], errors = 'coerce').eq(1)
+                unus_mask = pd.to_numeric(
+                    sig_seg['Unusable'], errors = 'coerce').eq(1) \
+                    if 'Unusable' in sig_seg.columns \
+                    else pd.Series(False, index = sig_seg.index)
+
+                x_vals = sig_seg[ax_x]
+                if col == 'Unusable':
+                    # Draw a line only where Unusable == 1
+                    y_vals = sig_seg[ax_y[i]].where(unus_mask, np.nan)
+                    fig.add_trace(
+                        go.Scatter(
+                            x = x_vals, y = y_vals,
+                            connectgaps = False,
+                            showlegend = True,
+                            hovertemplate = hover,
+                            **style
+                        ),
+                        row = row_id, col = 1
+                    )
+                else:
+                    mask = edit_mask & ~unus_mask
+                    y_vals = sig_seg[ax_y[i]].where(mask, np.nan)
+                    fig.add_trace(
+                        go.Scatter(
+                            x = x_vals, y = y_vals,
+                            connectgaps = False,
+                            showlegend = True,
+                            hovertemplate = hover,
+                            **style
+                        ),
+                        row = row_id, col = 1
+                    )
+                # fig.add_trace(
+                #     go.Scatter(
+                #         x = sig_seg.loc[sig_seg[col] == 1, ax_x],
+                #         y = sig_seg.loc[sig_seg[col] == 1, ax_y[i]],
+                #         showlegend = True,
+                #         connectgaps = False,
+                #         hovertemplate = hover,
+                #         **style
+                #     ),
+                #     row = row_id, col = 1
+                # )
+
+        # Format primary signal subplot
         fig.update_yaxes(
-            title_text = 'm/s²',
-            title_standoff = 5,
-            row = 1, col = 1,
-            showgrid = True,
-            gridwidth = 0.5,
-            gridcolor = 'lightgrey',
-            griddash = 'dot',
-            tickcolor = 'grey',
-            linecolor = 'grey')
+            title_text = unit, title_standoff = 5,
+            showgrid = True, gridwidth = 0.5, gridcolor = 'lightgrey',
+            griddash = 'dot', tickcolor = 'grey', linecolor = 'grey',
+            row = row_id, col = 1
+        )
 
-        # ECG/PPG subplot
-        fig.add_trace(
-            go.Scatter(
-                x = x_array,
-                y = signal_segment[y],
-                name = signal_type,
-                showlegend = True,
-                line = dict(color = '#3562bd', width = 1.5),
-                hovertemplate = f'<b>{signal_type}:</b> %{{y:.2f}} {y_axis} '
-                                f'<extra></extra>'),
-            row = 2, col = 1)
-        fig.update_yaxes(
-            title_text = y_axis,
-            title_standoff = 5,
-            row = 2, col = 1,
-            showgrid = True,
-            gridwidth = 0.5,
-            gridcolor = 'lightgrey',
-            griddash = 'dot',
-            tickcolor = 'grey',
-            linecolor = 'grey')
+    # Plot IBI signal in the last subplot if provided
+    if ibi is not None:
+        if len(ibi) != len(signal):
+            warnings.warn('`ibi` and `signal` have unmatched lengths. '
+                          'Resampling `ibi`.')
+            ibi_y = scipy_resample(ibi[ibi_col], len(signal))
+        else:
+            ibi_y = ibi[ibi_col]
+        ibi_y_seg = ibi_y[seg_start:seg_end].copy()
+        fig = _ibi_subplot(sig_seg[ax_x], ibi_y_seg, fig)
 
-        # IBI subplot
-        fig.add_trace(
-            go.Scatter(
-                x = ibi_segment[x],
-                y = ibi_segment['IBI'],
-                name = 'IBI',
-                line = dict(color = '#eb4034', width = 1.5),
-                hovertemplate = '<b>IBI</b>: %{y:.2f} ms <extra></extra>'),
-            row = 3, col = 1)
-        fig.update_yaxes(
-            title_text = 'ms',
-            row = 3, col = 1,
-            title_standoff = 1,
-            showgrid = True,
-            gridwidth = 0.5,
-            gridcolor = 'lightgrey',
-            griddash = 'dot',
-            tickcolor = 'grey',
-            linecolor = 'grey')
-
-        # Detected beats
-        fig.add_trace(
-            go.Scatter(
-                x = signal_segment.loc[signal_segment.Beat == 1, x],
-                y = signal_segment.loc[signal_segment.Beat == 1, y],
-                name = 'Detected Beat',
-                showlegend = True,
-                mode = 'markers',
-                marker = dict(color = '#f9c669', size = 6),
-                hovertemplate = beat_hover),
-            row = 2, col = 1)
-
-        # Artifactual beats
-        fig.add_trace(
-            go.Scatter(
-                x = signal_segment.loc[signal_segment.Artifact == 1, x],
-                y = signal_segment.loc[signal_segment.Artifact == 1, y],
-                name = 'Potential Artifact',
-                showlegend = True,
-                mode = 'markers',
-                marker = dict(color = 'red'),
-                hovertemplate = artifact_hover),
-            row = 2, col = 1)
-
-    else:
-        fig = make_subplots(rows = 2, cols = 1,
-                            shared_xaxes = True,
-                            vertical_spacing = 0.02,
-                            row_heights = [0.6, 0.4])
-
-        # ECG/PPG subplot
-        fig.add_trace(
-            go.Scatter(
-                x = x_array,
-                y = signal_segment[y],
-                name = signal_type,
-                showlegend = True,
-                line = dict(color = '#3562bd', width = 1.5),
-                hovertemplate = f'<b>{signal_type}:</b> %{{y:.2f}} {y_axis} '
-                                f'<extra></extra>'),
-            row = 1, col = 1)
-        fig.update_yaxes(
-            title_text = y_axis,
-            row = 1, col = 1,
-            title_standoff = 5,
-            showgrid = True,
-            gridwidth = 0.5,
-            gridcolor = 'lightgrey',
-            griddash = 'dot',
-            tickcolor = 'grey',
-            linecolor = 'grey')
-
-        # IBI subplot
-        fig.add_trace(
-            go.Scatter(
-                x = ibi_segment[x],
-                y = ibi_segment['IBI'],
-                name = 'IBI',
-                line = dict(color = '#eb4034', width = 1.5),
-                hovertemplate = '<b>IBI</b>: %{y:.2f} ms <extra></extra>'),
-            row = 2, col = 1)
-        fig.update_yaxes(
-            title_text = 'ms',
-            row = 2, col = 1, title_standoff = 1,
-            showgrid = True,
-            gridwidth = 0.5,
-            gridcolor = 'lightgrey',
-            griddash = 'dot',
-            tickcolor = 'grey',
-            linecolor = 'grey')
-
-        # Detected beats
-        fig.add_trace(
-            go.Scatter(
-                x = signal_segment.loc[signal_segment.Beat == 1, x],
-                y = signal_segment.loc[signal_segment.Beat == 1, y],
-                name = 'Detected Beat',
-                showlegend = True,
-                mode = 'markers',
-                marker = dict(color = '#f9c669', size = 6),
-                hovertemplate = beat_hover),
-            row = 1, col = 1)
-
-        # Artifactual beats
-        fig.add_trace(
-            go.Scatter(
-                x = signal_segment.loc[signal_segment.Artifact == 1, x],
-                y = signal_segment.loc[signal_segment.Artifact == 1, y],
-                name = 'Potential Artifact',
-                showlegend = True,
-                mode = 'markers',
-                marker = dict(color = 'red'),
-                hovertemplate = artifact_hover),
-            row = 1, col = 1)
-
-    # Format shared x-axis
-    x_min = signal_segment[x].min()
-    x_max = signal_segment[x].max()
+    # General figure formatting
+    x_min, x_max = sig_seg[ax_x].min(), sig_seg[ax_x].max()
     fig.update_xaxes(
         tickfont = dict(size = 14),
         tickcolor = 'grey',
         linecolor = 'grey',
-        range = [x_min, x_max])
-
-    # Format figure
+        range = [x_min, x_max]
+    )
     fig.update_layout(
-        height = 450,
-        title_text = title,
+        height = fig_height,
+        title_text = fig_title,
         template = 'simple_white',
         font = dict(family = 'Poppins', color = 'black'),
-        legend = dict(
-            font = dict(size = 16),
-            orientation = 'h',
-            yanchor = 'bottom',
-            y = 1.05,
-            xanchor = 'right',
-            x = 1.0),
+        legend = dict(font = dict(size = 16), orientation = 'h',
+                      yanchor = 'bottom', y = 1.05,
+                      xanchor = 'right', x = 1.0),
         annotations = [dict(
-            text = x.capitalize(),
-            x = 0.5,
-            y = -0.22,
-            showarrow = False,
-            xref = 'paper',
-            yref = 'paper',
-            font = dict(size = 16)
+            text = ax_x, x = 0.5, y = -0.22, showarrow = False,
+            xref = 'paper', yref = 'paper', font = dict(size = 16)
         )],
         margin = dict(l = 20, r = 20, t = 60, b = 70)
     )
+
     return fig
 
-def plot_signal(df, x, y, fs, seg_size = 60, segment = 1, n_segments = 1,
-                signal_type = None, peaks = None):
-    """
-    Visualize a signal.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        The DataFrame containing the signal data.
-    x : str
-        The column containing the x-axis value (e.g., `'Time'`).
-    y : str, list
-        The column(s) of the signal data (y-axis values).
-    fs : int, float
-        The sampling rate.
-    seg_size : int
-        The size of the segment, in seconds; by default, 60.
-    segment : int, float, None
-        The segment number; by default, 1. For example, segment `1`
-        denotes the first segment of the recording. This argument can also
-        be set to `None` if `df` contains a 'Segment' column.
-    n_segments : int, float
-        The number of segments to be visualized; by default, 1.
-    signal_type : str
-        The type of signal being plotted (i.e., 'ecg', 'bvp', 'acc',
-        'ibi'); by default, None.
-    peaks : str
-        The column containing peak occurrences, i.e., a sequence of
-        `0` and/or `1` denoting False or True occurrences of peaks.
-        By default, peaks will be plotted on the first trace.
-
-    Returns
-    -------
-    fig : matplotlib.axes.AxesSubplot
-        The signal visualization.
-    """
-
-    if segment is None and \
-            'segment' in [c.lower() for c in df.columns.tolist()]:
-        seg = df.loc[(df.Segment >= 1) & (df.Segment <= 2)]
-    else:
-        start = int(segment - 1) * seg_size * fs
-        end = int(((segment - 1) + n_segments) * seg_size * fs)
-        seg = df.iloc[start:end]
-
-    # Set plotting parameters
-    plt.rcParams['font.size'] = 14
-    palette1 = {'blue': '#4c73c2',
-                'red': '#eb4034',
-                'green': '#63b068',
-                'grey': '#bdbdbd'}
-    palette2 = ['#ec2049', '#176196', '#f7db4f', '#63b068']
-
-    # Set up the figure
-    fig = go.Figure()
-
-    # Plot a single signal
-    if not isinstance(y, list):
-        fig.add_trace(go.Scatter(
-            x = seg[x],
-            y = seg[y],
-            mode = 'lines',
-            hovertemplate = '%{x}' + '<br>%{y:.2f}' + '<extra></extra>',
-            name = f'{y}'))
-
-        # Add peaks
-        if peaks != None:
-            fig.add_trace(go.Scatter(
-                x = seg[x],
-                y = np.where(seg[peaks] == 1, seg[y], np.nan),
-                mode = 'markers',
-                marker = dict(size = 8, color = 'gold', line_width = 1),
-                hovertemplate = '<b>Peak</b>: %{y} <extra></extra>',
-                name = 'Peaks'))
-        fig.update_layout(yaxis_title = y)
-
-    # Plot multiple signals
-    else:
-        for yval in range(len(y)):
-            fig.add_trace(go.Scatter(
-                x = seg[x],
-                y = seg[y[yval]],
-                mode = 'lines',
-                line = dict(color = palette2[yval]),
-                hovertemplate = '%{x}' + '<br>%{y:.2f}' + '<extra></extra>',
-                name = f'{y[yval]}'))
-
-        # Add peaks
-        if peaks is not None:
-            fig.add_trace(go.Scatter(
-                x = seg[x],
-                y = np.where(seg[peaks] == 1, seg[y[0]], np.nan),
-                mode = 'markers',
-                marker = dict(size = 8, color = 'gold', line_width = 1),
-                hovertemplate = '<b>Peak</b>: %{y} <extra></extra>',
-                name = 'Peaks'))
-
-    # Format the plot
-    fig.update_layout(
-        xaxis_title = x,
-        template = 'simple_white',
-        height = 300,
-        margin = dict(l = 10, r = 30, b = 50, t = 50, pad = 3)
-    )
-    # Label axes and set trace colors according to signal type
-    if signal_type == 'ecg' or signal_type == 'bvp':
-        if isinstance(y, list):
-            for d in range(len(fig.data)):
-                fig.data[d].line.color = palette2[d]
-            return fig.update_layout(yaxis_title = signal_type.upper())
-        else:
-            return fig.update_traces(
-                line_color = palette1['blue']).update_layout(yaxis_title = y)
-    elif signal_type == 'acc':
-        if isinstance(y, list):
-            for d in range(len(fig.data)):
-                fig.data[d].line.color = palette2[d]
-            return fig.update_layout(yaxis_title = 'm/s<sup>2</sup>')
-        else:
-            return fig.update_traces(
-                line_color = palette1['green']).update_layout(
-                yaxis_title = 'm/s<sup>2</sup>')
-    elif signal_type == 'ibi':
-        if isinstance(y, list):
-            for d in range(len(fig.data)):
-                fig.data[d].line.color = palette2[d]
-            return fig.update_layout(yaxis_title = 'ms')
-        else:
-            return fig.update_traces(
-                line_color = palette1['red']).update_layout(yaxis_title = 'ms')
-    else:
-        return fig
-
-def plot_ibi_from_ecg(df, x, y, segment, n_segments):
-    """
-    Visualize an IBI series generated from ECG data.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        The DataFrame containing the signal data.
-    x : str
-        The column containing the x-axis value (e.g., `'Time'`).
-    y : str
-        The column containing the IBI series (e.g., `'IBI'`).
-    segment : int, float
-        The segment number. For example, segment `1` denotes the first
-        segment of the recording.
-    n_segments : int, float
-        The number of segments to be visualized; by default, 1.
-
-    Returns
-    -------
-    fig : matplotlib.axes.AxesSubplot
-        The IBI series plot.
-    """
-    start = int(segment)
-    end = round(segment + n_segments)
-    seg = df.loc[df['Segment'].between(start, end, inclusive = 'both')]
-    plt.rcParams['font.size'] = 14
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x = seg[x],
-        y = seg[y],
-        mode = 'lines',
-        marker = dict(color = '#eb4034'),
-        hovertemplate = '%{x}' + '<br>%{y:.2f} ms' + '<extra></extra>',
-        name = f'{y}'))
-
-    ymin = np.nanmin(seg[y].values.flatten()) * 0.95
-    ymax = np.nanmax(seg[y].values.flatten()) * 1.05
-    fig.update_layout(
-        yaxis_range = (ymin, ymax),
-        yaxis_title = 'IBI (ms)',
-        xaxis_title = x,
-        template = 'simple_white',
-        height = 300,
-        margin = dict(l = 50, r = 10, b = 50, t = 30, pad = 10)
-    )
-    fig.update_yaxes(
-        title_standoff = 10)
-    return fig
-
-def write_beat_editor_file(data, fs, signal_col, beats_col, ts_col = None,
-                           filename = None):
+def write_beat_editor_file(
+    data: pd.DataFrame,
+    fs: int,
+    signal_col: str,
+    beats_col: str,
+    ts_col: Optional[str] = None,
+    filename: Optional[str] = None,
+    batch: bool = False,
+    verbose: bool = True
+) -> None:
     """
     Create a JSON file for input to the Beat Editor.
 
     Parameters
     ----------
-    data : pd.DataFrame
+    data : pandas.DataFrame
         A DataFrame containing the cardiac data. Must contain at least
         the following columns:
           - Cardiac signal
@@ -1412,12 +1371,19 @@ def write_beat_editor_file(data, fs, signal_col, beats_col, ts_col = None,
     filename : str, optional
         The name of the JSON file to write. If no filename is provided,
         the default filename 'heartview_edit.json' is used.
+    batch : bool, optional
+        Whether input data is from a batch; by default, `False`. If `True`,
+        the JSON file is written to a 'beat-editor/data/batch' subdirectory.
+    verbose : bool, optional
+        If `True`, print a confirmation message after writing the JSON file.
 
     Returns
     -------
     None
     """
     from pathlib import Path
+
+    df = data.copy()
 
     # Set the output JSON filename
     if filename is None:
@@ -1430,34 +1396,46 @@ def write_beat_editor_file(data, fs, signal_col, beats_col, ts_col = None,
     if ts_col:
         required_cols.append(('ts_col', ts_col))
     for name, col in required_cols:
-        if col not in data.columns:
+        if col not in df.columns:
             raise ValueError(f'`{name}` not found in input data.')
 
     # Check if there are any beats
-    if data[beats_col].sum() == 0:
+    if df[beats_col].sum() == 0:
         warnings.warn('No beat occurrences found in input data.', UserWarning)
 
-    # Convert to `datetime` format if provided
+    # Convert timestamps to `datetime` if provided
     if ts_col is not None:
-        data[ts_col] = pd.to_datetime(data[ts_col])
-        data.rename(columns = {ts_col: 'Timestamp'}, inplace = True)
+        df[ts_col] = pd.to_datetime(df[ts_col])
+        df.rename(columns = {ts_col: 'Timestamp'}, inplace = True)
     else:
-        data.insert(0, 'Sample', data.index + 1)
+        if 'Sample' not in df.columns:
+            df.insert(0, 'Sample', df.index + 1)
 
-    # Format columns for JSON keys and save as JSON
-    if 'Segment' not in data.columns:
-        data.insert(0, 'Segment', (data.index // (fs * 60)) + 1)
-    data.rename(columns = {signal_col: 'Signal', beats_col: 'Beat'},
-                inplace = True)
+    # Add 'Segment' column if missing
+    if 'Segment' not in df.columns:
+        df.insert(0, 'Segment', (df.index // (fs * 60)) + 1)
+
+    # Rename columns for Beat Editor formatting
+    df.rename(columns = {signal_col: 'Signal', beats_col: 'Beat'},
+              inplace = True)
+
+    # Save to JSON
     root = Path(__file__).resolve().parents[1]
-    data_dir = root / 'beat-editor' / 'data'
+    if batch:
+        data_dir = root / 'beat-editor' / 'data' / 'batch'
+    else:
+        data_dir = root / 'beat-editor' / 'data'
     data_dir.mkdir(parents = True, exist_ok = True)
     json_path = data_dir / json_filename
-    data.to_json(json_path, orient = 'records', date_format = 'epoch',
-                 lines = False)
-    print(f'Beat Editor JSON file written to {json_path}')
+    df.to_json(json_path, orient = 'records', date_format = 'epoch',
+               lines = False)
+    if verbose:
+        print(f'Beat Editor JSON file written to {json_path}')
 
-def process_beat_edits(orig_data, edits):
+def process_beat_edits(
+    orig_data: pd.DataFrame,
+    edits: pd.DataFrame
+) -> pd.DataFrame:
     """
     Apply manual corrections from the Beat Editor output to original data.
     Edits are aligned either by sample index or timestamp, depending on the
@@ -1465,86 +1443,133 @@ def process_beat_edits(orig_data, edits):
 
     Parameters
     ----------
-    orig_data : pd.DataFrame
+    orig_data : pandas.DataFrame
         A DataFrame containing the original cardiac data inputted to the Beat
         Editor. Must contain a 'Beat' column and either:
         - 'Timestamp' column (datetime), or
         - 'Sample' column (integer sample indices)
-    edits : pd.DataFrame
+    edits : pandas.DataFrame
         A DataFrame of edit instructions parsed from a Beat Editor
-        `_edited.json` file. Must contain the following columns:
-        - 'x': the location of each edit, in the same unit as either
-          `orig_data['Timestamp']` (datetime) or `orig_data['Sample']`
-          (integer)
-        - 'editType': type of edit, with values 'ADD' or 'DELETE'
+        `_edited.json` file.  Must contain:
+        - 'editType': one of 'ADD', 'DELETE', or 'UNUSABLE'
+        - either 'x' (edit location) or 'from' (start of unusable segment,
+          with 'to' as the end), in the same time or sample units as
+          `orig_data`
 
     Returns
     -------
-    processed : pd.DataFrame
+    processed : pandas.DataFrame
         A copy of `orig_data` with the following additional columns:
-        - 'Deletion': 1 where beats were deleted, otherwise NaN
-        - 'Addition': 1 where beats were added, otherwise NaN
-        - 'Unusable': 1 where segments are marked unusable, otherwise NaN
         - 'Edited': 1 where all final beats are, otherwise NaN
-
+        - 'Deleted Beat': 1 where beats were deleted, otherwise NaN
+        - 'Added Beat': 1 where beats were added, otherwise NaN
+        - 'Unusable': 1 where segments are marked unusable, otherwise NaN
     """
-    if all(col not in edits.columns for col in ['x', 'from', 'to']):
-        raise ValueError('Input edits missing necessary columns.')
+
+    # Validate edits input
+    if not {'editType'}.issubset(edits.columns):
+        raise ValueError("`edits` must include columns 'editType'.")
+
+    processed = orig_data.copy()
+    processed['Edited'] = processed['Beat'].values
+    beat_edits = pd.DataFrame()
+    unusable_edits = pd.DataFrame()
+    if 'x' in edits.columns:
+        beat_edits = edits[['x', 'editType']].dropna(subset = ['x']).copy()
+    if {'from', 'to'}.issubset(edits.columns):
+        unusable_edits = edits.dropna(subset = ['from', 'to']).copy()
+
+    # Map by timestamp
+    has_ts = 'Timestamp' in processed.columns
+    if has_ts:
+        # Convert all timestamps to datetime format
+        if not np.issubdtype(processed['Timestamp'].dtype, np.datetime64):
+            processed['Timestamp'] = pd.to_datetime(processed['Timestamp'],
+                                                    errors = 'coerce')
+
+        # Map timestamps of edited beats to nearest timestamp
+        if not beat_edits.empty:
+            beat_edits['Timestamp'] = pd.to_datetime(
+                beat_edits['x'], unit = 'ms', errors = 'coerce')
+
+            # Map edited timestamps to their nearest timestamps
+            left = processed.sort_values('Timestamp')
+            right = beat_edits.sort_values(['Timestamp']).drop_duplicates(
+                subset = ['Timestamp'], keep = 'last').reset_index(drop = True)
+            processed = pd.merge_asof(
+                left, right, on = 'Timestamp', direction = 'nearest',
+                tolerance = pd.Timedelta(milliseconds = 2))
+
+        # Record 'Unusable' portions
+        if not unusable_edits.empty:
+            ft = unusable_edits.copy()[['from', 'to']].copy()
+            ft['from_ts'] = pd.to_datetime(
+                ft['from'], unit = 'ms', errors = 'coerce')
+            ft['to_ts'] = pd.to_datetime(
+                ft['to'], unit = 'ms', errors = 'coerce')
+
+            if not ft.empty:
+                ts = processed['Timestamp'].to_numpy()
+                sorter = np.argsort(ts)
+                ts_sorted = ts[sorter]
+
+                def __nearest_idx(arr_sorted, arr_sorter, query_ts):
+                    pos = np.searchsorted(arr_sorted, query_ts, side = 'left')
+                    left = np.clip(pos - 1, 0, len(arr_sorted) - 1)
+                    right = np.clip(pos, 0, len(arr_sorted) - 1)
+                    ld = np.abs(arr_sorted[left] - query_ts)
+                    rd = np.abs(arr_sorted[right] - query_ts)
+                    pick = np.where(rd < ld, right, left)
+                    return arr_sorter[pick]
+
+                start_ix = __nearest_idx(
+                    ts_sorted, sorter, ft['from_ts'].to_numpy())
+                end_ix = __nearest_idx(
+                    ts_sorted, sorter, ft['to_ts'].to_numpy())
+
+                for s, e in zip(start_ix, end_ix):
+                    if s > e:
+                        s, e = e, s
+                    processed.loc[s:e, 'Unusable'] = 1
+
+    # Map by sample number
     else:
-        processed = orig_data.copy()
+        # Convert all sample values to numeric type
+        processed['Sample'] = pd.to_numeric(
+            processed['Sample'], errors = 'coerce')
+        processed['Sample'] = processed['Sample'].astype('int64')
 
-        # Handle beat insertions/deletions
-        if 'x' in edits.columns:
-            mask_x = edits['x'].notna()
-            if 'Timestamp' in processed.columns:
-                edits.loc[mask_x, 'x'] = pd.to_datetime(
-                    edits.loc[mask_x, 'x'], unit = 'ms', errors = 'coerce')
-            edits.loc[mask_x, 'Sample'] = edits.loc[mask_x, 'x'].apply(
-                lambda x: (processed['Timestamp'] - x).abs().idxmin()
-                if 'Timestamp' in processed.columns else
-                (processed['Sample'] - x).abs().idxmin()
-            )
+        if not beat_edits.empty:
+            beat_edits = beat_edits[['x', 'editType']].dropna(subset = ['x']).copy()
+            beat_edits['Sample'] = pd.to_numeric(
+                beat_edits['x'], errors = 'coerce').round().astype('int64')
 
-        # Handle unusable markings
-        if all(col in edits.columns for col in ['from', 'to']):
-            mask_from = edits['from'].notna()
-            mask_to = edits['to'].notna()
-            if 'Timestamp' in processed.columns:
-                edits.loc[mask_from, 'from'] = pd.to_datetime(
-                    edits.loc[mask_from, 'from'], unit = 'ms',
-                    errors = 'coerce')
-                edits.loc[mask_to, 'to'] = pd.to_datetime(
-                    edits.loc[mask_to, 'to'], unit = 'ms', errors = 'coerce')
+            # Map edited sample indices to their nearest samples within 1 sample
+            left = processed.sort_values('Sample')
+            right = beat_edits.sort_values('Sample').drop_duplicates(
+                subset = 'Sample', keep = 'last')
+            processed = pd.merge_asof(
+                left, right, on = 'Sample', direction = 'nearest',
+                tolerance = 1)
 
-            # Store aligned sample indices
-            edits.loc[mask_from, 'Sample_from'] = edits.loc[
-                mask_from, 'from'].apply(
-                lambda x: (processed['Timestamp'] - x).abs().idxmin()
-                if 'Timestamp' in processed.columns else
-                (processed['Sample'] - x).abs().idxmin()
-            )
-            edits.loc[mask_to, 'Sample_to'] = edits.loc[mask_to, 'to'].apply(
-                lambda x: (processed['Timestamp'] - x).abs().idxmin()
-                if 'Timestamp' in processed.columns else
-                (processed['Sample'] - x).abs().idxmin()
-            )
+        # Record 'Unusable' portions
+        if not unusable_edits.empty:
+            for (f, t) in unusable_edits[['from', 'to']].values:
+                if pd.isna(f) or pd.isna(t):
+                    continue
+                s = int(round(f)); e = int(round(t))
+                if s > e:
+                    s, e = e, s
+                processed.loc[processed.Sample.between(s, e), 'Unusable'] = 1
 
-        # Identify rows for beat deletion and addition
-        deletions = edits.loc[edits.editType == 'DELETE', 'Sample'].values
-        additions = edits.loc[edits.editType == 'ADD', 'Sample'].values
-
-        # Flag deletions and additions in the processed DataFrame
-        processed.loc[deletions, 'Deletion'] = 1
-        processed.loc[additions, 'Addition'] = 1
-
-        # Add 'unusable' labels
-        for start, end in zip(edits.Sample_from, edits.Sample_to):
-            if pd.notna(start) and pd.notna(end):
-                processed.loc[int(start):int(end), 'Unusable'] = 1
-
-        # Add the corrected beat column
-        processed['Edited'] = processed.Beat.copy()
-        processed.loc[processed.Unusable == 1, 'Edited'] = np.nan
-        processed.loc[processed.Deletion == 1, 'Edited'] = np.nan
-        processed.loc[processed.Addition == 1, 'Edited'] = 1
-        return processed
+    # Record final edited beat occurrences
+    deletions_ix = processed[processed['editType'] == 'DELETE'].index.values
+    additions_ix = processed[processed['editType'] == 'ADD'].index.values
+    processed.loc[deletions_ix, 'Deleted Beat'] = 1
+    processed.loc[additions_ix, 'Added Beat'] = 1
+    processed.loc[deletions_ix, 'Edited'] = np.nan
+    if 'Unusable' in processed.columns:
+        processed.loc[processed['Unusable'].eq(1), 'Edited'] = np.nan
+    processed.loc[additions_ix, 'Edited'] = 1
+    processed = processed.drop(columns = ['x', 'editType'], errors = 'ignore')
+    return processed

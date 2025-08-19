@@ -3,7 +3,7 @@
 A to-do list of planned features, improvements, and tasks for HeartView.
 
 ## ✨ Features to Add
-- [ ] **DB:** Batch post-processing functionality with a UI component 
+- [x] **DB:** Batch post-processing functionality with a UI component 
   [@nmy2103]
 - [ ] **BE:** Plotting of tasks/conditions in the signal chart [@tchen94]
 - [ ] **DB:** Automated beat correction functionality with UI component
@@ -14,7 +14,7 @@ A to-do list of planned features, improvements, and tasks for HeartView.
 
 
 ## 🛠️ Improvements
-- [ ] **BE:** Migrate codebase to TypeScript
+- [x] **BE:** Migrate codebase to TypeScript
 - [ ] **BE:** Document or refactor to avoid confusion in the use of undo button
 
 

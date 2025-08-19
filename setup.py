@@ -8,6 +8,7 @@ requirements = [
     'dash_daq==0.5.0',
     'dash_uploader',
     'diskcache',
+    'flirt',
     'matplotlib',
     'multiprocess',
     'numpy==1.26.4',
@@ -23,7 +24,7 @@ requirements = [
 
 setuptools.setup(
     name = 'heartview',
-    version = '2.0.2',
+    version = '2.1.2',
     author = 'Natasha Yamane, Varun Mishra, and Matthew S. Goodwin',
     description = 'A signal quality assessment pipeline for wearable cardiovascular data',
     license = 'GPL-3.0',

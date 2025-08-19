@@ -58,6 +58,10 @@ class Filters:
         activity, and powerline interference.
         """
         nyq = 0.5 * self.fs
+        
+        if highcut >= nyq:
+            raise ValueError(f'highcut must be less than Nyquist frequency ({nyq} Hz).')
+            
         low = lowcut / nyq
         high = highcut / nyq
         b, a = butter(order, [low, high], btype = 'band')
