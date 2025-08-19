@@ -1,5 +1,5 @@
 <div align="center"> 
-  <img src="https://github.com/nmy2103/heartview/blob/main/assets/heartview-logo.png?raw=true" height="100">
+  <img src="https://github.com/nmy2103/heartview/blob/main/assets/heartview-logo.png?raw=true" style="height: 100px;">
   <br>
   <img src="https://badgen.net/badge/python/3.9+/blue">
   <img src="https://badgen.net/badge/license/GPL-3.0/orange">

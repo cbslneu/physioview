@@ -7,6 +7,8 @@ from math import ceil
 from scipy.interpolate import interp1d
 
 DEBUGGING = False
+from scipy.interpolate import interp1d
+
 
 # ============================== CARDIOVASCULAR ==============================
 class Cardio:
@@ -556,8 +558,9 @@ class Cardio:
         n_seg = ceil(len(seconds) / seg_size)
         segments = pd.Series(np.arange(1, n_seg + 1))
         n_expected = (
-                seconds.groupby(seconds.index // seg_size)['Mean HR'].median() * (seg_size / 60)
-        ).fillna(0).astype(int)
+                seconds.groupby(seconds.index // seg_size)[
+                    'Mean HR'].median() * (seg_size / 60)
+        ).fillna(0)
         n_detected = seconds.groupby(
             seconds.index // seg_size)['N Beats'].sum()
         n_missing = (n_expected - n_detected).clip(lower = 0)
@@ -579,6 +582,10 @@ class Cardio:
             n_expected.iloc[-1] = last_expected
             n_missing.iloc[-1] = last_n_missing
             perc_missing.iloc[-1] = last_perc_missing
+
+        # Cast to int
+        n_expected = n_expected.astype(int)
+        n_missing = n_missing.astype(int)
 
         if ts_col is not None:
             timestamps = seconds.groupby(

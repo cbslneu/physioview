@@ -9,6 +9,7 @@ Authors
 |Contributors|
 
 - `Yuna Watanabe <watanabe.y@northeastern.edu>`_, Northeastern University, Boston, MA, USA
+- `Tim Lun Chen <tchen994@gmail.com>`_
 
 .. |Contributors| raw:: html
 
