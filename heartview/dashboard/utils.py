@@ -302,7 +302,7 @@ def _downsample_data(
     x_col = 'Timestamp' if 'Timestamp' in df.columns else 'Sample'
     y_col = 'Filtered' if 'Filtered' in df.columns else signal_type
 
-    ds_factor = max(1, fs // ds_target)
+    ds_factor = max(1, int(fs) // ds_target)
     ds_fs = int(fs / ds_factor)
     ds_idx = np.arange(0, len(df), ds_factor)
 
@@ -315,6 +315,7 @@ def _downsample_data(
         x_col: df[x_col].iloc[ds_idx].to_numpy(),
         y_col: y_dec
     })
+
 
     # Rescale detected and artifactual beat indices
     down_beats = np.rint(
@@ -419,7 +420,7 @@ def _make_excel(
             # Write all other CSV files
             else:
                 df = pd.read_csv(file_path)
-                if 'processed' in str(file_path):
+                if 'cleaned' in str(file_path):
                     fname = file_path.stem.split('_')[-2]
                 else:
                     fname = file_path.stem.split('_')[-1]

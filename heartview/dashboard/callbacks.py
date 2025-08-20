@@ -642,7 +642,9 @@ def get_callbacks(app):
                 if file_type == 'Actiwave':
                     ds = True  # enable downsampling
                     actiwave = heartview.Actiwave(filepath)
-                    data, acc = actiwave.preprocess()
+                    actiwave_data = actiwave.preprocess(time_aligned = True)
+                    data = actiwave_data[['Timestamp', dtype]].copy()
+                    acc = actiwave_data[['Timestamp', 'X', 'Y', 'Z']].copy()
                     acc.to_csv(
                         str(temp_path / f'{file}_ACC.csv'), index = False)
                     fs = actiwave.get_ecg_fs()
@@ -671,15 +673,6 @@ def get_callbacks(app):
                             data = raw[['Timestamp', dtype]].copy()
                             acc = raw[['Timestamp', 'X', 'Y', 'Z']].copy()
 
-                    # Preprocess any acceleration data
-                    try:
-                        acc['Magnitude'] = ACC.compute_magnitude(
-                            acc['X'], acc['Y'], acc['Z'])
-                        acc.to_csv(str(temp_path / f'{file}_ACC.csv'),
-                                   index = False)
-                    except:
-                        acc = None
-
                 # Handle Empatica files
                 elif file_type == 'E4':
                     ds = False  # disable downsampling
@@ -703,6 +696,15 @@ def get_callbacks(app):
                     # BVP data
                     data = e4_data.bvp
                     fs = e4_data.bvp_fs
+
+                # Preprocess any acceleration data
+                try:
+                    acc['Magnitude'] = ACC.compute_magnitude(
+                        acc['X'], acc['Y'], acc['Z'])
+                    acc.to_csv(str(temp_path / f'{file}_ACC.csv'),
+                               index = False)
+                except:
+                    acc = None
 
                 # Preprocess data
                 preprocessed_data = utils._preprocess_cardiac(
