@@ -1,41 +1,59 @@
 # Beat Editor 📈
 
-### Installation for Manual Beat Editor
-**Manual Beat Editor requires Node (v22.x.x +), please be sure to install before proceeding with the installation below**
+**❗️Please ensure Node (v22.x.x +) is installed on your system before 
+proceeding with installation below.**
 <br>
-<br> *Run the following code below to check if Node is installed on your machine:*
+<br> *Check if Node is installed on your machine:*
 ```
 node --version
 ```
 If an error occurs, please refer to this link to install Node on your machine: https://nodejs.org/en/download/package-manager
 
-1. Go to the `beat-editor` directory
+### Installation
+1. Go to the `beat-editor` directory.
 ```
 cd beat-editor
 ```
-2. Install the required modules for beat-editor
+2. Install the required modules for the Beat Editor.
 ```
 npm install
 ```
-3. Go to the `server` folder
+3. Go to the `beat-editor/server` subdirectory.
 ```
 cd server
 ```
-4. Install the required modules for beat-editor's backend
+4. Install the required modules for the Beat Editor's backend.
 ```
 npm install
 ```
 
-### Executing Manual Beat Editor
-1. Navigate to the `server` directory
+### Startup
+1. Navigate to the `beat-editor/server` subdirectory.
 ```
 cd server
 ```
-2. Run the following line to start the backend
+2. Run the following line to start the backend.
 ```
 npm start
 ```
-3. Open up another terminal tab or window and navigate back to `beat-editor`, once there run the line from the following line to start the frontend code.
+3. Open another terminal tab or window, navigate back to the root 
+   `beat-editor` directory, and run:
 ```
 npm run dev
+```
+
+### Using Docker (For Developers) 🐳
+If you are developing the Beat Editor and want an isolated environment 
+without installing Node and `npm` locally, you can use Docker.
+
+1. Make sure [Docker Desktop](https://www.docker.com/products/docker-desktop/) 
+   is installed on your system.
+
+2. From the `beat-editor` directory, run:
+```
+docker compose up
+```
+3. To stop the services, press `Ctrl`+`C` in your terminal or run:
+```
+docker compose down
 ```
