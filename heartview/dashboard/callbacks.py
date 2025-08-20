@@ -809,6 +809,7 @@ def get_callbacks(app):
         if data is None:
             raise PreventUpdate
         else:
+            file = data['filename'].split('.')[0]
             data_type = data['data type']
             signal = pd.read_csv(str(render_dir / 'signal.csv'))
             fs = int(data['fs'])
@@ -854,15 +855,21 @@ def get_callbacks(app):
                     beats_ix_corrected, corrected_ibis, original, corrected = sqa.correct_interval(beats_ix, seg_size=seg_size, print_estimated_hr=False)
                     signal.loc[beats_ix_corrected, 'Corrected'] = 1
                     signal.to_csv(str(render_dir / 'signal.csv'), index = False)
+                    ibi_corrected = heartview.compute_ibis(
+                        signal, fs, beats_ix_corrected, 'Timestamp')
+                    ibi_corrected.to_csv(str(temp_path / f'{file}_IBI_corrected.csv'), index = False)
                     beat_correction_status['status'] = 'suggested'
                 else:
-                    pass
+                    if beat_correction_status['status'] == 'suggested':
+                        ibi_corrected = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
+                    else:
+                        ibi_corrected = None
 
                 # Create the signal subplots
                 overlay_corrected = beat_correction_status['status'] == 'suggested'
                 signal_plots = heartview.plot_cardio_signals(
                     signal, fs, ibi, data_type,
-                    x_axis, y_axis, acc, selected_segment, seg_size, overlay_corrected=overlay_corrected)
+                    x_axis, y_axis, ibi_corrected, acc, selected_segment, seg_size, overlay_corrected=overlay_corrected)
 
             # If EDA data was run
             else:

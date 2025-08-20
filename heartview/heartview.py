@@ -934,7 +934,7 @@ def compute_ibis(data, fs, beats_ix, ts_col = None):
     return ibi
 
 def plot_cardio_signals(signal, fs, ibi, signal_type, x = 'Timestamp',
-                        y = 'Filtered', acc = None, seg_num = 1,
+                        y = 'Filtered', ibi_corrected = None, acc = None, seg_num = 1,
                         seg_size = 60, title = None, overlay_corrected = False):
     """
     Create subplots of the electrocardiograph (ECG) or photoplethysmograph
@@ -987,6 +987,8 @@ def plot_cardio_signals(signal, fs, ibi, signal_type, x = 'Timestamp',
         df[x] = pd.to_datetime(df[x])
     signal_segment = signal.iloc[seg_start:seg_end]
     ibi_segment = ibi.iloc[seg_start:seg_end].dropna()
+    if ibi_corrected is not None:
+        ibi_corrected_segment = ibi_corrected.iloc[seg_start:seg_end].dropna()
 
     x_array = signal_segment[x]
     if not pd.api.types.is_datetime64_any_dtype(x_array):
@@ -1060,6 +1062,15 @@ def plot_cardio_signals(signal, fs, ibi, signal_type, x = 'Timestamp',
                 line = dict(color = '#eb4034', width = 1.5),
                 hovertemplate = '<b>IBI</b>: %{y:.2f} ms <extra></extra>'),
             row = 3, col = 1)
+        if ibi_corrected is not None:
+            fig.add_trace(
+                go.Scatter(
+                    x = ibi_corrected_segment[x],
+                    y = ibi_corrected_segment['IBI'],
+                    name = 'Corrected IBI',
+                    line = dict(color = 'rgba(34, 139, 33, 0.5)', width = 2.0),
+                    hovertemplate = '<b>Corrected IBI</b>: %{y:.2f} ms <extra></extra>'),
+                row = 3, col = 1)
         fig.update_yaxes(
             title_text = 'ms',
             row = 3, col = 1,
