@@ -426,7 +426,19 @@ layout = html.Div(id = 'main', children = [
                     html.Button(children = [
                         html.I(className = 'fa-solid fa-wand-magic-sparkles'),
                         html.Span('Correct Beats')
-                    ], id = 'beat-correction'),
+                    ], id = 'beat-correction', hidden = False),
+                    html.Button(children = [
+                        html.I(className = 'fa-solid fa-circle-check'),
+                        html.Span('Accept Corrections')
+                    ], id = 'accept-corrections', hidden = True),
+                    html.Button(children = [
+                        html.I(className = 'fa-solid fa-circle-xmark'),
+                        html.Span('Reject Corrections')
+                    ], id = 'reject-corrections', hidden = True),
+                    html.Button(children = [
+                        html.I(className = 'fa-solid fa-rotate-left'),
+                        html.Span('Revert Corrections')
+                    ], id = 'revert-corrections', hidden = True),
                     html.Span('|', className = 'separator'),
                     html.H5('Segment:'),
                     html.Button(

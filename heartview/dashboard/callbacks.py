@@ -793,18 +793,28 @@ def get_callbacks(app):
          Output('segment-dropdown', 'value'),
          Output('prev-n-tooltip', 'is_open'),
          Output('next-n-tooltip', 'is_open'),
-         Output('beat-correction-status', 'data')],
+         Output('beat-correction-status', 'data'),
+         Output('beat-correction', 'hidden'),
+         Output('accept-corrections', 'hidden'),
+         Output('reject-corrections', 'hidden'),
+         Output('revert-corrections', 'hidden')],
         Input('memory-db', 'data'),
         Input('segment-dropdown', 'value'),
         Input('prev-segment', 'n_clicks'),
         Input('next-segment', 'n_clicks'),
         Input('beat-correction', 'n_clicks'),
+        Input('accept-corrections', 'n_clicks'),
+        Input('reject-corrections', 'n_clicks'),
+        Input('revert-corrections', 'n_clicks'),
         State('beat-correction-status', 'data'),
         State('seg-size', 'value'),
-        State('segment-dropdown', 'options')
+        State('segment-dropdown', 'options'),
+        State('artifact-method', 'value'),
+        State('artifact-tol', 'value'),
     )
-    def update_signal_plots(data, selected_segment, prev_n, next_n, beat_correction_n,
-                            beat_correction_status, segment_size, segments):
+    def update_signal_plots(data, selected_segment, prev_n, next_n, 
+                            beat_correction_n, accept_corrections_n, reject_corrections_n, revert_corrections_n,
+                            beat_correction_status, segment_size, segments, artifact_method, artifact_tol):
         """Update the raw data plot based on the selected segment view."""
         if data is None:
             raise PreventUpdate
@@ -848,7 +858,6 @@ def get_callbacks(app):
                     else:
                         next_tt_open = True
                 # Correct beats if beat correction button is clicked
-                # TODO: Update ibi and ibi_corrected accordingly
                 if ctx.triggered_id == 'beat-correction':
                     beats_ix = signal.loc[signal['Beat'] == 1].index.tolist()
                     sqa = SQA.Cardio(fs)
@@ -859,7 +868,50 @@ def get_callbacks(app):
                         signal, fs, beats_ix_corrected, 'Timestamp')
                     ibi_corrected.to_csv(str(temp_path / f'{file}_IBI_corrected.csv'), index = False)
                     beat_correction_status['status'] = 'suggested'
+                # Accept corrections and update signal and ibi files
+                elif ctx.triggered_id == 'accept-corrections':
+                    beat_correction_status['status'] = 'accepted'
+                    # Update signal and ibi files to reflect accepted corrections
+                    ibi = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
+                    ibi.to_csv(str(render_dir / 'ibi.csv'), index = False)
+                    ibi_corrected = None
+                    signal = pd.read_csv(str(render_dir / 'signal.csv'))
+                    signal.loc[signal['Beat'] == 1, 'Original Beat'] = 1
+                    signal['Beat'] = None
+                    signal.loc[signal['Corrected'] == 1, 'Beat'] = 1
+                    # Update artifacts
+                    beats_ix = signal.loc[signal['Beat'] == 1].index.tolist()
+                    sqa = SQA.Cardio(fs)
+                    artifacts_ix = sqa.identify_artifacts(
+                        beats_ix, method = artifact_method, tol = artifact_tol,
+                        initial_hr = 'auto')
+                    signal['Artifact'] = None
+                    signal.loc[artifacts_ix, 'Artifact'] = 1
+                    signal.to_csv(str(render_dir / 'signal.csv'), index = False)
+                # Reject corrections and reset beat correction status
+                elif ctx.triggered_id == 'reject-corrections':
+                    beat_correction_status['status'] = None
+                    ibi_corrected = None
+                # Revert corrections and update signal and ibi files to original
+                elif ctx.triggered_id == 'revert-corrections':
+                    beat_correction_status['status'] = None
+                    ibi_corrected = None
+                    signal = pd.read_csv(str(render_dir / 'signal.csv'))
+                    signal['Beat'] = None
+                    signal.loc[signal['Original Beat'] == 1, 'Beat'] = 1
+                    beats_ix = signal.loc[signal['Beat'] == 1].index.tolist()
+                    sqa = SQA.Cardio(fs)
+                    artifacts_ix = sqa.identify_artifacts(
+                        beats_ix, method = artifact_method, tol = artifact_tol,
+                        initial_hr = 'auto')
+                    signal['Artifact'] = None
+                    signal.loc[artifacts_ix, 'Artifact'] = 1
+                    signal.to_csv(str(render_dir / 'signal.csv'), index = False)
+                    ibi = heartview.compute_ibis(
+                        signal, fs, beats_ix, 'Timestamp')
+                    ibi.to_csv(str(render_dir / 'ibi.csv'), index = False)
                 else:
+                    # If beat correction status is suggested, render the corrected ibis
                     if beat_correction_status['status'] == 'suggested':
                         ibi_corrected = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
                     else:
@@ -870,12 +922,17 @@ def get_callbacks(app):
                 signal_plots = heartview.plot_cardio_signals(
                     signal, fs, ibi, data_type,
                     x_axis, y_axis, ibi_corrected, acc, selected_segment, seg_size, overlay_corrected=overlay_corrected)
+                
+                beat_correction_hidden = beat_correction_status['status'] == 'suggested' or beat_correction_status['status'] == 'accepted'
+                accept_corrections_hidden = beat_correction_status['status'] != 'suggested'
+                reject_corrections_hidden = beat_correction_status['status'] != 'suggested'
+                revert_corrections_hidden = beat_correction_status['status'] != 'accepted'
 
             # If EDA data was run
             else:
                 signal_plots = utils._blank_fig()
 
-            return signal_plots, selected_segment, prev_tt_open, next_tt_open, beat_correction_status
+            return signal_plots, selected_segment, prev_tt_open, next_tt_open, beat_correction_status, beat_correction_hidden, accept_corrections_hidden, reject_corrections_hidden, revert_corrections_hidden
 
     # === Open export summary modal ===========================================
     @app.callback(
