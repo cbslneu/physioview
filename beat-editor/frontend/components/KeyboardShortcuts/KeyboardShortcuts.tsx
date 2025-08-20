@@ -54,6 +54,9 @@ const KeyboardShortcuts = () => {
                 <div className="shortcut-item">
                   <div className="shortcut-keys">
                     <i className="fa-solid fa-u keybind"></i>
+                    <i className="fa-solid fa-plus plus"></i>
+                    <img src="../../public/images/right-click.png"
+                         className="rt-click-keybind" width={22} height={22}/>
                   </div>
                   <div className="shortcut-label">Mark Unusable</div>
                 </div>
