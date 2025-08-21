@@ -980,11 +980,11 @@ def plot_signal(
     peaks_label: Optional[str] = None,
     peaks_color: Optional[str] = None,
     artifacts_map: Optional[Dict[str, Union[str, str]]] = None,
+    correction_map: Optional[Dict[str, Union[str, str]]] = None,
     edits_map: Optional[Dict[str, Union[str, str]]] = None,
     acc: Optional[pd.DataFrame] = None,
     ibi: Optional[pd.DataFrame] = None,
     ibi_corrected: Optional[pd.DataFrame] = None,
-    overlay_corrected: Optional[bool] = False,
     seg_number: Optional[int] = 1,
     seg_size: Optional[int] = 60,
     n_segments: Optional[int] = 1,
@@ -1021,6 +1021,11 @@ def plot_signal(
         containing binary (0/1) artifact annotations; by default, None (i.e.,
         no artifacts are plotted). Example: `{'ECG': 'Artifact'}` will plot
         artifact markers from the 'Artifact' column on the ECG subplot.
+    correction_map : dict of {str: str}, optional
+        A dictionary mapping a signal type to the name of a column in `signal`
+        containing binary (0/1) corrected beat annotations; by default, None (i.e.,
+        no corrected peaks are plotted). Example: `{'ECG': 'Corrected'}` will plot
+        corrected beat markers from the 'Corrected' column on the ECG subplot.
     edits_map : dict of {str: str}, optional
         A dictionary mapping a signal type to one or more edit types and
         their corresponding binary (0/1) annotation columns in `signal`; by
@@ -1035,6 +1040,10 @@ def plot_signal(
         'Magnitude' or another numeric column.
     ibi : pandas.DataFrame, optional
         DataFrame containing inter-beat interval (IBI) data. If present,
+        plotted as a secondary signal in the last subplot. Must contain
+        'IBI' or another numeric column.
+    ibi_corrected : pandas.DataFrame, optional
+        DataFrame containing auto-corrected inter-beat interval (IBI) data. If present,
         plotted as a secondary signal in the last subplot. Must contain
         'IBI' or another numeric column.
     seg_number : int, optional
@@ -1070,9 +1079,6 @@ def plot_signal(
     >>>     ibi = ibi_data)
     >>> fig.show()
     """
-    if overlay_corrected and 'Corrected' not in signal.columns:
-        raise NotImplementedError('To overlay corrected beats, auto beat correction must be performed first.')
-
     # Validate axes
     ax_x, ax_y = axes[0], axes[1]
     ax_y = ax_y if isinstance(ax_y, list) else [ax_y]
@@ -1117,7 +1123,7 @@ def plot_signal(
         return row_heights, row_ids
 
     # Count and extract secondary signals
-    has_acc, has_ibi = False, False
+    has_acc, has_ibi, has_ibi_corrected = False, False, False
     n_secondary = 0
     if acc is not None:
         has_acc = True
@@ -1140,6 +1146,15 @@ def plot_signal(
             ibi_col = num_cols[0] if num_cols else None
             warnings.warn(f"'IBI' not found in `ibi` columns. Using "
                           f"{ibi_col} instead.")
+        if ibi_corrected is not None:
+            has_ibi_corrected = True
+            ibi_corrected_col = 'IBI'
+            if ibi_corrected_col not in ibi_corrected.columns:
+                num_cols = ibi_corrected.select_dtypes(
+                    include = 'number').columns.tolist()
+                corrected_ibi_col = num_cols[0] if num_cols else None
+                warnings.warn(f"'IBI' not found in `ibi_corrected` columns. Using "
+                              f"{corrected_ibi_col} instead.")
 
     # Segment data
     seg_len = int(seg_size * fs)
@@ -1178,7 +1193,7 @@ def plot_signal(
         has_peaks = (peaks_map is not None)
         has_artifacts = (artifacts_map is not None)
         has_edits = (edits_map is not None)
-        has_corrected_peaks = (overlay_corrected and 'Corrected' in sig_seg.columns)
+        has_corrected_peaks = (correction_map is not None)
         if (has_edits and 'Unusable' in list(edits_map.values())[0].keys()
                 and 'Unusable' in sig_seg.columns):
             sig_traces = dict(
@@ -1241,8 +1256,7 @@ def plot_signal(
         
         # Plot corrected peaks if provided
         if has_corrected_peaks:
-            corrected_peaks_col = 'Corrected'
-            _peak_color = 'forestgreen' if peaks_color is None else peaks_color
+            corrected_peaks_col = correction_map.get(stype, None)
             fig.add_trace(
                 go.Scatter(
                     x = sig_seg.loc[sig_seg[corrected_peaks_col] == 1, ax_x],
@@ -1329,10 +1343,10 @@ def plot_signal(
             ibi_y = ibi[ibi_col]
         ibi_y_seg = ibi_y[seg_start:seg_end].copy()
         fig = _ibi_subplot(sig_seg[ax_x], ibi_y_seg, fig)
-    if overlay_corrected:
-        ibi_y = ibi_corrected[ibi_col]
-        ibi_y_seg = ibi_y[seg_start:seg_end].copy()
-        fig = _ibi_subplot(sig_seg[ax_x], ibi_y_seg, fig, line_dict = dict(color = 'rgba(34, 139, 33, 0.5)', width = 2.0), name = 'Auto-corrected IBI')
+        if has_ibi_corrected:
+            ibi_y = ibi_corrected[ibi_corrected_col]
+            ibi_y_seg = ibi_y[seg_start:seg_end].copy()
+            fig = _ibi_subplot(sig_seg[ax_x], ibi_y_seg, fig, line_dict = dict(color = 'rgba(34, 139, 33, 0.5)', width = 2.0), name = 'Auto-corrected IBI')
 
     # General figure formatting
     x_min, x_max = sig_seg[ax_x].min(), sig_seg[ax_x].max()

@@ -39,7 +39,8 @@ def _acc_subplot(
             y = acc_y,
             name = name,
             line = line_dict,
-            hovertemplate = f'<b>{name}</b>: %{y:.2f} m/s² <extra></extra>'),
+            hovertemplate = f'<b>{name}</b>: %{{y:.2f}} m/s² <extra></extra>'
+        ),
         row = 1, col = 1)
     fig.update_yaxes(
         title_text = 'm/s²', title_standoff = 5,
@@ -70,7 +71,7 @@ def _ibi_subplot(
             line = line_dict,
             connectgaps = True,
             mode = 'lines',
-            hovertemplate = f'<b>{name}</b>: %{y:.2f} ms <extra></extra>'
+            hovertemplate = f'<b>{name}</b>: %{{y:.2f}} ms <extra></extra>'
         ),
         row = last_row, col = 1
     )

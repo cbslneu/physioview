@@ -1133,15 +1133,16 @@ def get_callbacks(app):
 
                 else:
                     overlay_corrected = beat_correction_status['status'] == 'suggested'
+                    correction_map = {data_type: 'Corrected'} if overlay_corrected else None
                     # Create the signal subplots for uploaded data
                     signal_plots = heartview.plot_signal(
                         signal = signal, signal_type = data_type,
                         axes = (x_axis, y_axis), fs = fs,
                         peaks_map = {data_type: 'Beat'},
                         artifacts_map = {data_type: 'Artifact'},
+                        correction_map = correction_map,
                         acc = acc, ibi = ibi,
                         ibi_corrected = ibi_corrected,
-                        overlay_corrected = overlay_corrected,
                         seg_number = selected_segment,
                         seg_size = segment_size)
 
