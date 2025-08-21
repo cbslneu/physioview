@@ -488,7 +488,8 @@ def get_callbacks(app):
         output = [
             Output('dtype-validator', 'is_open'),
             Output('mapping-validator', 'is_open'),
-            Output('memory-db', 'data')
+            Output('memory-db', 'data'),
+            Output('beat-correction', 'disabled')
         ],
         inputs = [
             Input('run-data', 'n_clicks'),
@@ -750,7 +751,9 @@ def get_callbacks(app):
             set_progress((perc * 100, f'{perc:.0f}%'))
             sleep(0.7)
 
-            return dtype_error, map_error, preprocessed
+            beat_correction_disabled = False
+
+            return dtype_error, map_error, preprocessed, beat_correction_disabled
 
     # == Create Beat Editor editing files =====================================
     @app.callback(

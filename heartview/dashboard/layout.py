@@ -496,7 +496,7 @@ layout = html.Div(id = 'main', children = [
                     html.Button(children = [
                         html.I(className = 'fa-solid fa-wand-magic-sparkles'),
                         html.Span('Auto Beat Correction')
-                    ], id = 'beat-correction', hidden = False),
+                    ], id = 'beat-correction', hidden = False, disabled = True),
                     html.Button(children = [
                         html.I(className = 'fa-solid fa-circle-check'),
                         html.Span('Accept')

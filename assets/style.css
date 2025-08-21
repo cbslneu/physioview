@@ -925,6 +925,8 @@ th:first-child {  /* style only first table header */
 #loading-beat-editor-btn .dash-spinner.dash-dot-spinner {
     font-size: 6px !important;  /* smaller than default (12px) */
 }
+#beat-correction:disabled,
+#revert-corrections:disabled,
 #open-beat-editor:disabled,
 #postprocess-data:disabled {
     background-color: #bababa;
