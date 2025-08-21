@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import dash_bootstrap_components as dbc
 from tqdm import tqdm
 from math import ceil
 from scipy.interpolate import interp1d
@@ -200,51 +199,15 @@ class Cardio:
         metrics['Invalid'] = metrics['N Detected'].apply(
             lambda x: 1 if x < int(min_hr * (seg_size/60)) or x > 220 else np.nan)
 
-        return metrics
-
-    def display_summary_table(self, sqa_df):
-        """
-        Display the SQA summary table.
-
-        Parameters
-        ----------
-        sqa_df : pandas.DataFrame
-            The DataFrame containing the SQA metrics per segment.
-
-        Returns
-        -------
-        table : dash_bootstrap_components.Table
-            Summary table for SQA metrics.
-
-        """
-        missing_n = len(sqa_df.loc[sqa_df['N Missing'] > 0])
-        artifact_n = len(sqa_df.loc[sqa_df['N Artifact'] > 0])
-        invalid_n = len(sqa_df.loc[sqa_df['Invalid'] == 1])
-        avg_missing = '{0:.2f}%'.format(sqa_df['% Missing'].mean())
-        avg_artifact = '{0:.2f}%'.format(
-            sqa_df.loc[sqa_df['% Artifact'] > 0, '% Artifact'].mean())
-
-        summary = pd.DataFrame({
-            'Signal Quality Metrics': ['Segments with Missing Beats',
-                                       'Segments with Artifactual Beats',
-                                       'Segments with Invalid Beats',
-                                       'Average % Missing Beats/Segment',
-                                       'Average % Artifactual Beats/Segment'],
-            '': [missing_n, artifact_n, invalid_n, avg_missing, avg_artifact]
+        metrics = metrics.astype({
+            'Segment': 'Int64',
+            'N Detected': 'Int64',
+            'N Expected': 'Int64',
+            'N Missing': 'Int64',
+            'N Artifact': 'Int64',
         })
 
-        summary.set_index('Signal Quality Metrics', inplace = True)
-
-        table = dbc.Table.from_dataframe(
-            summary,
-            index = True,
-            className = 'segmentTable',
-            striped = False,
-            hover = False,
-            bordered = False
-        )
-
-        return table
+        return metrics
 
     def get_artifacts(self, data, beats_ix, artifacts_ix,
                       seg_size = 60, ts_col = None):
@@ -285,9 +248,9 @@ class Cardio:
         n_seg = ceil(len(df) / (self.fs * seg_size))
         segments = pd.Series(np.arange(1, n_seg + 1))
         n_detected = df.groupby(
-            df.index // (self.fs * seg_size))['Beat'].sum()
+            df.index // (self.fs * seg_size))['Beat'].sum().fillna(0).astype(int)
         n_artifact = df.groupby(
-            df.index // (self.fs * seg_size))['Artifact'].sum()
+            df.index // (self.fs * seg_size))['Artifact'].sum().fillna(0).astype(int)
         perc_artifact = round((n_artifact / n_detected) * 100, 2)
 
         if ts_col is not None:
@@ -435,7 +398,7 @@ class Cardio:
             artifact_beats = []
 
             if len(ibi_diffs) < neighbors:
-                neighbors = len(ibis)
+                neighbors = len(ibi_diffs)
 
             for ii in range(len(ibi_diffs)):
 
@@ -484,11 +447,11 @@ class Cardio:
 
                     bad_neighbors = int(neighbors * 0.25)
                     if ii + (bad_neighbors - 1) < len(beats_ix):
-                        artifact_beats.append(beats_ix[ii:(ii +
-                                                           bad_neighbors)])
+                        artifact_beats.append(
+                            beats_ix[ii + 1:(ii + bad_neighbors + 1)])
                     else:
                         artifact_beats.append(
-                            beats_ix[ii:(ii + (bad_neighbors - 1))])
+                            beats_ix[ii + 1:(ii + (bad_neighbors - 1))])
                     ibi_bad[ii + 1] = 1
 
             artifact_beats = np.array(artifact_beats).flatten()
@@ -576,8 +539,8 @@ class Cardio:
             else:
                 last_perc_missing = 0
                 last_n_missing = 0
-            n_expected.iloc[-1] = last_expected
-            n_missing.iloc[-1] = last_n_missing
+            n_expected.iloc[-1] = int(last_expected)
+            n_missing.iloc[-1] = int(last_n_missing)
             perc_missing.iloc[-1] = last_perc_missing
 
         if ts_col is not None:

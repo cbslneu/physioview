@@ -51,21 +51,22 @@ If you use this software in your research, please cite [this paper](https://link
 }
 ```
 
-## Latest Release [HeartView 2.0.2]
+## Latest Release [HeartView 2.1.2]
 
 ### Pipeline Enhancements:
-- Added Beat Editor data I/O functions.
+- Introduced batch processing support.
+- Added postprocessing features, including heart rate variability (HRV) 
+  extraction.
 
 ### Dashboard Improvements:
-- Added dropdown menus for selecting artifact identification methods.
-- Added dropdown menus for selecting beat detection algorithms.
+- Enabled uploading of ZIP archives for batch processing.
+- Added a dropdown menu to select a subject's data from a batch.
+- Enabled Beat Editor access within a modal.
+- Added rendering of beat edits directly in the dashboard's signal plot.
+- Introduced export functionality for postprocessed data.
 
 ### Beat Editor Improvements:
-- Added save functionality to preserve editing progress.
-- Added keyboard shortcuts for faster navigation and editing.
-
-### Structural Refactoring:
-- Refactored modules for cleaner path handling and clarity.
+- Simplified the interface by removing static text and file names.
 
 For a full list of changes, see the [full changelog](CHANGELOG.md).
 

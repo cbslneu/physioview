@@ -3,14 +3,57 @@ All notable changes to this project will be documented in this file. The
 format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [HeartView 2.0.2] - 2024-07-07
+## [HeartView 2.1.2] - 2025-08-19
+### Added
+* `_plotting.py` module to modularize helper functions and constants for 
+`heartview.plot_signal()`
+* `heartview.write_beat_editor_file()` and `heartview.process_beat_edits()` 
+  functions for creating Beat Editor JSON files and incorporating manual 
+  edits into downstream signal processing
+* `flirt` package to setup requirements
+
+#### Dashboard
+* Dropdown for multi-file selection
+* Button and modal for direct access to the Beat Editor 
+* Rendering of Beat Editor edits directly in the signal plots
+* Button and modal for single- and batch-file postprocessing and export
+* Error prompt for batch upload validation
+* Rendering of signal plots to use a ~250 Hz sampling rate (up from ~125 Hz) 
+  for consistency with Beat Editor data
+* CSS styling for new Beat Editor and postprocessing-related components
+
+### Changed
+* `heartview.plot_signal()` function for multimodal signal plotting 
+  with flexible beat and edit annotations
+* Type hints across codebase for improved readability
+* Package version to 2.1.2 across metadata
+
+#### Pipeline
+* Artifact neighbor selection in `SQA.Cardio.identify_artifacts_cbd()` to 
+  also flag succeeding rather than only preceding beats around artifactual 
+  interbeat intervals
+* Grouped beat and artifact counts to return integers instead of floats with 
+  missing values set to zero in `SQA.Cardio`
+
+#### Dashboard
+* Offcanvas to now close automatically after preprocessing
+* Table title from "Data Summary" to "Quality Summary"
+* Metrics shown in the "Quality Summary" table
+* Position of segment selection dropdown for signal plots
+* Static text for improved clarity
+
+### Removed
+* `heartview.plot_cardio_signals()` (now handled by 
+  `heartview.plot_signal()`)
+
+## [HeartView 2.0.2] - 2025-07-07
 
 ### Added
 
 #### Dashboard
 - Dropdown for artifact identification method selection
 - Dropdown for beat detection algorithm selection
-- Progreess bar in "Export Summary" modal
+- Progress bar in "Export Summary" modal
 
 #### Beat Editor
 - Keyboard shortcuts 
