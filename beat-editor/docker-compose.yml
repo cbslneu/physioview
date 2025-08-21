@@ -10,8 +10,8 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - ./data:/app/data
-      - ./saved:/app/saved
+      - ./data:/data
+      - ./saved:/saved
   frontend:
     build:
       context: ./frontend
