@@ -495,19 +495,19 @@ layout = html.Div(id = 'main', children = [
                 html.Div(className = 'processing-buttons', children = [
                     html.Button(children = [
                         html.I(className = 'fa-solid fa-wand-magic-sparkles'),
-                        html.Span('Correct Beats')
+                        html.Span('Auto Beat Correction')
                     ], id = 'beat-correction', hidden = False),
                     html.Button(children = [
                         html.I(className = 'fa-solid fa-circle-check'),
-                        html.Span('Accept Corrections')
+                        html.Span('Accept')
                     ], id = 'accept-corrections', hidden = True),
                     html.Button(children = [
                         html.I(className = 'fa-solid fa-circle-xmark'),
-                        html.Span('Reject Corrections')
+                        html.Span('Reject')
                     ], id = 'reject-corrections', hidden = True),
                     html.Button(children = [
                         html.I(className = 'fa-solid fa-rotate-left'),
-                        html.Span('Revert Corrections')
+                        html.Span('Revert Auto-Correction')
                     ], id = 'revert-corrections', hidden = True),
                     html.Div(id = 'beat-editor-option', children = [
                         html.Span('|', className = 'separator'),
