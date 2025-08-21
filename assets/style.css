@@ -873,7 +873,12 @@ th:first-child {  /* style only first table header */
     display: flex;
     align-items: center;
 }
-#beat-correction, #accept-corrections, #reject-corrections, #revert-corrections {
+#beat-correction, 
+#accept-corrections, 
+#reject-corrections, 
+#revert-corrections, 
+#postprocess-data, 
+#open-beat-editor {
     width: auto;
     height: 26px;
     background: #313c42;
@@ -884,36 +889,38 @@ th:first-child {  /* style only first table header */
     padding: 0px 4px 0px 5px;
     margin-right: 5px;
 }
-#beat-correction:hover, #accept-corrections:hover, #reject-corrections:hover, #revert-corrections:hover {
+#beat-correction:hover, 
+#accept-corrections:hover, 
+#reject-corrections:hover, 
+#revert-corrections:hover, 
+#postprocess-data:hover, 
+#open-beat-editor:hover {
     background: #ee8a78 !important;
     color: #ffffff !important;
 }
-#beat-correction > i, #reject-corrections > i {  /* magic wand icon */
+#beat-correction > i,
+#reject-corrections > i {  /* magic wand icon */
     transform: rotate(90deg);
     color: #ffffff;
     font-size: 10.5pt;
 }
-#beat-correction > span {
+#beat-correction > span,
+#postprocess-data > span,
+#open-beat-editor > span {
     margin-left: 5px;
 }
-#accept-corrections > i, #revert-corrections > i {  /* check icon */
+#accept-corrections > i, 
+#revert-corrections > i,
+#postprocess-data > i,
+#open-beat-editor > i {  /* check icon */
     color: #ffffff;
     font-size: 10.5pt;
     margin-right: 0.2em;
-#postprocess-option {
+}
+#postprocess-option,
+#beat-editor-option {
     display: inline-flex;
     align-items: center;
-}
-#postprocess-data {
-    width: auto;
-    height: 26px;
-    background: #313c42;
-    font-size: 11pt;
-    display: flex;
-    align-items: center;
-    color: #ffffff;
-    padding: 0px 4px 0px 5px;
-    margin-left: 5px;
 }
 #loading-beat-editor-btn .dash-spinner.dash-dot-spinner {
     font-size: 6px !important;  /* smaller than default (12px) */
@@ -922,31 +929,6 @@ th:first-child {  /* style only first table header */
 #postprocess-data:disabled {
     background-color: #bababa;
     pointer-events: none;
-}
-#open-beat-editor {
-    width: auto;
-    height: 26px;
-    background: #313c42;
-    font-size: 11pt;
-    display: flex;
-    align-items: center;
-    color: #ffffff;
-    padding: 0px 4px 0px 5px;
-    margin: 0px 5px 0px 3px;
-}
-#postprocess-data:hover,
-#open-beat-editor:hover {
-    background: #ee8a78 !important;
-    color: #ffffff !important;
-}
-#postprocess-data > i,
-#open-beat-editor > i {  /* new window icon */
-    color: #ffffff;
-    font-size: 10pt;
-}
-#postprocess-data > span,
-#open-beat-editor > span {
-    margin-left: 5px;
 }
 #edits-made {
     font-weight: 600;

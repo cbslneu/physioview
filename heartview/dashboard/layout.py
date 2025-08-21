@@ -471,22 +471,6 @@ layout = html.Div(id = 'main', children = [
                 html.Div(id = 'graph-settings-left', children = [
                     html.H4('Signal View'),
                     html.Div(className = 'segment-view', children = [
-                        html.Button(children = [
-                            html.I(className = 'fa-solid fa-wand-magic-sparkles'),
-                            html.Span('Correct Beats')
-                        ], id = 'beat-correction', hidden = False),
-                        html.Button(children = [
-                            html.I(className = 'fa-solid fa-circle-check'),
-                            html.Span('Accept Corrections')
-                        ], id = 'accept-corrections', hidden = True),
-                        html.Button(children = [
-                            html.I(className = 'fa-solid fa-circle-xmark'),
-                            html.Span('Reject Corrections')
-                        ], id = 'reject-corrections', hidden = True),
-                        html.Button(children = [
-                            html.I(className = 'fa-solid fa-rotate-left'),
-                            html.Span('Revert Corrections')
-                        ], id = 'revert-corrections', hidden = True),
                         html.Span('|', className = 'separator'),
                         html.H5('Segment:'),
                         html.Button(
@@ -510,13 +494,32 @@ layout = html.Div(id = 'main', children = [
                 ]),
                 html.Div(className = 'processing-buttons', children = [
                     html.Button(children = [
+                        html.I(className = 'fa-solid fa-wand-magic-sparkles'),
+                        html.Span('Correct Beats')
+                    ], id = 'beat-correction', hidden = False),
+                    html.Button(children = [
+                        html.I(className = 'fa-solid fa-circle-check'),
+                        html.Span('Accept Corrections')
+                    ], id = 'accept-corrections', hidden = True),
+                    html.Button(children = [
+                        html.I(className = 'fa-solid fa-circle-xmark'),
+                        html.Span('Reject Corrections')
+                    ], id = 'reject-corrections', hidden = True),
+                    html.Button(children = [
+                        html.I(className = 'fa-solid fa-rotate-left'),
+                        html.Span('Revert Corrections')
+                    ], id = 'revert-corrections', hidden = True),
+                    html.Div(id = 'beat-editor-option', children = [
+                        html.Span('|', className = 'separator'),
+                        html.Button(children = [
                         dbc.Spinner(
                             children = [
                                 html.I(className = 'fa-solid fa-arrow-up-right-from-square')
                             ], id = 'beat-editor-spinner', size = 'sm'),
-                        html.Span('Beat Editor', id = 'beat-editor-btn-label'),
-                    ], id = 'open-beat-editor', n_clicks = 0,
-                        disabled = True),
+                            html.Span('Beat Editor', id = 'beat-editor-btn-label'),
+                        ], id = 'open-beat-editor', n_clicks = 0,
+                            disabled = True),
+                    ]),
                     html.Div(id = 'postprocess-option', children = [
                         html.Span('|', className = 'separator'),
                         html.Button(children = [
