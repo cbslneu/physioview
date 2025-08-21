@@ -7,20 +7,20 @@ proceeding with installation below.**
 ```
 node --version
 ```
-If an error occurs, please refer to this link to install Node on your machine: https://nodejs.org/en/download/package-manager
+If an error occurs, please refer to this link to install Node: https://nodejs.org/en/download/package-manager
 
 ### Installation
-1. Go to the `beat-editor` directory.
+1. Go to the `beat-editor/frontend` directory.
 ```
-cd beat-editor
+cd beat-editor/frontend
 ```
 2. Install the required modules for the Beat Editor.
 ```
 npm install
 ```
-3. Go to the `beat-editor/server` subdirectory.
+3. Go to the `beat-editor/backend` subdirectory.
 ```
-cd server
+cd ../backend
 ```
 4. Install the required modules for the Beat Editor's backend.
 ```
@@ -28,16 +28,12 @@ npm install
 ```
 
 ### Startup
-1. Navigate to the `beat-editor/server` subdirectory.
-```
-cd server
-```
-2. Run the following line to start the backend.
+1. Within the `beat-editor/backend` subdirectory, run:
 ```
 npm start
 ```
-3. Open another terminal tab or window, navigate back to the root 
-   `beat-editor` directory, and run:
+2. Open another Terminal tab or window, navigate back to the 
+   `beat-editor/frontend` directory, and run:
 ```
 npm run dev
 ```
@@ -51,7 +47,15 @@ without installing Node and `npm` locally, you can use Docker.
 
 2. From the `beat-editor` directory, run:
 ```
-docker compose up
+docker compose up -d
+```
+  If the Docker services start successfully, you should see output like:
+```
+[+] Running 4/4
+ ✔ backend                           Built                                                                                                                                                                                                                                                                                                                  0.0s 
+ ✔ frontend                          Built                                                                                                                                                                                                                                                                                                                  0.0s 
+ ✔ Container beat-editor-backend-1   Started                                                                                                                                                                                                                                                                                                                0.1s 
+ ✔ Container beat-editor-frontend-1  Started  
 ```
 3. To stop the services, press `Ctrl`+`C` in your terminal or run:
 ```
