@@ -489,7 +489,6 @@ def get_callbacks(app):
             Output('dtype-validator', 'is_open'),
             Output('mapping-validator', 'is_open'),
             Output('memory-db', 'data'),
-            Output('beat-correction', 'disabled')
         ],
         inputs = [
             Input('run-data', 'n_clicks'),
@@ -751,8 +750,7 @@ def get_callbacks(app):
             set_progress((perc * 100, f'{perc:.0f}%'))
             sleep(0.7)
 
-            beat_correction_disabled = False
-            return dtype_error, map_error, preprocessed, beat_correction_disabled
+            return dtype_error, map_error, preprocessed
 
     # == Create Beat Editor editing files =====================================
     @app.callback(
@@ -768,6 +766,8 @@ def get_callbacks(app):
     def create_beat_editor_files(all_subjects, beat_correction_status, memory, filt_on):
         """Create Beat Editor _edit.json files for uploaded files and
         enable the 'Beat Editor' button."""
+        if memory is None:
+            return None, None, True
         file_type = memory['file type']
         data_type = memory['data type']
         fs = memory['fs']
@@ -967,7 +967,8 @@ def get_callbacks(app):
          Output('beat-correction', 'hidden'),
          Output('accept-corrections', 'hidden'),
          Output('reject-corrections', 'hidden'),
-         Output('revert-corrections', 'hidden')],
+         Output('revert-corrections', 'hidden'),
+         Output('plot-displayed', 'data')],
         [Input('memory-db', 'data'),
          Input('segment-dropdown', 'value'),
          Input('subject-dropdown', 'value'),
@@ -1035,10 +1036,10 @@ def get_callbacks(app):
                 ibi_corrected.to_csv(str(temp_path / f'{file}_IBI_corrected.csv'), index = False)
                 signal, _, ibi_corrected = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix, beats_ix_corrected)
                 ibi_corrected.to_csv(str(render_dir / 'ibi_corrected.csv'), index = False)
-                beat_correction_status['status'] = 'suggested'
+                beat_correction_status = 'suggested'
             # Accept corrections and update signal and ibi files
             elif trig == 'accept-corrections':
-                beat_correction_status['status'] = 'accepted'
+                beat_correction_status = 'accepted'
                 # Update signal and ibi files to reflect accepted corrections
                 ibi = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
                 ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
@@ -1051,11 +1052,11 @@ def get_callbacks(app):
                 signal, _, _ = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix)
             # Reject corrections and reset beat correction status
             elif trig == 'reject-corrections':
-                beat_correction_status['status'] = None
+                beat_correction_status = None
                 ibi_corrected = None
             # Revert corrections and update signal and ibi files to original
             elif trig == 'revert-corrections':
-                beat_correction_status['status'] = None
+                beat_correction_status = None
                 ibi_corrected = None
                 signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
                 signal, beats_ix, artifacts_ix = utils._revert_beat_corrections(
@@ -1077,7 +1078,7 @@ def get_callbacks(app):
                     else:
                         next_tt_open = True
                 # If beat correction status is suggested, render the corrected ibis
-                if beat_correction_status['status'] == 'suggested':
+                if beat_correction_status == 'suggested':
                     ibi_corrected = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
                 else:
                     ibi_corrected = None
@@ -1136,7 +1137,7 @@ def get_callbacks(app):
                     )
 
                 else:
-                    overlay_corrected = beat_correction_status['status'] == 'suggested'
+                    overlay_corrected = beat_correction_status == 'suggested'
                     correction_map = {data_type: 'Corrected'} if overlay_corrected else None
                     # Create the signal subplots for uploaded data
                     signal_plots = heartview.plot_signal(
@@ -1154,12 +1155,15 @@ def get_callbacks(app):
             else:
                 signal_plots = utils._blank_fig()
 
-            beat_correction_hidden = beat_correction_status['status'] == 'suggested' or beat_correction_status['status'] == 'accepted'
-            accept_corrections_hidden = beat_correction_status['status'] != 'suggested'
-            reject_corrections_hidden = beat_correction_status['status'] != 'suggested'
-            revert_corrections_hidden = beat_correction_status['status'] != 'accepted'
+            beat_correction_hidden = beat_correction_status == 'suggested' or beat_correction_status == 'accepted'
+            accept_corrections_hidden = beat_correction_status != 'suggested'
+            reject_corrections_hidden = beat_correction_status != 'suggested'
+            revert_corrections_hidden = beat_correction_status != 'accepted'
 
-            return signal_plots, selected_segment, prev_tt_open, next_tt_open, beat_correction_status, beat_correction_hidden, accept_corrections_hidden, reject_corrections_hidden, revert_corrections_hidden
+            plot_displayed = True
+
+            return signal_plots, selected_segment, prev_tt_open, next_tt_open, beat_correction_status, \
+                   beat_correction_hidden, accept_corrections_hidden, reject_corrections_hidden, revert_corrections_hidden, plot_displayed
 
     # === Open export summary modal ===========================================
     @app.callback(
@@ -1371,6 +1375,24 @@ def get_callbacks(app):
         if export_type is not None:
             return False
         return True
+    
+    # === Enable/Disable Beat Correction buttons ======================================
+    @app.callback(
+        [Output('beat-correction', 'disabled'),
+         Output('revert-corrections', 'disabled')],
+        [Input('plot-displayed', 'data'),
+         Input('be-edited-trigger', 'children')],
+        State('subject-dropdown', 'value')
+    )
+    def update_beat_correction_buttons(plot_displayed, beats_edited, selected_subject):
+        # If the subject has been edited, disable the beat correction button
+        print(f'plot_displayed: {plot_displayed}')
+        if beats_edited == selected_subject:
+            return True, True
+        elif plot_displayed is False:
+            return True, True
+        else:
+            return False, False
 
     # ======================== BEAT EDITOR ELEMENTS ===========================
     # === Update Beat Editor button label and trigger on edit =================

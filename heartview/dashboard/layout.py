@@ -466,7 +466,8 @@ layout = html.Div(id = 'main', children = [
 
         # Bottom Panel: Raw ECG/BVP, IBI, and ACC Plots
         html.Div(className = 'raw-plots', children = [
-            dcc.Store(id = 'beat-correction-status', storage_type = 'memory', data = {'status': None}),
+            dcc.Store(id = 'beat-correction-status', storage_type = 'memory', data = None),
+            dcc.Store(id = 'plot-displayed', storage_type = 'memory', data = False),
             html.Div(className = 'graph-settings', children = [
                 html.Div(id = 'graph-settings-left', children = [
                     html.H4('Signal View'),
@@ -508,7 +509,7 @@ layout = html.Div(id = 'main', children = [
                     html.Button(children = [
                         html.I(className = 'fa-solid fa-rotate-left'),
                         html.Span('Revert Auto-Correction')
-                    ], id = 'revert-corrections', hidden = True),
+                    ], id = 'revert-corrections', hidden = True, disabled = False),
                     html.Div(id = 'beat-editor-option', children = [
                         html.Span('|', className = 'separator'),
                         html.Button(children = [
