@@ -752,7 +752,6 @@ def get_callbacks(app):
             sleep(0.7)
 
             beat_correction_disabled = False
-
             return dtype_error, map_error, preprocessed, beat_correction_disabled
 
     # == Create Beat Editor editing files =====================================
@@ -760,21 +759,23 @@ def get_callbacks(app):
         [Output('be-create-file', 'children'),
          Output('beat-editor-spinner', 'children'),
          Output('open-beat-editor', 'disabled')],
-        Input('subject-dropdown', 'options'),
-        [State('memory-db', 'data'),
+        [Input('subject-dropdown', 'options'),
+         Input('beat-correction-status', 'data'),
+         State('memory-db', 'data'),
          State('toggle-filter', 'on')],
         prevent_initial_call = True
     )
-    def create_beat_editor_files(all_subjects, memory, filt_on):
+    def create_beat_editor_files(all_subjects, beat_correction_status, memory, filt_on):
         """Create Beat Editor _edit.json files for uploaded files and
         enable the 'Beat Editor' button."""
         file_type = memory['file type']
         data_type = memory['data type']
         fs = memory['fs']
         signal_col = 'Filtered' if filt_on else data_type
+        trig = ctx.triggered_id
 
         # Handle batch files
-        if file_type == 'batch':
+        if file_type == 'batch' and trig != 'beat-correction-status':
             filenames = sorted([s for s in all_subjects.values()])
             for name in filenames:
                 data = pd.read_csv(temp_path / f'{name}_{data_type}.csv')
@@ -803,9 +804,14 @@ def get_callbacks(app):
             else:
                 artifacts_ix = None
 
+            # If beat correction triggered, it's already downsampled
+            if trig == 'beat-correction-status':
+                ds = data
+                ds_fs = 250
             # Downsample Beat Editor data to match dashboard render
-            ds, _, _, ds_fs = utils._downsample_data(
-                data, fs, signal_col, beats_ix, artifacts_ix)
+            else:
+                ds, _, _, ds_fs = utils._downsample_data(
+                    data, fs, signal_col, beats_ix, artifacts_ix)
             heartview.write_beat_editor_file(
                 ds, ds_fs, signal_col, 'Beat', ts_col, filename,
                 verbose = False)
@@ -1042,6 +1048,7 @@ def get_callbacks(app):
                 signal['Artifact'] = None
                 signal.loc[artifacts_ix, 'Artifact'] = 1
                 signal.to_csv(str(render_dir / 'signal.csv'), index = False)
+                signal.to_csv(str(temp_path / f'{file}_{data_type}.csv'), index = False)
             # Reject corrections and reset beat correction status
             elif trig == 'reject-corrections':
                 beat_correction_status['status'] = None
