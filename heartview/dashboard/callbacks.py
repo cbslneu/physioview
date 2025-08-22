@@ -760,8 +760,8 @@ def get_callbacks(app):
          Output('beat-editor-spinner', 'children'),
          Output('open-beat-editor', 'disabled')],
         [Input('subject-dropdown', 'options'),
-         Input('beat-correction-status', 'data'),
-         State('memory-db', 'data'),
+         Input('beat-correction-status', 'data')],
+        [State('memory-db', 'data'),
          State('toggle-filter', 'on')],
         prevent_initial_call = True
     )
@@ -787,7 +787,7 @@ def get_callbacks(app):
                     artifacts_ix = None
 
                 # Downsample Beat Editor data to match dashboard render
-                ds, _, _, ds_fs = utils._downsample_data(
+                ds, _, _, _, ds_fs = utils._downsample_data(
                     data, fs, signal_col, beats_ix, artifacts_ix)
                 heartview.write_beat_editor_file(
                     ds, ds_fs, signal_col, 'Beat', ts_col, name,
@@ -804,14 +804,9 @@ def get_callbacks(app):
             else:
                 artifacts_ix = None
 
-            # If beat correction triggered, it's already downsampled
-            if trig == 'beat-correction-status':
-                ds = data
-                ds_fs = 250
             # Downsample Beat Editor data to match dashboard render
-            else:
-                ds, _, _, ds_fs = utils._downsample_data(
-                    data, fs, signal_col, beats_ix, artifacts_ix)
+            ds, _, _, _, ds_fs = utils._downsample_data(
+                data, fs, signal_col, beats_ix, artifacts_ix)
             heartview.write_beat_editor_file(
                 ds, ds_fs, signal_col, 'Beat', ts_col, filename,
                 verbose = False)
@@ -1017,38 +1012,43 @@ def get_callbacks(app):
             prev_tt_open = False
             next_tt_open = False
 
+            def _save_temp_and_render(signal, file, data_type, fs, signal_col, beats_ix, artifacts_ix, corrected_beats_ix = None):
+                beats_ix = np.array(beats_ix)
+                artifacts_ix = np.array(artifacts_ix)
+                if corrected_beats_ix is not None:
+                    corrected_beats_ix = np.array(corrected_beats_ix)
+                signal.to_csv(str(temp_path / f'{file}_{data_type}.csv'), index = False)
+                ds_signal, ds_ibi, ds_ibi_corrected, _, _ = utils._downsample_data(
+                    signal, fs, signal_col, beats_ix, artifacts_ix, corrected_beats_ix)
+                ds_signal.to_csv(str(render_dir / 'signal.csv'), index = False)
+                return ds_signal, ds_ibi, ds_ibi_corrected
+
             # Handle prev/next segment clicks
+            signal_col = 'Filtered' if filt_on else data_type
+            fs_full = memory['fs']
             if trig == 'beat-correction':
-                beats_ix = signal.loc[signal['Beat'] == 1].index.tolist()
-                sqa = SQA.Cardio(fs)
-                beats_ix_corrected, corrected_ibis, original, corrected = sqa.correct_interval(beats_ix, seg_size=segment_size, print_estimated_hr=False)
-                signal.loc[beats_ix_corrected, 'Corrected'] = 1
-                signal.to_csv(str(render_dir / 'signal.csv'), index = False)
-                ibi_corrected = heartview.compute_ibis(
-                    signal, fs, beats_ix_corrected, 'Timestamp')
+                signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
+                beats_ix = signal.loc[signal['Beat'] == 1].index.values
+                artifacts_ix = signal.loc[signal['Artifact'] == 1].index.values
+                signal, beats_ix_corrected, ibi_corrected = utils._correct_beats(
+                    signal, fs_full, beats_ix, segment_size)
                 ibi_corrected.to_csv(str(temp_path / f'{file}_IBI_corrected.csv'), index = False)
+                signal, _, ibi_corrected = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix, beats_ix_corrected)
+                ibi_corrected.to_csv(str(render_dir / 'ibi_corrected.csv'), index = False)
                 beat_correction_status['status'] = 'suggested'
             # Accept corrections and update signal and ibi files
             elif trig == 'accept-corrections':
                 beat_correction_status['status'] = 'accepted'
                 # Update signal and ibi files to reflect accepted corrections
                 ibi = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
+                ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
+                ibi = pd.read_csv(str(render_dir / 'ibi_corrected.csv'))
                 ibi.to_csv(str(render_dir / 'ibi.csv'), index = False)
                 ibi_corrected = None
-                signal = pd.read_csv(str(render_dir / 'signal.csv'))
-                signal.loc[signal['Beat'] == 1, 'Original Beat'] = 1
-                signal['Beat'] = None
-                signal.loc[signal['Corrected'] == 1, 'Beat'] = 1
-                # Update artifacts
-                beats_ix = signal.loc[signal['Beat'] == 1].index.tolist()
-                sqa = SQA.Cardio(fs)
-                artifacts_ix = sqa.identify_artifacts(
-                    beats_ix, method = artifact_method, tol = artifact_tol,
-                    initial_hr = 'auto')
-                signal['Artifact'] = None
-                signal.loc[artifacts_ix, 'Artifact'] = 1
-                signal.to_csv(str(render_dir / 'signal.csv'), index = False)
-                signal.to_csv(str(temp_path / f'{file}_{data_type}.csv'), index = False)
+                signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
+                signal, beats_ix, artifacts_ix = utils._accept_beat_corrections(
+                    signal, fs_full, artifact_method, artifact_tol)
+                signal, _, _ = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix)
             # Reject corrections and reset beat correction status
             elif trig == 'reject-corrections':
                 beat_correction_status['status'] = None
@@ -1057,19 +1057,13 @@ def get_callbacks(app):
             elif trig == 'revert-corrections':
                 beat_correction_status['status'] = None
                 ibi_corrected = None
-                signal = pd.read_csv(str(render_dir / 'signal.csv'))
-                signal['Beat'] = None
-                signal.loc[signal['Original Beat'] == 1, 'Beat'] = 1
-                beats_ix = signal.loc[signal['Beat'] == 1].index.tolist()
-                sqa = SQA.Cardio(fs)
-                artifacts_ix = sqa.identify_artifacts(
-                    beats_ix, method = artifact_method, tol = artifact_tol,
-                    initial_hr = 'auto')
-                signal['Artifact'] = None
-                signal.loc[artifacts_ix, 'Artifact'] = 1
-                signal.to_csv(str(render_dir / 'signal.csv'), index = False)
+                signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
+                signal, beats_ix, artifacts_ix = utils._revert_beat_corrections(
+                    signal, fs_full, artifact_method, artifact_tol)
                 ibi = heartview.compute_ibis(
-                    signal, fs, beats_ix, 'Timestamp')
+                    signal, fs_full, beats_ix, 'Timestamp')
+                ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
+                signal, ibi, _ = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix)
                 ibi.to_csv(str(render_dir / 'ibi.csv'), index = False)
             else:
                 if trig == 'prev-segment':
