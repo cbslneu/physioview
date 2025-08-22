@@ -12,9 +12,9 @@ app.use(bodyParser.json());
 app.use(cors());
 
 // Endpoint for fetching JSON files
-app.get('/fetch-file', async (req, res) => {
-    const dataDir = path.join(__dirname, 'data');
-    const savedDir = path.join(__dirname, 'saved');
+app.get("/fetch-file", async (req, res) => {
+    const dataDir = path.join(__dirname, "..", "data");
+    const savedDir = path.join(__dirname, "..", "saved");
     try {
         const dataFiles = await fs.promises.readdir(dataDir);
         const fileDirJsonFiles = dataFiles.filter(file => file.endsWith('_edit.json'));
@@ -33,7 +33,7 @@ app.get('/fetch-file', async (req, res) => {
             const filePath = path.join(dataDir, file);
             const fileContent = await fs.promises.readFile(filePath, 'utf-8');
             return {
-                fileName: file.replace('_edit.json', ''),
+                fileName: file.replace("_edit.json", ""),
                 data: JSON.parse(fileContent)
             };
         }));
@@ -41,7 +41,7 @@ app.get('/fetch-file', async (req, res) => {
         // If there's a '_edited.json' file, take the data in there too to replot
         const allSavedData = savedFiles.length !== 0 ? await Promise.all(savedDirJsonFiles.map(async (file) => {
             const filePath = path.join(savedDir, file);
-            const fileContent = await fs.promises.readFile(filePath, 'utf-8');
+            const fileContent = await fs.promises.readFile(filePath, "utf-8");
             return {
                 fileName: file,
                 data: JSON.parse(fileContent)
@@ -59,15 +59,15 @@ app.get('/fetch-file', async (req, res) => {
 });
 
 // Endpoint for saving JSON file
-app.post('/saved', async (req, res) => {
+app.post("/saved", async (req, res) => {
     const { fileName, data } = req.body;
-    const savedFilePath = path.join(__dirname, "saved");
+    const savedFilePath = path.join(__dirname, "..", "saved");
     // Checks if /saved exists, if not make it
     if (!fs.existsSync(savedFilePath)) {
         fs.mkdirSync(savedFilePath);
     }
 
-    const filePath = path.join(__dirname, 'saved', `${fileName}_edited.json`);
+    const filePath = path.join(__dirname, "..", "saved", `${fileName}_edited.json`);
 
     try {
         const { addModeCoordinates, deleteModeCoordinates, unusableSegments } = data;
@@ -77,10 +77,10 @@ app.post('/saved', async (req, res) => {
             // Delete the file instead of saving an empty file
             if (fs.existsSync(filePath)) {
                 await fs.promises.unlink(filePath);
-                console.log('File deleted due to empty data:', fileName);
-                res.status(200).send('File deleted due to empty data.');
+                console.log("File deleted due to empty data:", fileName);
+                res.status(200).send("File deleted due to empty data.");
             } else {
-                res.status(200).send('No file to delete.');
+                res.status(200).send("No file to delete.");
             }
             return;
         }
