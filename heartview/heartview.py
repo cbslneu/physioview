@@ -1261,11 +1261,11 @@ def plot_signal(
                 go.Scatter(
                     x = sig_seg.loc[sig_seg[corrected_peaks_col] == 1, ax_x],
                     y = sig_seg.loc[sig_seg[corrected_peaks_col] == 1, ax_y[i]],
-                    name = 'Auto-corrected Beat',
+                    name = 'Auto-Corrected Beat',
                     mode = 'markers',
                     showlegend = True,
                     marker = dict(color='rgba(250, 250, 250, 0.0)', line = dict(color = 'forestgreen', width = 1.5), size = 7),
-                    hovertemplate = f'<b>Auto-corrected Beat</b><extra></extra>'
+                    hovertemplate = f'<b>Auto-Corrected Beat</b><extra></extra>'
                 ),
                 row = row_id, col = 1
             )
@@ -1346,7 +1346,7 @@ def plot_signal(
         if has_ibi_corrected:
             ibi_y = ibi_corrected[ibi_corrected_col]
             ibi_y_seg = ibi_y[seg_start:seg_end].copy()
-            fig = _ibi_subplot(sig_seg[ax_x], ibi_y_seg, fig, line_dict = dict(color = 'rgba(34, 139, 33, 0.5)', width = 2.0), name = 'Auto-corrected IBI')
+            fig = _ibi_subplot(sig_seg[ax_x], ibi_y_seg, fig, line_dict = dict(color = 'rgba(34, 139, 33, 0.5)', width = 2.0), name = 'Auto-Corrected IBI')
 
     # General figure formatting
     x_min, x_max = sig_seg[ax_x].min(), sig_seg[ax_x].max()
