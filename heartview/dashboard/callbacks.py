@@ -996,10 +996,6 @@ def get_callbacks(app):
                             beat_correction_n, accept_corrections_n, reject_corrections_n, revert_corrections_n, beats_edited,
                             all_subjects, beat_correction_status, segment_size, filt_on, segments, artifact_method, artifact_tol):
         """Update the raw data plot based on the selected segment view."""
-        if beat_correction_status == {}:
-            for subject in all_subjects:
-                beat_correction_status[subject] = None
-
         if memory is None:
             raise PreventUpdate
         else:
@@ -1015,9 +1011,15 @@ def get_callbacks(app):
 
             trig = ctx.triggered_id
 
+
             # Reset selected_segment to 1 when new data is loaded
             if trig == 'memory-db':
                 selected_segment = 1
+                beat_correction_status = {}
+
+            if beat_correction_status == {}:
+                for subject in all_subjects:
+                        beat_correction_status[subject] = None
 
             prev_tt_open = False
             next_tt_open = False
