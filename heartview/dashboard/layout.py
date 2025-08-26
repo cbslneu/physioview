@@ -466,7 +466,7 @@ layout = html.Div(id = 'main', children = [
 
         # Bottom Panel: Raw ECG/BVP, IBI, and ACC Plots
         html.Div(className = 'raw-plots', children = [
-            dcc.Store(id = 'beat-correction-status', storage_type = 'memory', data = None),
+            dcc.Store(id = 'beat-correction-status', storage_type = 'memory', data = {}),
             dcc.Store(id = 'plot-displayed', storage_type = 'memory', data = False),
             html.Div(className = 'graph-settings', children = [
                 html.Div(id = 'graph-settings-left', children = [

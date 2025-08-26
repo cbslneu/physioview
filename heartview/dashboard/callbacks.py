@@ -983,7 +983,8 @@ def get_callbacks(app):
          Input('reject-corrections', 'n_clicks'),
          Input('revert-corrections', 'n_clicks'),
          Input('be-edited-trigger', 'children')],
-        [State('beat-correction-status', 'data'),
+        [State('subject-dropdown', 'options'),
+         State('beat-correction-status', 'data'),
          State('seg-size', 'value'),
          State('toggle-filter', 'on'),
          State('segment-dropdown', 'options'),
@@ -993,8 +994,12 @@ def get_callbacks(app):
     )
     def update_signal_plots(memory, selected_segment, selected_subject, prev_n, next_n, 
                             beat_correction_n, accept_corrections_n, reject_corrections_n, revert_corrections_n, beats_edited,
-                            beat_correction_status, segment_size, filt_on, segments, artifact_method, artifact_tol):
+                            all_subjects, beat_correction_status, segment_size, filt_on, segments, artifact_method, artifact_tol):
         """Update the raw data plot based on the selected segment view."""
+        if beat_correction_status == {}:
+            for subject in all_subjects:
+                beat_correction_status[subject] = None
+
         if memory is None:
             raise PreventUpdate
         else:
@@ -1040,10 +1045,10 @@ def get_callbacks(app):
                 ibi_corrected.to_csv(str(temp_path / f'{file}_IBI_corrected.csv'), index = False)
                 signal, _, ibi_corrected = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix, beats_ix_corrected)
                 ibi_corrected.to_csv(str(render_subdir / 'ibi_corrected.csv'), index = False)
-                beat_correction_status = 'suggested'
+                beat_correction_status[selected_subject] = 'suggested'
             # Accept corrections and update signal and ibi files
             elif trig == 'accept-corrections':
-                beat_correction_status = 'accepted'
+                beat_correction_status[selected_subject] = 'accepted'
                 # Update signal and ibi files to reflect accepted corrections
                 ibi = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
                 ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
@@ -1056,11 +1061,11 @@ def get_callbacks(app):
                 signal, _, _ = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix)
             # Reject corrections and reset beat correction status
             elif trig == 'reject-corrections':
-                beat_correction_status = None
+                beat_correction_status[selected_subject] = None
                 ibi_corrected = None
             # Revert corrections and update signal and ibi files to original
             elif trig == 'revert-corrections':
-                beat_correction_status = None
+                beat_correction_status[selected_subject] = None
                 ibi_corrected = None
                 signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
                 signal, beats_ix, artifacts_ix = utils._revert_beat_corrections(
@@ -1082,7 +1087,7 @@ def get_callbacks(app):
                     else:
                         next_tt_open = True
                 # If beat correction status is suggested, render the corrected ibis
-                if beat_correction_status == 'suggested':
+                if beat_correction_status[selected_subject] == 'suggested':
                     ibi_corrected = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
                 else:
                     ibi_corrected = None
@@ -1141,7 +1146,7 @@ def get_callbacks(app):
                     )
 
                 else:
-                    overlay_corrected = beat_correction_status == 'suggested'
+                    overlay_corrected = beat_correction_status[selected_subject] == 'suggested'
                     correction_map = {data_type: 'Corrected'} if overlay_corrected else None
                     # Create the signal subplots for uploaded data
                     signal_plots = heartview.plot_signal(
@@ -1159,10 +1164,10 @@ def get_callbacks(app):
             else:
                 signal_plots = utils._blank_fig()
 
-            beat_correction_hidden = beat_correction_status == 'suggested' or beat_correction_status == 'accepted'
-            accept_corrections_hidden = beat_correction_status != 'suggested'
-            reject_corrections_hidden = beat_correction_status != 'suggested'
-            revert_corrections_hidden = beat_correction_status != 'accepted'
+            beat_correction_hidden = beat_correction_status[selected_subject] == 'suggested' or beat_correction_status[selected_subject] == 'accepted'
+            accept_corrections_hidden = beat_correction_status[selected_subject] != 'suggested'
+            reject_corrections_hidden = beat_correction_status[selected_subject] != 'suggested'
+            revert_corrections_hidden = beat_correction_status[selected_subject] != 'accepted'
 
             plot_displayed = True
 
