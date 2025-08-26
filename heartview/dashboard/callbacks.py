@@ -758,12 +758,13 @@ def get_callbacks(app):
          Output('beat-editor-spinner', 'children'),
          Output('open-beat-editor', 'disabled')],
         [Input('subject-dropdown', 'options'),
+         Input('subject-dropdown', 'value'),
          Input('beat-correction-status', 'data')],
         [State('memory-db', 'data'),
          State('toggle-filter', 'on')],
         prevent_initial_call = True
     )
-    def create_beat_editor_files(all_subjects, beat_correction_status, memory, filt_on):
+    def create_beat_editor_files(all_subjects, selected_subject, beat_correction_status, memory, filt_on):
         """Create Beat Editor _edit.json files for uploaded files and
         enable the 'Beat Editor' button."""
         if memory is None:
@@ -795,7 +796,10 @@ def get_callbacks(app):
 
         # Handle single files
         else:
-            filename = Path(memory['filename']).stem
+            if file_type == 'batch':
+                filename = selected_subject
+            else:
+                filename = Path(memory['filename']).stem
             data = pd.read_csv(str(temp_path / f'{filename}_{data_type}.csv'))
             ts_col = 'Timestamp' if 'Timestamp' in data.columns else None
             beats_ix = data[data.Beat == 1].index.values
@@ -1021,7 +1025,7 @@ def get_callbacks(app):
                 signal.to_csv(str(temp_path / f'{file}_{data_type}.csv'), index = False)
                 ds_signal, ds_ibi, ds_ibi_corrected, _, _ = utils._downsample_data(
                     signal, fs, signal_col, beats_ix, artifacts_ix, corrected_beats_ix)
-                ds_signal.to_csv(str(render_dir / 'signal.csv'), index = False)
+                ds_signal.to_csv(str(render_subdir / 'signal.csv'), index = False)
                 return ds_signal, ds_ibi, ds_ibi_corrected
 
             # Handle prev/next segment clicks
@@ -1035,7 +1039,7 @@ def get_callbacks(app):
                     signal, fs_full, beats_ix, segment_size)
                 ibi_corrected.to_csv(str(temp_path / f'{file}_IBI_corrected.csv'), index = False)
                 signal, _, ibi_corrected = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix, beats_ix_corrected)
-                ibi_corrected.to_csv(str(render_dir / 'ibi_corrected.csv'), index = False)
+                ibi_corrected.to_csv(str(render_subdir / 'ibi_corrected.csv'), index = False)
                 beat_correction_status = 'suggested'
             # Accept corrections and update signal and ibi files
             elif trig == 'accept-corrections':
@@ -1043,8 +1047,8 @@ def get_callbacks(app):
                 # Update signal and ibi files to reflect accepted corrections
                 ibi = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
                 ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
-                ibi = pd.read_csv(str(render_dir / 'ibi_corrected.csv'))
-                ibi.to_csv(str(render_dir / 'ibi.csv'), index = False)
+                ibi = pd.read_csv(str(render_subdir / 'ibi_corrected.csv'))
+                ibi.to_csv(str(render_subdir / 'ibi.csv'), index = False)
                 ibi_corrected = None
                 signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
                 signal, beats_ix, artifacts_ix = utils._accept_beat_corrections(
@@ -1065,7 +1069,7 @@ def get_callbacks(app):
                     signal, fs_full, beats_ix, 'Timestamp')
                 ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
                 signal, ibi, _ = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix)
-                ibi.to_csv(str(render_dir / 'ibi.csv'), index = False)
+                ibi.to_csv(str(render_subdir / 'ibi.csv'), index = False)
             else:
                 if trig == 'prev-segment':
                     if selected_segment > 1:
@@ -1386,7 +1390,6 @@ def get_callbacks(app):
     )
     def update_beat_correction_buttons(plot_displayed, beats_edited, selected_subject):
         # If the subject has been edited, disable the beat correction button
-        print(f'plot_displayed: {plot_displayed}')
         if beats_edited == selected_subject:
             return True, True
         elif plot_displayed is False:
