@@ -751,6 +751,41 @@ def get_callbacks(app):
             sleep(0.7)
 
             return dtype_error, map_error, preprocessed
+    
+    @app.callback(
+        Output('re-render-sqa-flag', 'data'),
+        [Input('beat-correction-status', 'data'),
+         Input('be-edited-trigger', 'children')],
+        [State('memory-db', 'data'),
+         State('subject-dropdown', 'value'),
+         State('seg-size', 'value')],
+        prevent_initial_call = True
+    )
+    def recompute_sqa(beat_correction_status, beats_edited, memory, selected_subject, segment_size):
+        trig = ctx.triggered_id
+        if trig == 'beat-correction-status':
+            if selected_subject not in beat_correction_status.keys():
+                return False
+            elif beat_correction_status[selected_subject] == 'suggested':
+                return False
+        elif trig == 'be-edited-trigger':
+            if beats_edited != selected_subject:
+                return False
+        
+        fs = memory['fs']
+        data_type = memory['data type']
+        sqa = SQA.Cardio(fs)
+        file = selected_subject
+        preprocessed_data = pd.read_csv(str(temp_path / f'{selected_subject}_{data_type}.csv'))
+        ts_col = 'Timestamp' if 'Timestamp' in preprocessed_data.columns else None
+        beats_ix = preprocessed_data[preprocessed_data.Beat == 1].index.values
+        artifacts_ix = preprocessed_data[preprocessed_data.Artifact == 1].index.values
+        metrics = sqa.compute_metrics(
+            preprocessed_data, beats_ix, artifacts_ix, seg_size = segment_size,
+            show_progress = False)
+        metrics.to_csv(str(temp_path / f'{file}_SQA.csv'), index = False)
+
+        return True
 
     # == Create Beat Editor editing files =====================================
     @app.callback(
@@ -885,10 +920,11 @@ def get_callbacks(app):
          Output('postprocess-data', 'disabled')],
         [Input('memory-db', 'data'),
          Input('qa-charts-dropdown', 'value'),
-         Input('subject-dropdown', 'value')],
+         Input('subject-dropdown', 'value'),
+         Input('re-render-sqa-flag', 'data')],
         prevent_initial_call = True
     )
-    def update_sqa_plot(memory, sqa_view, selected_subject):
+    def update_sqa_plot(memory, sqa_view, selected_subject, re_render_sqa_flag):
         """Update the SQA plot based on the selected view and enable the
         'Postprocess' button."""
         file = selected_subject
@@ -917,10 +953,11 @@ def get_callbacks(app):
          Output('postprocess-export-mode', 'options')],
         [Input('memory-db', 'data'),
          Input('subject-dropdown', 'value'),
-         State('subject-dropdown', 'options')],
+         Input('re-render-sqa-flag', 'data'),
+         State('subject-dropdown', 'options'),],
         prevent_initial_call = True
     )
-    def update_sqa_table(memory, selected_subject, all_subjects):
+    def update_sqa_table(memory, selected_subject, re_render_sqa_flag, all_subjects):
         """Update the SQA summary table and export batch options."""
         file = selected_subject
         data_type = memory['data type']

@@ -468,6 +468,7 @@ layout = html.Div(id = 'main', children = [
         html.Div(className = 'raw-plots', children = [
             dcc.Store(id = 'beat-correction-status', storage_type = 'memory', data = {}),
             dcc.Store(id = 'plot-displayed', storage_type = 'memory', data = False),
+            dcc.Store(id = 're-render-sqa-flag', storage_type = 'memory', data = False),
             html.Div(className = 'graph-settings', children = [
                 html.Div(id = 'graph-settings-left', children = [
                     html.H4('Signal View'),
