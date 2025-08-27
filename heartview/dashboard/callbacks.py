@@ -833,8 +833,10 @@ def get_callbacks(app):
         else:
             if file_type == 'batch':
                 filename = selected_subject
+                batch = True
             else:
                 filename = Path(memory['filename']).stem
+                batch = False
             data = pd.read_csv(str(temp_path / f'{filename}_{data_type}.csv'))
             ts_col = 'Timestamp' if 'Timestamp' in data.columns else None
             beats_ix = data[data.Beat == 1].index.values
@@ -848,7 +850,7 @@ def get_callbacks(app):
                 data, fs, signal_col, beats_ix, artifacts_ix)
             heartview.write_beat_editor_file(
                 ds, ds_fs, signal_col, 'Beat', ts_col, filename,
-                verbose = False)
+                batch = batch, verbose = False)
 
         # Beat Editor button icon
         btn_icon = html.I(className = 'fa-solid fa-arrow-up-right-from-square')
