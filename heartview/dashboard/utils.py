@@ -120,12 +120,72 @@ def _preprocess_cardiac(
 
     # Downsample data to at least 125 Hz for quicker plot rendering
     if downsample:
-        ds_data, ds_ibi, ds_acc, ds_fs = _downsample_data(
+        ds_data, ds_ibi, _, ds_acc, ds_fs = _downsample_data(
             preprocessed_data, fs, 'ECG', beats_ix, artifacts_ix,
             acc = acc_data)
         return preprocessed_data, ibi, metrics, ds_data, ds_ibi, ds_acc, ds_fs
     else:
         return preprocessed_data, ibi, metrics
+
+def _correct_beats(
+    signal: pd.DataFrame,
+    fs: int,
+    beats_ix: list[int],
+    segment_size: int
+):
+    """Correct the beats in a signal."""
+    signal = signal.copy()
+    sqa = SQA.Cardio(fs)
+    beats_ix_corrected, _, _, _ = \
+        sqa.correct_interval(beats_ix, seg_size = segment_size, print_estimated_hr = False)
+    signal.loc[beats_ix_corrected, 'Corrected'] = 1
+    ibi_corrected = compute_ibis(signal, fs, beats_ix_corrected, 'Timestamp')
+    
+    return signal, beats_ix_corrected, ibi_corrected
+
+def _accept_beat_corrections(
+    signal: pd.DataFrame,
+    fs: int,
+    artifact_method: str,
+    artifact_tol: float
+):
+    """Accept the suggested automatic beat corrections in a signal."""
+    signal = signal.copy()
+    # Save original beat indices
+    signal.loc[signal['Beat'] == 1, 'Original Beat'] = 1
+    # Reset beat column
+    signal['Beat'] = None
+    # Update beat column with corrected beats
+    signal.loc[signal['Corrected'] == 1, 'Beat'] = 1
+    signal.drop(columns = ['Corrected'], inplace = True)
+    # Update artifacts
+    beats_ix = signal.loc[signal['Beat'] == 1].index.values
+    sqa = SQA.Cardio(fs)
+    artifacts_ix = sqa.identify_artifacts(
+        beats_ix, method = artifact_method, tol = artifact_tol,
+        initial_hr = 'auto')
+    signal['Artifact'] = None
+    signal.loc[artifacts_ix, 'Artifact'] = 1
+    return signal, beats_ix, artifacts_ix
+
+def _revert_beat_corrections(
+    signal: pd.DataFrame,
+    fs: int,
+    artifact_method: str,
+    artifact_tol: float
+):
+    """Revert the beat corrections in a signal."""
+    signal = signal.copy()
+    signal['Beat'] = None
+    signal.loc[signal['Original Beat'] == 1, 'Beat'] = 1
+    beats_ix = signal.loc[signal['Beat'] == 1].index.values
+    sqa = SQA.Cardio(fs)
+    artifacts_ix = sqa.identify_artifacts(
+        beats_ix, method = artifact_method, tol = artifact_tol,
+        initial_hr = 'auto')
+    signal['Artifact'] = None
+    signal.loc[artifacts_ix, 'Artifact'] = 1
+    return signal, beats_ix, artifacts_ix
 
 # ===================== HeartView Dashboard UI Functions =====================
 def _check_csv(name) -> bool:
@@ -292,6 +352,7 @@ def _downsample_data(
     signal_type: str,
     beats_ix: Union[list[int], np.ndarray],
     artifacts_ix: Union[list[int], np.ndarray],
+    corrected_beats_ix: Union[list[int], np.ndarray] = None,
     ds_target: int = 250,
     acc: Optional[pd.DataFrame] = None
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, float]:
@@ -324,9 +385,17 @@ def _downsample_data(
         artifacts_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
     ds.loc[down_beats, 'Beat'] = 1
     ds.loc[down_artifacts, 'Artifact'] = 1
+    if corrected_beats_ix is not None:
+        down_corrected_beats = np.rint(
+            corrected_beats_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
+        ds.loc[down_corrected_beats, 'Corrected'] = 1
 
     # Downsample IBI data
     ds_ibi = compute_ibis(ds, ds_fs, down_beats, ts_col = x_col)
+    if corrected_beats_ix is not None:
+        ds_ibi_corrected = compute_ibis(ds, ds_fs, down_corrected_beats, ts_col = x_col)
+    else:
+        ds_ibi_corrected = None
 
     # Downsample acceleration data
     if acc is not None:
@@ -340,7 +409,7 @@ def _downsample_data(
                                'Magnitude': acc_dec})
     else:
         ds_acc = None
-    return ds, ds_ibi, ds_acc, ds_fs
+    return ds, ds_ibi, ds_ibi_corrected, ds_acc, ds_fs
 
 def _cardiac_summary_table(sqa_df: pd.DataFrame) -> dbc.Table:
     """Display the SQA summary table."""

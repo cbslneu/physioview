@@ -466,6 +466,9 @@ layout = html.Div(id = 'main', children = [
 
         # Bottom Panel: Raw ECG/BVP, IBI, and ACC Plots
         html.Div(className = 'raw-plots', children = [
+            dcc.Store(id = 'beat-correction-status', storage_type = 'memory', data = {}),
+            dcc.Store(id = 'plot-displayed', storage_type = 'memory', data = False),
+            dcc.Store(id = 're-render-sqa-flag', storage_type = 'memory', data = False),
             html.Div(className = 'graph-settings', children = [
                 html.Div(id = 'graph-settings-left', children = [
                     html.H4('Signal View'),
@@ -493,13 +496,32 @@ layout = html.Div(id = 'main', children = [
                 ]),
                 html.Div(className = 'processing-buttons', children = [
                     html.Button(children = [
+                        html.I(className = 'fa-solid fa-wand-magic-sparkles'),
+                        html.Span('Auto Beat Correction')
+                    ], id = 'beat-correction', hidden = False, disabled = True),
+                    html.Button(children = [
+                        html.I(className = 'fa-solid fa-circle-check'),
+                        html.Span('Accept')
+                    ], id = 'accept-corrections', hidden = True),
+                    html.Button(children = [
+                        html.I(className = 'fa-solid fa-circle-xmark'),
+                        html.Span('Reject')
+                    ], id = 'reject-corrections', hidden = True),
+                    html.Button(children = [
+                        html.I(className = 'fa-solid fa-rotate-left'),
+                        html.Span('Revert Auto-Correction')
+                    ], id = 'revert-corrections', hidden = True, disabled = False),
+                    html.Div(id = 'beat-editor-option', children = [
+                        html.Span('|', className = 'separator'),
+                        html.Button(children = [
                         dbc.Spinner(
                             children = [
                                 html.I(className = 'fa-solid fa-arrow-up-right-from-square')
                             ], id = 'beat-editor-spinner', size = 'sm'),
-                        html.Span('Beat Editor', id = 'beat-editor-btn-label'),
-                    ], id = 'open-beat-editor', n_clicks = 0,
-                        disabled = True),
+                            html.Span('Beat Editor', id = 'beat-editor-btn-label'),
+                        ], id = 'open-beat-editor', n_clicks = 0,
+                            disabled = True),
+                    ]),
                     html.Div(id = 'postprocess-option', children = [
                         html.Span('|', className = 'separator'),
                         html.Button(children = [

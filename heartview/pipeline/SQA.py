@@ -5,6 +5,7 @@ from tqdm import tqdm
 from math import ceil
 from scipy.interpolate import interp1d
 
+DEBUGGING = False
 
 # ============================== CARDIOVASCULAR ==============================
 class Cardio:
@@ -666,6 +667,684 @@ class Cardio:
             s += 1
         interval_data = pd.DataFrame(interval_data)
         return interval_data
+    
+    def correct_interval(self, beats_ix, seg_size = 60, initial_hr = 'auto', prev_n = 6, min_bpm = 40, max_bpm = 200, 
+                            hr_estimate_window = 6, print_estimated_hr = True, short_threshold = (24 / 32),  long_threshold = (44 / 32), extra_threshold = (52 / 32)):
+        '''
+        Correct artifactual beats in cardiovascular data based
+        on the approach by Hegarty-Craver et al. (2018).
+
+        Parameters
+        ----------
+        beats_ix : array_like
+            An array containing the indices of detected beats.
+        initial_hr : int, float, optional
+            The heart rate value for the first interbeat interval (IBI) to be
+            validated against; by default, automatically set ('auto').
+        prev_n : int, optional
+            The number of preceding IBIs to validate against; by default, 6.
+        min_bpm : int, optional
+            The minimum possible heart rate in beats per minute (bpm); by default, 40.
+        max_bpm : int, optional
+            The maximum possible heart rate in beats per minute (bpm); by default, 200.
+        hr_estimate_window : int, optional
+            The window size for estimating the heart rate; by default, 6.
+        print_estimated_hr : bool, optional
+            Whether to print the estimated heart rate; by default, True.
+        short_threshold : float, optional
+            The threshold for short IBIs; by default, 24/32.
+        long_threshold : float, optional
+            The threshold for long IBIs; by default, 44/32.
+        extra_threshold : float, optional
+            The threshold for extra long IBIs; by default, 52/32.
+
+        Returns
+        -------
+        beats_ix_corrected: array_like
+            An array containing the indices of corrected beats.
+        original: pandas.DataFrame
+            A data frame containing the original IBIs (millisecond-based and index-based) and beat indices.
+        corrected: pandas.DataFrame
+            A data frame containing the corrected IBIs (millisecond-based and index-based) and beat indices.
+
+        References
+        ----------
+        Hegarty-Craver, M. et al. (2018). Automated respiratory sinus
+        arrhythmia measurement: Demonstration using executive function
+        assessment. Behavioral Research Methods, 50, 1816–1823.
+        '''
+        global MIN_BPM, MAX_BPM
+        MIN_BPM = min_bpm
+        MAX_BPM = max_bpm
+        
+        ibis = np.diff(beats_ix)
+        # drop the first beat
+        beats = beats_ix[1:]
+
+        global cnt, corrected_ibis, corrected_beats, corrected_flags
+        global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
+        # increment when correcting the ibi and decrement when accepting the ibi
+        cnt = 0
+        # initialize
+        prev_ibi = 0
+        prev_beat = 0
+        prev_flag = None
+        current_ibi = 0
+        current_beat = 0
+        current_flag = None
+        corrected_ibis = []
+        corrected_beats = []
+        corrected_flags = []
+        correction_flags = [0 for i in range(len(beats))]
+        
+        # Set the initial IBI to compare against
+        global prev_ibis_fifo, first_ibi, correction_failed
+        if initial_hr == 'auto':
+            successive_diff = np.abs(np.diff(ibis))
+            min_diff_ix = np.convolve(successive_diff, np.ones(hr_estimate_window) / hr_estimate_window, mode = 'valid').argmin()
+            first_ibi = ibis[min_diff_ix:min_diff_ix + hr_estimate_window].mean()
+            if print_estimated_hr:
+                print('Estimated average HR (bpm): ', np.floor(60 / (first_ibi / self.fs)))
+        else:
+            first_ibi = self.fs * 60 / initial_hr
+        
+        # FIFO for the previous n+1 IBIs
+        prev_ibis_fifo = self._MaxNFifo(prev_n, first_ibi)
+        # Store whether the correction failed for the last n IBIs
+        correction_failed = self._MaxNFifo(prev_n - 1)
+
+        def _estimate_ibi(prev_ibis):
+            '''
+            Estimate IBI based on the previous IBIs.
+            
+            Parameters
+            ---------------------
+            prev_ibis: array_like
+                A list of prev_n number of previous IBIs.
+            
+            Returns
+            ---------------------
+            estimated_ibi : int
+            '''
+            return np.median(prev_ibis)
+
+        def _return_flag(current_ibi, prev_ibis = None):
+            '''
+            Return whether the current IBI is correct, short, long, or extra long based on the previous IBIs.
+                Correct: 26/32 - 44/32 of the estimated IBI
+                Short: < 26/32 of the estimated IBI
+                Long: > 44/32 and < 54/32 of the estimated IBI
+                Extra Long: > 54/32 of the estimated IBI
+            
+            Parameters
+            ---------------------
+            current_ibi: int
+                current IBI value in the number of indices.
+            prev_ibis: array_like, optional
+                A list of prev_n number of previous IBIs.
+            
+            Returns
+            ---------------------
+            flag : str
+                The flag of the current IBI: 'Correct', 'Short', 'Long', or 'Extra Long'.
+            '''
+            # Calculate the estimated IBI
+            estimated_ibi = _estimate_ibi(prev_ibis)
+
+            # Set the acceptable/valid range of IBIs
+            low = short_threshold * estimated_ibi
+            high = long_threshold * estimated_ibi
+            extra = extra_threshold * estimated_ibi
+
+            # flag the ibi: correct, short, long, or extra long
+            if low <= current_ibi <= high:
+                flag = 'Correct'
+            elif current_ibi < low:
+                flag = 'Short'
+            elif current_ibi > high and current_ibi < extra:
+                flag = 'Long'
+            else:
+                flag = 'Extra Long'
+            
+            return flag
+        
+        def _acceptance_check(corrected_ibi, prev_ibis):
+            '''
+            Check if the corrected IBI is acceptable (falls within the 27/32 - 42/32 of the estimated IBI).
+
+            Parameters
+            ---------------------
+            corrected_ibi: int
+                The corrected IBI value.
+            prev_ibis: array_like
+                A list of prev_n number of previous IBIs.
+            
+            Returns
+            ---------------------
+            bool
+                True if the corrected IBI is within the acceptable range, False otherwise.
+            '''
+            # Calculate the estimated IBI
+            estimated_ibi = _estimate_ibi(prev_ibis)
+            
+            # Set the acceptable/valid range of IBIs
+            low = short_threshold * estimated_ibi
+            high = long_threshold * estimated_ibi
+
+            # If the corrected value is within the range, return True
+            if corrected_ibi >= low and corrected_ibi <= high:
+            #if corrected_ibi <= high:
+                return True
+            else:
+                return False
+
+        def _accept_ibi(n, correction_failed_flag = 0):
+            '''
+            Accept the current IBI without correction.
+
+            Parameters
+            ---------------------
+            n : int
+                The index of the current IBI.
+            correction_failed_flag : int, optional
+                Flag to indicate whether the correction failed for the current IBI; by default, 0.
+                If the flag is 1, the correction failed for the current IBI.
+            '''
+            global prev_ibis_fifo, cnt, correction_failed
+            global corrected_ibis, corrected_beats, corrected_flags
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag
+            
+            # Check if the previous IBI is within the limits before accepting the current IBI
+            _check_limits(n)
+
+            # Fix the previous IBI
+            corrected_ibis.append(prev_ibi)
+            corrected_beats.append(prev_beat)
+            corrected_flags.append(prev_flag)
+
+            # Add the previous IBI to the queue
+            prev_ibis_fifo.push(prev_ibi)
+
+            # Update the previous IBI to the current IBI
+            prev_ibi = current_ibi
+            prev_beat = current_beat
+            prev_flag = current_flag
+            
+            # Decrement the counter
+            cnt = max(0, cnt-1)
+            if DEBUGGING:
+                print('accepted:', current_ibi, ' flag:', current_flag, ' based on ', prev_ibis_fifo.get_queue()[1:])
+            # If the correction failed for the current IBI, push 1 to the correction_failed FIFO, otherwise push 0
+            if correction_failed_flag == 0:
+                correction_failed.push(0)
+            else:
+                correction_failed.push(1)
+        
+        def _add_prev_and_current(n):
+            '''
+            Add the previous and current IBIs if the sum is less than 42/32 of the estimated IBI.
+
+            Parameters
+            ---------------------
+            n : int
+                The index of the current IBI.
+            '''
+            global prev_ibis_fifo, cnt
+            global corrected_ibis, corrected_beats, corrected_flags
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
+            
+            # Add the previous and current IBIs
+            corrected_ibi = prev_ibi + current_ibi
+
+            # Check if the corrected IBI is acceptable
+            if _acceptance_check(corrected_ibi, prev_ibis_fifo.get_queue()[1:]):
+                # Update the current IBI to the corrected IBI
+                current_ibi = corrected_ibi
+                current_beat = current_beat
+                current_flag = _return_flag(current_ibi, prev_ibis_fifo.get_queue()[1:])
+
+                if n == 1:
+                    # Update the previous IBI to the current IBI
+                    prev_ibi = current_ibi
+                    prev_beat = current_beat
+                    prev_flag = current_flag
+
+                else:
+                    # Pull up the second previous IBI as previous IBI
+                    prev_ibi = corrected_ibis[-1]
+                    prev_beat = corrected_beats[-1]
+                    prev_flag = corrected_flags[-1]
+                    
+                    # Check if the previous IBI is within the limits before accepting the current IBI
+                    _check_limits(n)
+                    
+                    # Check_limits function may update the previous IBI pulled, so update the value
+                    corrected_ibis[-1] = prev_ibi
+                    corrected_beats[-1] = prev_beat
+                    corrected_flags[-1] = prev_flag
+
+                    # Update the last IBI value in the queue
+                    prev_ibis_fifo.change_last(prev_ibi)
+
+                    # Update the previous IBI to the current IBI
+                    prev_ibi = current_ibi
+                    prev_beat = current_beat
+                    prev_flag = current_flag
+
+                # Flag that previous and current IBIs are corrected
+                correction_flags[n-1] = 1
+                correction_flags[n] = 1
+
+                # Increment the counter
+                cnt += 1
+
+                if DEBUGGING:
+                    print('added:', current_ibi, ' flag:', current_flag, ' based on ', prev_ibis_fifo.get_queue()[1:])
+            else:
+                if DEBUGGING:
+                    print('acceptance check failed for adding: ', corrected_ibi)
+                # If the corrected IBI is not acceptable, accept the current IBI
+                _accept_ibi(n, correction_failed_flag=1)
+        
+        def _add_secondprev_and_prev(n):
+            '''
+            Add the second previous and previous IBIs if the sum is less than 42/32 of the estimated IBI.
+
+            Parameters
+            ---------------------
+            n : int
+                The index of the current IBI.
+            '''
+            global prev_ibis_fifo, cnt
+            global corrected_ibis, corrected_beats, corrected_flags
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
+            
+            # Add the previous and current IBIs
+            corrected_ibi = corrected_ibis[-1] + prev_ibi
+
+            # Check if the corrected IBI is acceptable
+            # Use IBIs before the second previous IBI
+            if _acceptance_check(corrected_ibi, prev_ibis_fifo.get_queue()[:-2]):
+                # Update the current IBI to the corrected IBI
+                
+                # Pull up the second previous IBI as previous IBI
+                prev_ibi = corrected_ibi
+                prev_beat = prev_beat
+                prev_flag = _return_flag(prev_ibi, prev_ibis_fifo.get_queue()[:-2])
+                
+                # Check if the previous IBI is within the limits before accepting the current IBI
+                _check_limits(n)
+                
+                # Update the value
+                corrected_ibis[-1] = prev_ibi
+                corrected_beats[-1] = prev_beat
+                corrected_flags[-1] = prev_flag
+
+                # Update the last IBI value in the queue
+                prev_ibis_fifo.change_last(prev_ibi)
+
+                # Update the previous IBI to the current IBI
+                prev_ibi = current_ibi
+                prev_beat = current_beat
+                prev_flag = current_flag
+
+                # Flag that previous and current IBIs are corrected
+                correction_flags[n-2] = 1
+                correction_flags[n-1] = 1
+
+                # Increment the counter
+                cnt += 1
+
+                if DEBUGGING:
+                    print('added second prev + prev:', prev_ibi, ' flag:', prev_flag, ' based on ', prev_ibis_fifo.get_queue()[:-2])
+            else:
+                if DEBUGGING:
+                    print('acceptance check failed for adding second prev + prev: ', corrected_ibi)
+                # If the corrected IBI is not acceptable, accept the current IBI
+                _accept_ibi(n, correction_failed_flag=1)
+                
+        def _insert_interval(n):
+            '''
+            Split the (previous IBI + current IBI) into multiple intervals. 
+            The number of splits is determined based on the initial_hr parameter.
+            
+            Parameters
+            ---------------------
+            n : int
+                The index of the current IBI.
+            '''
+            global prev_ibis_fifo, cnt, first_ibi
+            global corrected_ibis, corrected_beats, corrected_flags
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
+
+            # Calculate the number of splits
+            n_split = round((prev_ibi + current_ibi) / _estimate_ibi(prev_ibis_fifo.get_queue()[1:]), 0).astype(int)
+
+            # Calculate the new IBI
+            ibi = np.floor((prev_ibi + current_ibi) / n_split)
+
+            # Check if the corrected IBI is acceptable
+            if _acceptance_check(ibi, prev_ibis_fifo.get_queue()[1:]):
+                # Fix inserted IBIs other than previous/current IBIs
+                for i in range(n_split - 2):
+                    corrected_ibis.append(ibi)
+                    corrected_flags.append(_return_flag(ibi, prev_ibis_fifo.get_queue()[1:]))
+                    if (n == 1 and i == 0) | (len(corrected_beats) == 0):
+                        corrected_beats.append(beats_ix[0] + ibi)
+                    else:
+                        corrected_beats.append(corrected_beats[-1] + ibi)
+                    # Add to the queue
+                    prev_ibis_fifo.push(ibi)
+
+                # Update the previous IBI
+                prev_ibi = ibi
+                if len(corrected_beats) > 0:
+                    prev_beat = corrected_beats[-1] + ibi
+                else:
+                    prev_beat = beats_ix[0] + ibi
+                prev_flag = _return_flag(ibi, prev_ibis_fifo.get_queue()[:-1])
+
+                # Update the current IBI
+                current_ibi = current_beat - prev_beat
+                current_flag = _return_flag(ibi, prev_ibis_fifo.get_queue()[1:])
+
+                # Check if the previous IBI is within the limits
+                _check_limits(n)
+
+                # Fix the previous IBI
+                corrected_ibis.append(prev_ibi)
+                corrected_beats.append(prev_beat)
+                corrected_flags.append(prev_flag)
+
+                # Add to the queue
+                prev_ibis_fifo.push(prev_ibi)
+                
+                # Update the previous IBI to the current IBI
+                prev_ibi = current_ibi
+                prev_beat = current_beat
+                prev_flag = current_flag
+
+                # Flag that previous and current IBIs are corrected
+                correction_flags[n-1] = 1
+                correction_flags[n] = 1
+
+                # Increment the counter by n_split - 1 in this case
+                cnt += n_split - 1
+
+                if DEBUGGING:
+                    print('inserted ',n_split - 2, ' intervals: ', ibi, ' flag:', current_flag, ' based on ', prev_ibis_fifo.get_queue()[1:])
+            else:
+                if DEBUGGING:
+                    print('acceptance check failed for inserting: ', ibi)
+                # If the corrected IBI is not acceptable, accept the current IBI
+                _accept_ibi(n, correction_failed_flag=1)
+
+        def _average_prev_and_current(n):
+            '''
+            Average the previous and current IBIs.
+
+            Parameters
+            ---------------------
+            n : int
+                The index of the current IBI.
+            '''
+            global prev_ibis_fifo, cnt
+            global corrected_ibis, corrected_beats, corrected_flags
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
+            
+            # Average the previous and current IBIs
+            ibi = np.floor((prev_ibi + current_ibi) / 2)
+            
+            # Check if the corrected IBI is acceptable
+            if _acceptance_check(ibi, prev_ibis_fifo.get_queue()[1:]):
+                # Update the previous and current IBI
+                prev_ibi = ibi
+                if n == 1:
+                    prev_beat = beats_ix[0] + ibi
+                else:
+                    prev_beat = corrected_beats[-1] + ibi
+                prev_flag = _return_flag(ibi, prev_ibis_fifo.get_queue()[:-1])
+                current_ibi = current_beat - prev_beat
+                current_flag = _return_flag(ibi, prev_ibis_fifo.get_queue()[1:])
+
+                # Check if the previous IBI is within the limits
+                _check_limits(n)
+
+                # Fix the previous IBI
+                corrected_ibis.append(prev_ibi)
+                corrected_beats.append(prev_beat)
+                corrected_flags.append(prev_flag)
+
+                # Add to the queue
+                prev_ibis_fifo.push(prev_ibi)
+
+                # Update the previous IBI to the current IBI
+                prev_ibi = current_ibi
+                prev_beat = current_beat
+                prev_flag = current_flag
+                
+                # Flag that previous and current IBIs are corrected
+                correction_flags[n-1] = 1
+                correction_flags[n] = 1
+
+                # Increment the counter
+                cnt += 1
+
+                if DEBUGGING:
+                    print('averaged:', ibi, ' flag:', current_flag, ' based on ', prev_ibis_fifo.get_queue()[1:])
+            else:
+                if DEBUGGING:
+                    print('acceptance check failed for averaging: ', ibi)
+                _accept_ibi(n, correction_failed_flag=1)
+                
+
+        def _check_limits(n):
+            '''
+            Check if the previous IBI (n-1) is within the limits.
+            If it is longer the maximum IBI, shorten the previous IBI and lengthen the current IBI.
+            If it is shorter than the minimum IBI, lengthen the previous IBI and shorten the current IBI.
+
+            Parameters
+            ---------------------
+            n : int
+                The index of the current IBI.
+            '''
+            global prev_ibis_fifo, cnt
+            global corrected_ibis, corrected_beats, corrected_flags
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
+            MIN_IBI = np.floor(self.fs * 60 / MAX_BPM)         # minimum IBI in indices
+            MAX_IBI = np.floor(self.fs * 60 / MIN_BPM)         # maximum IBI in indices
+
+            # If the previous IBI is shorter than the minimum IBI, lengthen the previous IBI and shorten the current IBI
+            if prev_ibi < MIN_IBI:
+                remainder = MIN_IBI - prev_ibi
+                prev_beat = prev_beat + remainder
+                prev_ibi = MIN_IBI
+                prev_flag = _return_flag(prev_ibi, prev_ibis_fifo.get_queue()[:-1])
+                current_ibi = current_ibi - remainder
+                current_flag = _return_flag(current_ibi, prev_ibis_fifo.get_queue()[1:])
+
+                # Flag that previous and current IBIs are corrected
+                correction_flags[n-1] = 1
+                correction_flags[n] = 1
+
+                # Increment the counter
+                cnt += 1
+
+                if DEBUGGING:
+                    print('Shorter than the minimum IBI and corrected: ', prev_ibi, ' ', prev_flag, ' | ', current_ibi, ' ', current_flag)
+
+            # If the previous IBI is longer than the maximum IBI, shorten the previous IBI and lengthen the current IBI
+            elif prev_ibi > MAX_IBI:
+                remainder = prev_ibi - MAX_IBI
+                prev_beat = prev_beat - remainder
+                prev_ibi = MAX_IBI
+                prev_flag = _return_flag(prev_ibi, prev_ibis_fifo.get_queue()[:-1])
+                current_ibi = current_ibi + remainder
+                current_flag = _return_flag(current_ibi, prev_ibis_fifo.get_queue()[1:])
+
+                # Flag that previous and current IBIs are corrected
+                correction_flags[n-1] = 1
+                correction_flags[n] = 1
+
+                # Increment the counter
+                cnt += 1
+
+                if DEBUGGING:
+                    print('Longer than the maximum IBI and corrected: ', prev_ibi, ' ', prev_flag, ' | ', current_ibi, ' ', current_flag)
+            return
+        
+        for n in range(len(ibis)):
+            current_ibi = ibis[n]
+            current_beat = beats[n]
+                
+            # Accept the first ibi
+            if n == 0:
+                current_flag = _return_flag(current_ibi, prev_ibis = prev_ibis_fifo.get_queue())
+                # Update the previous IBI to the current IBI
+                prev_ibi = current_ibi
+                prev_beat = current_beat
+                prev_flag = current_flag
+            
+            else:
+                current_flag = _return_flag(current_ibi, prev_ibis = prev_ibis_fifo.get_queue()[:-1])
+                # If the current ibi is correct
+                if DEBUGGING:
+                    print('n:', n)
+                    print('prev:', prev_ibi, ' ', prev_flag, ' | current:', current_ibi, ' ', current_flag)
+                if current_flag == 'Correct':
+                    if prev_flag == 'Correct' or prev_flag == 'Long':
+                        _accept_ibi(n)                           # If the previous ibi is correct or long, then accept the current ibi
+                    elif prev_flag == 'Short':
+                        if n == 1:
+                            _add_prev_and_current(n) 
+                        else:
+                            if corrected_ibis[-1] > current_ibi:
+                                _add_prev_and_current(n)                 # If the previous ibi is short, add previous and current intervals
+                            else:
+                                _add_secondprev_and_prev(n)
+                    elif prev_flag == 'Extra Long':
+                        _insert_interval(n)                      # If the previous ibi is extra long, split the previous and current intervals
+                # If the current ibi is short
+                elif current_flag == 'Short':
+                    if prev_flag == 'Correct':
+                        _accept_ibi(n)                           # If the previous ibi is correct, accept previous
+                    elif prev_flag == 'Short':
+                        _add_prev_and_current(n)                 # If the previous ibi is short, add previous and current intervals
+                    elif prev_flag == 'Long' or prev_flag == 'Extra Long':
+                        _average_prev_and_current(n)             # If the previous ibi is long or extra long, average the previous and current intervals
+                # If the current ibi is long
+                elif current_flag == 'Long':
+                    if prev_flag == 'Correct' or prev_flag == 'Long':
+                        _accept_ibi(n)                           # If the previous ibi is correct or long, accept previous
+                    elif prev_flag == 'Short':
+                        _average_prev_and_current(n)             # If the previous ibi is short, average previous and current intervals
+                    elif prev_flag == 'Extra Long':
+                        _insert_interval(n)                      # If the previous ibi is extra long, split the previous and current intervals
+                # If the current ibi is extra long
+                elif current_flag == 'Extra Long':
+                    if prev_flag == 'Correct' or prev_flag == 'Long' or prev_flag == 'Extra Long':
+                        _insert_interval(n)                      # If the previous ibi is correct, long, or extra long, split the previous and current intervals
+                    elif prev_flag == 'Short':
+                        _average_prev_and_current(n)             # If the previous ibi is short, average previous and current intervals
+
+            # If more than 3 corrections are made in the last prev_n IBIs, reset the FIFO
+            if sum(correction_failed.get_queue()) >= 3:
+                prev_ibis_fifo.reset(first_ibi)
+
+        # Add the last beat
+        corrected_ibis.append(current_ibi)
+        corrected_beats.append(current_beat)
+        corrected_flags.append(current_flag)
+
+        correction_flags = np.array(correction_flags).astype(int)
+
+        # Convert the IBIs to milliseconds
+        original_ibis_ms = np.round((np.array(ibis) / self.fs) * 1000, 2)
+        
+        original = pd.DataFrame(
+            {'Original IBI (ms)': np.insert(original_ibis_ms, 0, np.nan),
+            'Original IBI (index)': np.insert(ibis.astype(object), 0, np.nan),
+            'Original Beat': np.insert(beats, 0, beats_ix[0]),
+            'Correction': np.insert(correction_flags, 0, 0)}
+        )
+        
+        corrected_ibis_ms = np.round((np.array(corrected_ibis) / self.fs) * 1000, 2)
+
+        corrected_ibis = np.array(corrected_ibis).astype(object)
+        corrected_flags = np.array(corrected_flags).astype(object)
+            
+        # Add the first beat and create a dataframe
+        corrected = pd.DataFrame(
+            {'Corrected IBI (ms)': np.insert(corrected_ibis_ms, 0, np.nan),
+            'Corrected IBI (index)': np.insert(corrected_ibis, 0, np.nan), 
+            'Corrected Beat': np.insert(corrected_beats, 0, beats_ix[0]),
+            'Flag': np.insert(corrected_flags, 0, np.nan)}
+        )
+        beats_ix_corrected = np.insert(corrected_beats, 0, beats_ix[0])
+        return beats_ix_corrected, corrected_ibis, original, corrected
+    
+    def get_corrected(self, beats_ix, seg_size = 60, initial_hr = 'auto', prev_n = 6, min_bpm = 40, max_bpm = 200, hr_estimate_window = 6, print_estimated_hr = True,
+                        short_threshold = (24 / 32),  long_threshold = (44 / 32), extra_threshold = (52 / 32)):
+        """
+        Get the corrected interbeat intervals (IBIs) and beat indices.
+
+        Parameters
+        ----------
+        data : pandas.DataFrame
+            A data frame containing the pre-processed ECG or PPG data.
+        beats_ix : array_like
+            An array containing the indices of detected beats.
+        seg_size : int
+            The size of the segment in seconds; by default, 60.
+        initial_hr : int, float, optional
+            The heart rate value for the first interbeat interval (IBI) to be
+            validated against; by default, 80 bpm (750 ms).
+        prev_n : int, optional
+            The number of preceding IBIs to validate against; by default, 6.
+
+        Returns
+        -------
+        original : pandas.DataFrame
+            A data frame containing the original IBIs and beat indices.
+        corrected : pandas.DataFrame
+            A data frame containing the corrected IBIs and beat indices.
+        combined : pandas.DataFrame
+            A data frame containing the summary of flags in each segment.
+        """
+        # Get the corrected IBIs and beat indices
+        original, corrected = self.correct_interval(beats_ix=beats_ix, seg_size = seg_size, initial_hr=initial_hr, prev_n=prev_n, min_bpm=min_bpm, max_bpm=max_bpm, hr_estimate_window=hr_estimate_window, print_estimated_hr = print_estimated_hr,
+                                                short_threshold=short_threshold, long_threshold= long_threshold, extra_threshold=extra_threshold)
+
+        # Get the segment number for each beat
+        for row in original.iterrows():
+            seg = ceil(row[1].loc['Original Beat'] / (seg_size * self.fs))
+            original.loc[row[0], 'Segment'] = seg
+        for row in corrected.iterrows():
+            seg = ceil(row[1].loc['Corrected Beat'] / (seg_size * self.fs))
+            corrected.loc[row[0], 'Segment'] = seg
+        original['Segment'] = original['Segment'].astype(pd.Int64Dtype())
+        corrected['Segment'] = corrected['Segment'].astype(pd.Int64Dtype())
+        
+        # Get the number and percentage of corrected beats in each segment
+        original_seg = original.groupby('Segment')['Correction'].sum().astype(pd.Int64Dtype())
+        original_seg = pd.DataFrame(original_seg.reset_index(name = '# Corrected'))
+        original_seg_nbeats = original.groupby('Segment')['Correction'].count().astype(pd.Int64Dtype())
+        original_seg_nbeats = pd.DataFrame(original_seg_nbeats.reset_index(name = '# Beats'))
+        original_seg = original_seg.merge(original_seg_nbeats, on = 'Segment')
+        original_seg['% Corrected'] = round((original_seg['# Corrected'] / original_seg['# Beats']) * 100, 2)
+        original_seg.drop('# Beats', axis = 1, inplace = True)
+
+        # Get the number of each flag (Correct/Short/Long/Extra Long) in each segment
+        corrected_seg = corrected.groupby('Segment')['Flag'].value_counts().astype(pd.Int64Dtype())
+        corrected_seg = pd.DataFrame(corrected_seg.reset_index(name = 'Count'))
+        corrected_seg = corrected_seg.pivot(index = 'Segment', columns = 'Flag', values = 'Count').reset_index().fillna(0)
+        corrected_seg.columns.name = None
+        corrected_seg = corrected_seg.rename_axis(None, axis = 1)
+    
+        combined = pd.merge(corrected_seg, original_seg, on='Segment')
+
+        return original, corrected, combined
 
     def plot_missing(self, df, invalid_thresh = 30, title = None):
         """
@@ -879,6 +1558,82 @@ class Cardio:
         iqr = self._get_iqr(data)
         QD = iqr * 0.5
         return QD
+    class _MaxNFifo:
+            '''
+            A class for FIFO with N elements at maximum.
+
+            Parameters/Attributes
+            ---------------------
+            prev_n : int
+                The maximum number of elements in the FIFO.
+            '''
+            def __init__(self, prev_n, item = None):
+                '''
+                Initialize the FIFO object.
+                
+                Parameters
+                ---------------------
+                prev_n : int
+                    The maximum number of elements in the FIFO.
+                item : int, optional
+                    The initial item to add to the FIFO; by default, None.
+                    The item is added twice if it is not None.
+                '''
+                self.prev_n = prev_n
+                if item is not None:
+                    self.queue = [item, item]
+                else:
+                    self.queue = []
+
+            def push(self, item):
+                '''
+                Push an item to the FIFO. If the number of elements exceeds the maximum, remove the first element.
+
+                Parameters
+                ---------------------
+                item : int
+                    The item to add to the FIFO.
+                '''
+                self.queue.append(item)
+                if len(self.queue) > self.prev_n + 1:
+                    self.queue.pop(0)
+
+            def get_queue(self):
+                '''
+                Return the FIFO queue.
+
+                Return
+                ---------------------
+                queue : list
+                '''
+                return self.queue
+            
+            def change_last(self, item):
+                '''
+                Change the last item in the FIFO queue.
+
+                Parameters
+                ---------------------
+                item : int
+                    The new item to replace the last item in the queue.
+                '''
+                self.queue[-1] = item
+            
+            def reset(self, item = None):
+                '''
+                Reset the FIFO queue. 
+                If an item is given, reset the queue with the item. If not, reset the queue with an empty list.
+
+                Parameters
+                ---------------------
+                item: int, optional
+                    The item to add to the FIFO; by default, None.
+                    The item is added twice if it is not None.
+                '''
+                if item is None:
+                    self.queue = []
+                else:
+                    self.queue = [item, item]
 
 # =================================== EDA ====================================
 class EDA:

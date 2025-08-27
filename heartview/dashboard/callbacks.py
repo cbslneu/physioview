@@ -488,7 +488,7 @@ def get_callbacks(app):
         output = [
             Output('dtype-validator', 'is_open'),
             Output('mapping-validator', 'is_open'),
-            Output('memory-db', 'data')
+            Output('memory-db', 'data'),
         ],
         inputs = [
             Input('run-data', 'n_clicks'),
@@ -751,27 +751,67 @@ def get_callbacks(app):
             sleep(0.7)
 
             return dtype_error, map_error, preprocessed
+    
+    @app.callback(
+        Output('re-render-sqa-flag', 'data'),
+        [Input('beat-correction-status', 'data'),
+         Input('be-edited-trigger', 'children')],
+        [State('memory-db', 'data'),
+         State('subject-dropdown', 'value'),
+         State('seg-size', 'value')],
+        prevent_initial_call = True
+    )
+    def recompute_sqa(beat_correction_status, beats_edited, memory, selected_subject, segment_size):
+        trig = ctx.triggered_id
+        if trig == 'beat-correction-status':
+            if selected_subject not in beat_correction_status.keys():
+                return False
+            elif beat_correction_status[selected_subject] == 'suggested':
+                return False
+        elif trig == 'be-edited-trigger':
+            if beats_edited != selected_subject:
+                return False
+        
+        fs = memory['fs']
+        data_type = memory['data type']
+        sqa = SQA.Cardio(fs)
+        file = selected_subject
+        preprocessed_data = pd.read_csv(str(temp_path / f'{selected_subject}_{data_type}.csv'))
+        ts_col = 'Timestamp' if 'Timestamp' in preprocessed_data.columns else None
+        beats_ix = preprocessed_data[preprocessed_data.Beat == 1].index.values
+        artifacts_ix = preprocessed_data[preprocessed_data.Artifact == 1].index.values
+        metrics = sqa.compute_metrics(
+            preprocessed_data, beats_ix, artifacts_ix, seg_size = segment_size,
+            show_progress = False)
+        metrics.to_csv(str(temp_path / f'{file}_SQA.csv'), index = False)
+
+        return True
 
     # == Create Beat Editor editing files =====================================
     @app.callback(
         [Output('be-create-file', 'children'),
          Output('beat-editor-spinner', 'children'),
          Output('open-beat-editor', 'disabled')],
-        Input('subject-dropdown', 'options'),
+        [Input('subject-dropdown', 'options'),
+         Input('subject-dropdown', 'value'),
+         Input('beat-correction-status', 'data')],
         [State('memory-db', 'data'),
          State('toggle-filter', 'on')],
         prevent_initial_call = True
     )
-    def create_beat_editor_files(all_subjects, memory, filt_on):
+    def create_beat_editor_files(all_subjects, selected_subject, beat_correction_status, memory, filt_on):
         """Create Beat Editor _edit.json files for uploaded files and
         enable the 'Beat Editor' button."""
+        if memory is None:
+            return None, None, True
         file_type = memory['file type']
         data_type = memory['data type']
         fs = memory['fs']
         signal_col = 'Filtered' if filt_on else data_type
+        trig = ctx.triggered_id
 
         # Handle batch files
-        if file_type == 'batch':
+        if file_type == 'batch' and trig != 'beat-correction-status':
             filenames = sorted([s for s in all_subjects.values()])
             for name in filenames:
                 data = pd.read_csv(temp_path / f'{name}_{data_type}.csv')
@@ -783,7 +823,7 @@ def get_callbacks(app):
                     artifacts_ix = None
 
                 # Downsample Beat Editor data to match dashboard render
-                ds, _, _, ds_fs = utils._downsample_data(
+                ds, _, _, _, ds_fs = utils._downsample_data(
                     data, fs, signal_col, beats_ix, artifacts_ix)
                 heartview.write_beat_editor_file(
                     ds, ds_fs, signal_col, 'Beat', ts_col, name,
@@ -791,7 +831,12 @@ def get_callbacks(app):
 
         # Handle single files
         else:
-            filename = Path(memory['filename']).stem
+            if file_type == 'batch':
+                filename = selected_subject
+                batch = True
+            else:
+                filename = Path(memory['filename']).stem
+                batch = False
             data = pd.read_csv(str(temp_path / f'{filename}_{data_type}.csv'))
             ts_col = 'Timestamp' if 'Timestamp' in data.columns else None
             beats_ix = data[data.Beat == 1].index.values
@@ -801,11 +846,11 @@ def get_callbacks(app):
                 artifacts_ix = None
 
             # Downsample Beat Editor data to match dashboard render
-            ds, _, _, ds_fs = utils._downsample_data(
+            ds, _, _, _, ds_fs = utils._downsample_data(
                 data, fs, signal_col, beats_ix, artifacts_ix)
             heartview.write_beat_editor_file(
                 ds, ds_fs, signal_col, 'Beat', ts_col, filename,
-                verbose = False)
+                batch = batch, verbose = False)
 
         # Beat Editor button icon
         btn_icon = html.I(className = 'fa-solid fa-arrow-up-right-from-square')
@@ -877,10 +922,11 @@ def get_callbacks(app):
          Output('postprocess-data', 'disabled')],
         [Input('memory-db', 'data'),
          Input('qa-charts-dropdown', 'value'),
-         Input('subject-dropdown', 'value')],
+         Input('subject-dropdown', 'value'),
+         Input('re-render-sqa-flag', 'data')],
         prevent_initial_call = True
     )
-    def update_sqa_plot(memory, sqa_view, selected_subject):
+    def update_sqa_plot(memory, sqa_view, selected_subject, re_render_sqa_flag):
         """Update the SQA plot based on the selected view and enable the
         'Postprocess' button."""
         file = selected_subject
@@ -909,10 +955,11 @@ def get_callbacks(app):
          Output('postprocess-export-mode', 'options')],
         [Input('memory-db', 'data'),
          Input('subject-dropdown', 'value'),
-         State('subject-dropdown', 'options')],
+         Input('re-render-sqa-flag', 'data'),
+         State('subject-dropdown', 'options'),],
         prevent_initial_call = True
     )
-    def update_sqa_table(memory, selected_subject, all_subjects):
+    def update_sqa_table(memory, selected_subject, re_render_sqa_flag, all_subjects):
         """Update the SQA summary table and export batch options."""
         file = selected_subject
         data_type = memory['data type']
@@ -958,27 +1005,42 @@ def get_callbacks(app):
         [Output('raw-data', 'figure'),
          Output('segment-dropdown', 'value'),
          Output('prev-n-tooltip', 'is_open'),
-         Output('next-n-tooltip', 'is_open')],
+         Output('next-n-tooltip', 'is_open'),
+         Output('beat-correction-status', 'data'),
+         Output('beat-correction', 'hidden'),
+         Output('accept-corrections', 'hidden'),
+         Output('reject-corrections', 'hidden'),
+         Output('revert-corrections', 'hidden'),
+         Output('plot-displayed', 'data')],
         [Input('memory-db', 'data'),
-         Input('subject-dropdown', 'value'),
          Input('segment-dropdown', 'value'),
+         Input('subject-dropdown', 'value'),
          Input('prev-segment', 'n_clicks'),
          Input('next-segment', 'n_clicks'),
+         Input('beat-correction', 'n_clicks'),
+         Input('accept-corrections', 'n_clicks'),
+         Input('reject-corrections', 'n_clicks'),
+         Input('revert-corrections', 'n_clicks'),
          Input('be-edited-trigger', 'children')],
-        [State('seg-size', 'value'),
+        [State('subject-dropdown', 'options'),
+         State('beat-correction-status', 'data'),
+         State('seg-size', 'value'),
          State('toggle-filter', 'on'),
-         State('segment-dropdown', 'options')],
+         State('segment-dropdown', 'options'),
+         State('artifact-method', 'value'),
+         State('artifact-tol', 'value')],
         prevent_initial_call = True
     )
-    def update_signal_plots(memory, selected_subject, selected_segment,
-                            prev_n, next_n, beats_edited, segment_size,
-                            filt_on, segments):
+    def update_signal_plots(memory, selected_segment, selected_subject, prev_n, next_n, 
+                            beat_correction_n, accept_corrections_n, reject_corrections_n, revert_corrections_n, beats_edited,
+                            all_subjects, beat_correction_status, segment_size, filt_on, segments, artifact_method, artifact_tol):
         """Update the raw data plot based on the selected segment view."""
         if memory is None:
             raise PreventUpdate
         else:
             data_type = memory['data type']
             file_type = memory['file type']
+            file = selected_subject
             if file_type == 'batch':
                 render_subdir = render_dir / selected_subject
             else:
@@ -988,24 +1050,88 @@ def get_callbacks(app):
 
             trig = ctx.triggered_id
 
+
             # Reset selected_segment to 1 when new data is loaded
             if trig == 'memory-db':
                 selected_segment = 1
+                beat_correction_status = {}
+
+            if beat_correction_status == {}:
+                for subject in all_subjects:
+                        beat_correction_status[subject] = None
 
             prev_tt_open = False
             next_tt_open = False
 
+            def _save_temp_and_render(signal, file, data_type, fs, signal_col, beats_ix, artifacts_ix, corrected_beats_ix = None):
+                beats_ix = np.array(beats_ix)
+                artifacts_ix = np.array(artifacts_ix)
+                if corrected_beats_ix is not None:
+                    corrected_beats_ix = np.array(corrected_beats_ix)
+                signal.to_csv(str(temp_path / f'{file}_{data_type}.csv'), index = False)
+                ds_signal, ds_ibi, ds_ibi_corrected, _, _ = utils._downsample_data(
+                    signal, fs, signal_col, beats_ix, artifacts_ix, corrected_beats_ix)
+                ds_signal.to_csv(str(render_subdir / 'signal.csv'), index = False)
+                return ds_signal, ds_ibi, ds_ibi_corrected
+
             # Handle prev/next segment clicks
-            if trig == 'prev-segment':
-                if selected_segment > 1:
-                    selected_segment -= 1
+            signal_col = 'Filtered' if filt_on else data_type
+            fs_full = memory['fs']
+            if trig == 'beat-correction':
+                signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
+                beats_ix = signal.loc[signal['Beat'] == 1].index.values
+                artifacts_ix = signal.loc[signal['Artifact'] == 1].index.values
+                signal, beats_ix_corrected, ibi_corrected = utils._correct_beats(
+                    signal, fs_full, beats_ix, segment_size)
+                ibi_corrected.to_csv(str(temp_path / f'{file}_IBI_corrected.csv'), index = False)
+                signal, _, ibi_corrected = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix, beats_ix_corrected)
+                ibi_corrected.to_csv(str(render_subdir / 'ibi_corrected.csv'), index = False)
+                beat_correction_status[selected_subject] = 'suggested'
+            # Accept corrections and update signal and ibi files
+            elif trig == 'accept-corrections':
+                beat_correction_status[selected_subject] = 'accepted'
+                # Update signal and ibi files to reflect accepted corrections
+                ibi = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
+                ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
+                ibi = pd.read_csv(str(render_subdir / 'ibi_corrected.csv'))
+                ibi.to_csv(str(render_subdir / 'ibi.csv'), index = False)
+                ibi_corrected = None
+                signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
+                signal, beats_ix, artifacts_ix = utils._accept_beat_corrections(
+                    signal, fs_full, artifact_method, artifact_tol)
+                signal, _, _ = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix)
+            # Reject corrections and reset beat correction status
+            elif trig == 'reject-corrections':
+                beat_correction_status[selected_subject] = None
+                ibi_corrected = None
+            # Revert corrections and update signal and ibi files to original
+            elif trig == 'revert-corrections':
+                beat_correction_status[selected_subject] = None
+                ibi_corrected = None
+                signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
+                signal, beats_ix, artifacts_ix = utils._revert_beat_corrections(
+                    signal, fs_full, artifact_method, artifact_tol)
+                ibi = heartview.compute_ibis(
+                    signal, fs_full, beats_ix, 'Timestamp')
+                ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
+                signal, ibi, _ = _save_temp_and_render(signal, file, data_type, fs_full, signal_col, beats_ix, artifacts_ix)
+                ibi.to_csv(str(render_subdir / 'ibi.csv'), index = False)
+            else:
+                if trig == 'prev-segment':
+                    if selected_segment > 1:
+                        selected_segment -= 1
+                    else:
+                        prev_tt_open = True
+                elif trig == 'next-segment':
+                    if selected_segment != max(segments):
+                        selected_segment += 1
+                    else:
+                        next_tt_open = True
+                # If beat correction status is suggested, render the corrected ibis
+                if beat_correction_status[selected_subject] == 'suggested':
+                    ibi_corrected = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
                 else:
-                    prev_tt_open = True
-            elif trig == 'next-segment':
-                if selected_segment != max(segments):
-                    selected_segment += 1
-                else:
-                    next_tt_open = True
+                    ibi_corrected = None
 
             # If cardiac data was run
             if data_type in ['ECG', 'PPG', 'BVP']:
@@ -1061,13 +1187,17 @@ def get_callbacks(app):
                     )
 
                 else:
+                    overlay_corrected = beat_correction_status[selected_subject] == 'suggested'
+                    correction_map = {data_type: 'Corrected'} if overlay_corrected else None
                     # Create the signal subplots for uploaded data
                     signal_plots = heartview.plot_signal(
                         signal = signal, signal_type = data_type,
                         axes = (x_axis, y_axis), fs = fs,
                         peaks_map = {data_type: 'Beat'},
                         artifacts_map = {data_type: 'Artifact'},
+                        correction_map = correction_map,
                         acc = acc, ibi = ibi,
+                        ibi_corrected = ibi_corrected,
                         seg_number = selected_segment,
                         seg_size = segment_size)
 
@@ -1075,7 +1205,15 @@ def get_callbacks(app):
             else:
                 signal_plots = utils._blank_fig()
 
-            return signal_plots, selected_segment, prev_tt_open, next_tt_open
+            beat_correction_hidden = beat_correction_status[selected_subject] == 'suggested' or beat_correction_status[selected_subject] == 'accepted'
+            accept_corrections_hidden = beat_correction_status[selected_subject] != 'suggested'
+            reject_corrections_hidden = beat_correction_status[selected_subject] != 'suggested'
+            revert_corrections_hidden = beat_correction_status[selected_subject] != 'accepted'
+
+            plot_displayed = True
+
+            return signal_plots, selected_segment, prev_tt_open, next_tt_open, beat_correction_status, \
+                   beat_correction_hidden, accept_corrections_hidden, reject_corrections_hidden, revert_corrections_hidden, plot_displayed
 
     # === Open export summary modal ===========================================
     @app.callback(
@@ -1287,6 +1425,23 @@ def get_callbacks(app):
         if export_type is not None:
             return False
         return True
+    
+    # === Enable/Disable Beat Correction buttons ======================================
+    @app.callback(
+        [Output('beat-correction', 'disabled'),
+         Output('revert-corrections', 'disabled')],
+        [Input('plot-displayed', 'data'),
+         Input('be-edited-trigger', 'children')],
+        State('subject-dropdown', 'value')
+    )
+    def update_beat_correction_buttons(plot_displayed, beats_edited, selected_subject):
+        # If the subject has been edited, disable the beat correction button
+        if beats_edited == selected_subject:
+            return True, True
+        elif plot_displayed is False:
+            return True, True
+        else:
+            return False, False
 
     # ======================== BEAT EDITOR ELEMENTS ===========================
     # === Update Beat Editor button label and trigger on edit =================

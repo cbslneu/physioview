@@ -29,15 +29,18 @@ _EDIT_STYLES = {
 def _acc_subplot(
     acc_x: np.ndarray,
     acc_y: np.ndarray,
-    fig: go.Figure
+    fig: go.Figure,
+    line_dict: dict = dict(color = 'forestgreen', width = 1.5),
+    name: str = 'ACC'
 ) -> go.Figure:
     fig.add_trace(
         go.Scatter(
             x = acc_x,
             y = acc_y,
-            name = 'ACC',
-            line = dict(color = 'forestgreen', width = 1.5),
-            hovertemplate = '<b>ACC</b>: %{y:.2f} m/s² <extra></extra>'),
+            name = name,
+            line = line_dict,
+            hovertemplate = f'<b>{name}</b>: %{{y:.2f}} m/s² <extra></extra>'
+        ),
         row = 1, col = 1)
     fig.update_yaxes(
         title_text = 'm/s²', title_standoff = 5,
@@ -49,7 +52,9 @@ def _acc_subplot(
 def _ibi_subplot(
     ibi_x: np.ndarray,
     ibi_y: np.ndarray,
-    fig: go.Figure
+    fig: go.Figure,
+    line_dict: dict = dict(color = '#eb4034', width = 1.5),
+    name: str = 'IBI'
 ) -> go.Figure:
 
     # Get the last row id from the figure
@@ -62,11 +67,11 @@ def _ibi_subplot(
 
     fig.add_trace(
         go.Scatter(
-            x = ibi_x, y = ibi_y, name = 'IBI',
-            line = dict(color = '#eb4034', width = 1.5),
+            x = ibi_x, y = ibi_y, name = name,
+            line = line_dict,
             connectgaps = True,
             mode = 'lines',
-            hovertemplate = '<b>IBI</b>: %{y:.2f} ms <extra></extra>'
+            hovertemplate = f'<b>{name}</b>: %{{y:.2f}} ms <extra></extra>'
         ),
         row = last_row, col = 1
     )
