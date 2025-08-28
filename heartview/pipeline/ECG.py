@@ -1,3 +1,4 @@
+from typing import Literal
 from scipy.signal import butter, cheby1, ellip, filtfilt, find_peaks, \
     hilbert, iirnotch, lfilter, sosfiltfilt
 from scipy.ndimage import uniform_filter1d
@@ -18,7 +19,7 @@ class Filters:
         50 or 60 (by default, 60). The 50 Hz power grid is prevalent in
         many European, Asian, and African countries.
     """
-    def __init__(self, fs, powerline_freq = 60):
+    def __init__(self,fs: int, powerline_freq: Literal[50, 60] = 60):
         """
         Initialize the Filters object.
 
@@ -26,7 +27,7 @@ class Filters:
         ----------
         fs : int
             The sampling rate of the ECG signal.
-        powerline_freq : int
+        powerline_freq : {50, 60}
             The powerline interference frequency. This value must be either
             50 or 60 (by default, 60). The 50 Hz power grid is prevalent in
             many European, Asian, and African countries.
@@ -39,7 +40,12 @@ class Filters:
         else:
             self.pl_freq = powerline_freq
 
-    def baseline_wander(self, signal, cutoff = 0.05, order = 2):
+    def baseline_wander(
+        self,
+        signal: np.ndarray,
+        cutoff: float = 0.05,
+        order: int = 2
+    ) -> np.ndarray:
         """
         Apply a high-pass filter to remove baseline wander from ECG data.
 
@@ -61,20 +67,23 @@ class Filters:
         """
         nyquist = 0.5 * self.fs
         highcut = cutoff / nyquist
-        b, a = butter(order,
-                      highcut,
-                      btype = 'high',
-                      analog = False)
+        b, a = butter(order, highcut, btype = 'high', analog = False)
         filtered = filtfilt(b, a, signal)
         return filtered
 
-    def muscle_noise(self, signal, lowcut = 30, highcut = 100, order = 2):
+    def muscle_noise(
+        self,
+        signal: np.ndarray,
+        lowcut: float = 30,
+        highcut: float= 100,
+        order: int = 2
+    ) -> np.ndarray:
         """
         Apply a bandstop filter to remove muscle (EMG) noise from ECG data.
 
         Parameters
         ----------
-        signal : array-like
+        signal : array_like
             An array containing the noisy signal data.
         lowcut : float, optional
             The lower cutoff frequency of the bandstop filter;
@@ -88,7 +97,7 @@ class Filters:
 
         Returns
         -------
-        filtered : array-like
+        filtered : array_like
             The filtered signal with muscle/EMG noise removed.
         """
         nyquist = 0.5 * self.fs
@@ -101,7 +110,11 @@ class Filters:
         filtered = sosfiltfilt(sos, signal)
         return filtered
 
-    def powerline_interference(self, signal, q = 30):
+    def powerline_interference(
+        self,
+        signal: np.ndarray,
+        q: float = 30
+    ) -> np.ndarray:
         """
         Filter out powerline interference at a specified frequency.
 
@@ -109,7 +122,7 @@ class Filters:
         ----------
         signal : array_like
             An array containing the noisy signal data.
-        q : float
+        q : float, optional
             The quality factor, i.e., how narrow or wide the stopband is
             for a notch filter (by default, 30). A higher quality factor
             indicates a narrower bandpass.
@@ -124,27 +137,54 @@ class Filters:
         filtered = filtfilt(b, a, signal)
         return filtered
 
-    def filter_signal(self, signal, lowcut = 1, highcut = 15, rs = 0.15,
-                      rp = 80, order = 2):
+    def filter_signal(
+        self,
+        signal: np.ndarray,
+        lowcut: float = 1,
+        highcut: float = 15,
+        rp: float= 0.15,
+        rs: float = 80,
+        order: int = 2
+    ) -> np.ndarray:
         """
         Filter out artifact from ECG data due to powerline interference,
-        baseline wander, movement, and muscle noise using an elliptic bandpass
-        filter.
+        baseline wander, movement, and muscle noise using an elliptic (Cauer)
+        bandpass filter.
 
         Parameters
         ----------
-        signal : array-like
+        signal : array_like
             An array containing the ECG data to be filtered.
+        lowcut : float, optional
+            The lower cutoff frequency (in Hz) of the bandpass filter below
+            which frequencies are attenuated; by default, 1 Hz.
+        highcut : float, optional
+            The upper cutoff frequency (in Hz) of the bandpass filter above
+            which frequencies are attenuated; by default, 15 Hz.
+        rp : float, optional
+            The maximum ripple (in dB) allowed in the passband; by default,
+            0.15 dB. Smaller values make the passband flatter (i.e.,
+            allow less distortion of ECG frequencies).
+        rs : float, optional
+            The minimum ripple (in dB) allowed in the stopband; by default,
+            80 dB. Larger values reject more noise.
+        order : int, optional
+            The filter order. Lower orders yield smoother transitions but less
+            sharp cutoff; by default, 2.
 
         Returns
         -------
-        filtered : array-like
-            An array containing the filtered ECG signal.
+        filtered : array_like
+            An array containing the bandpass-filtered ECG signal.
+
+        Notes
+        -----
+        This is the default filter used in the HeartView Dashboard.
         """
         nyq = 0.5 * self.fs
         low = lowcut / nyq
         high = highcut / nyq
-        b, a = ellip(order, rs, rp, [low, high], btype = 'band')
+        b, a = ellip(order, rp, rs, [low, high], btype = 'band')
         filtered = filtfilt(b, a, signal)
         return filtered
 
@@ -170,7 +210,7 @@ class BeatDetectors:
     procedures.
     """
 
-    def __init__(self, fs, preprocessed = True):
+    def __init__(self, fs: int, preprocessed: bool = True):
         """
         Initialize the BeatDetectors object.
 
@@ -188,18 +228,22 @@ class BeatDetectors:
         else:
             self.preprocessed = preprocessed
 
-    def engzee(self, signal):
-        """Extracts QRS complex locations from an ECG signal with the Engelse
+    def engzee(
+        self,
+        signal: np.ndarray
+    ) -> np.ndarray:
+        """
+        Extract QRS complex locations from an ECG signal with the Engelse
          and Zeelenberg (1979) algorithm, modified by Lourenço et al. (2011).
 
         Parameters
         ----------
-        signal : array-like
+        signal : array_like
             An array containing the ECG signal.
 
         Returns
         -------
-        ecg_beats : array-like
+        ecg_beats : array_like
             An array containing the indices of detected R peaks.
 
         References
@@ -338,13 +382,19 @@ class BeatDetectors:
         ecg_beats = self._remove_dupes(ecg_beats)
         return ecg_beats
 
-    def manikandan(self, signal, adaptive_threshold = True, window = 0.44):
-        """Extracts R peak locations from an ECG signal with the Manikandan
+    def manikandan(
+        self,
+        signal: np.ndarray,
+        adaptive_threshold: bool = True,
+        window: float = 0.44
+    ) -> np.ndarray:
+        """
+        Extract R peak locations from an ECG signal with the Manikandan
         and Soman (2012) algorithm.
 
         Parameters
         ----------
-        signal : array-like
+        signal : array_like
             An array containing the ECG signal.
         adaptive_threshold : boolean, optional
             Whether to refine beat detection using adaptive thresholding;
@@ -355,7 +405,7 @@ class BeatDetectors:
 
         Returns
         -------
-        ecg_beats : array-like
+        ecg_beats : array_like
             An array containing the indices of detected R peaks.
 
         References
@@ -462,18 +512,22 @@ class BeatDetectors:
         else:
             return ecg_beats
 
-    def nabian(self, signal):
-        """Extracts R peak locations from an ECG signal with the Nabian
+    def nabian(
+        self,
+        signal: np.ndarray
+    ) -> np.ndarray:
+        """
+        Extract R peak locations from an ECG signal with the Nabian
         et al. (2018) algorithm.
 
         Parameters
         ----------
-        signal : array-like
+        signal : array_like
             An array containing the ECG signal.
 
         Returns
         -------
-        ecg_beats : array-like
+        ecg_beats : array_like
             An array containing the indices of detected R peaks.
 
         References
@@ -499,18 +553,22 @@ class BeatDetectors:
         ecg_beats = self._remove_dupes(ecg_beats)
         return ecg_beats
 
-    def pantompkins(self, signal):
-        """Extracts QRS complex locations from an ECG signal with the
+    def pantompkins(
+        self,
+        signal: np.ndarray
+    ) -> np.ndarray:
+        """
+        Extract QRS complex locations from an ECG signal with the
         Pan & Tompkins (1985) algorithm.
 
         Parameters
         ----------
-        signal : array-like
+        signal : array_like
             An array containing the ECG signal.
 
         Returns
         -------
-        ecg_beats : array-like
+        ecg_beats : array_like
             An array containing the indices of detected beats.
 
         References
@@ -602,13 +660,21 @@ class BeatDetectors:
         ecg_beats = self._remove_dupes(ecg_beats)
         return ecg_beats
 
-    def _ma_cumulative_sum(self, signal, window_len):
+    def _ma_cumulative_sum(
+        self,
+        signal: np.ndarray,
+        window_len: int
+    ) -> np.ndarray:
         """Moving average filter using cumulative sums."""
         cumsum = np.cumsum(np.insert(signal, 0, 0))
         ma = (cumsum[window_len:] - cumsum[:-window_len]) / float(window_len)
         return ma
 
-    def _ma_convolution(self, signal, window_len):
+    def _ma_convolution(
+        self,
+        signal: np.ndarray,
+        window_len: int
+    ) -> np.ndarray:
         """Moving average filter using convolution."""
         padded_diff = np.pad(
             signal, (window_len // 2, window_len // 2), mode = 'constant')
@@ -616,8 +682,12 @@ class BeatDetectors:
             padded_diff, np.ones(window_len) / window_len, mode = 'valid')
         return ma
 
-    def _butter_bandpass_filter(self, signal, method: str):
-        """A Butterworth bandpass filter, used in the pre-processing procedures
+    def _butter_bandpass_filter(
+        self,
+        signal: np.ndarray,
+        method: str
+    ) -> np.ndarray:
+        """A Butterworth bandpass filter, used in the preprocessing procedure
         of the Pan & Tompkins (1985) and Hamilton & Tompkins (1986) QRS
         detection algorithms. All parameters, including the passband frequency
         range (`Wn`) and order (`N`) of the filter, are provided as default
@@ -641,8 +711,11 @@ class BeatDetectors:
         preprocessed = filtfilt(b, a, signal)
         return preprocessed
 
-    def _elliptic_bandpass_filter(self, signal):
-        """An elliptic bandpass filter, used in the pre-processing procedure
+    def _elliptic_bandpass_filter(
+        self,
+        signal: np.ndarray
+    ) -> np.ndarray:
+        """An elliptic bandpass filter, used in the preprocessing procedure
         of the Nabian et al. (2018) R peak detection algorithm. All parameters,
         including the lower and upper cutoff frequencies (`Wn`), passband
         ripple (`rp`), stopband attenuation (`rs`), and order (`N`) of the
@@ -656,8 +729,11 @@ class BeatDetectors:
         preprocessed = filtfilt(b, a, signal)
         return preprocessed
 
-    def _cheby1_filter(self, signal):
-        """A Chebyshev Type I bandpass filter, used in the pre-processing
+    def _cheby1_filter(
+        self,
+        signal: np.ndarray
+    ) -> np.ndarray:
+        """A Chebyshev Type I bandpass filter, used in the preprocessing
         procedure of the Manikandan and Soman (2012) beat detection algorithm.
         All parameters, including the lower and upper cutoff frequencies
         (`Wn`), passband ripple (`rp`), and order (`N`), of the filter are
@@ -671,7 +747,10 @@ class BeatDetectors:
         preprocessed = filtfilt(b, a, signal)
         return preprocessed
 
-    def _remove_dupes(self, ecg_beats):
+    def _remove_dupes(
+        self,
+        ecg_beats: np.ndarray
+    ) -> np.ndarray:
         """Remove duplicate indices in an `ecg_beats` array."""
         ecg_beats = np.array(ecg_beats)
         unique_values, unique_ix = np.unique(ecg_beats, return_index = True)
