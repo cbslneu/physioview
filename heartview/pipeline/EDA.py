@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
 import cvxopt as cv
-from tqdm import tqdm
+from typing import Literal, Optional, Union
 from zipfile import ZipFile
-from scipy.signal import butter, filtfilt, windows
-from scipy.signal import resample as scipy_resample
+from scipy.signal import butter, convolve, ellip, filtfilt, find_peaks, \
+    firwin, resample_poly
+from math import gcd
+from scipy.fft import fft, ifft, fftfreq
 
 # ============================== EDA Filters =================================
 class Filters:
@@ -28,78 +30,7 @@ class Filters:
         """
         self.fs = fs
 
-    def bandpass(self, signal, lowcut = 0.05, highcut = 2, order = 2):
-        """
-        Filter an EDA signal with a Butterworth bandpass filter.
-
-        Parameters
-        ----------
-        signal : array_like
-            An array containing the raw EDA signal.
-        lowcut : int, float
-            The cut-off frequency at which frequencies below this value in the
-            EDA signal are attenuated; by default, 0.05 Hz.
-        highcut : int, float
-            The cut-off frequency at which frequencies above this value in the
-            EDA signal are attenuated; by default, 2.0 Hz.
-        order : int
-            The filter order, i.e., the number of samples required to produce
-            the desired filtered output; by default, 2.
-
-        Returns
-        -------
-        filtered : array_like
-            An array containing the filtered EDA signal.
-
-        Notes
-        -----
-        This is the all-in-one default filter used by the PhysioView
-        dashboard to remove baseline drift, electromyographic (EMG)
-        activity, and powerline interference.
-        """
-        nyq = 0.5 * self.fs
-        
-        if highcut >= nyq:
-            raise ValueError(f'highcut must be less than Nyquist frequency ({nyq} Hz).')
-            
-        low = lowcut / nyq
-        high = highcut / nyq
-        b, a = butter(order, [low, high], btype = 'band')
-        filtered = filtfilt(b, a, signal)
-        return filtered
-
-    def gaussian(self, signal, window = 40, sigma = 0.4):
-        """
-        Apply a Gaussian low-pass filter to an EDA signal.
-
-        Parameters
-        ----------
-        signal : array_like
-            An array containing the raw EDA signal.
-        window : int
-            The number of points in the window; by default, 40.
-        sigma : float
-            The standard deviation (sigma) of the Gaussian window, in seconds;
-            by default, 0.4 s (or 400 ms).
-
-        Returns
-        -------
-        filtered : array_like
-            An array containing the smoothed EDA signal.
-            
-        References
-        ----------
-        Campanella, S., Altaleb, A., Belli, A., Pierleoni, P., & Palma, L. 
-        (2023). A method for stress detection using empatica E4 bracelet and 
-        machine-learning techniques. Sensors (Basel), 23(7), 3565.
-        """
-        sigma_points = int(sigma * self.fs)
-        gaussian_window = windows.gaussian(int(window), sigma_points)
-        gaussian_window /= np.sum(gaussian_window)  # normalize
-        filtered = np.convolve(signal, gaussian_window, mode = 'same')
-        return filtered
-
-    def lowpass(self, signal, cutoff = 2, order = 3):
+    def lowpass_butter(self, signal, cutoff = 2, order = 3):
         """
         Filter an EDA signal with a Butterworth low-pass filter.
 
@@ -125,6 +56,142 @@ class Filters:
         filtered = filtfilt(b, a, signal)
         return filtered
 
+    def lowpass_elliptic(
+        self,
+        signal: np.ndarray,
+        cutoff: float = 1.0,
+        order: int = 4,
+        rp: float = 1,
+        rs: float = 40
+    ) -> np.ndarray:
+        """
+        Apply an elliptic low-pass filter to an EDA signal.
+
+        Parameters
+        ----------
+        signal : array_like
+            An array containing the raw EDA signal to be filtered.
+        cutoff : float, optional
+            The cutoff frequency in Hz; by default, 1 Hz.
+        order : int, optional
+            The filter order; by default, 4.
+        rp : float, optional
+            Maximum ripple (in dB) allowed in the passband; by default, 1 dB.
+        rs : float, optional
+            Minimum attenuation (in dB) required in the stopband;
+            by default, 40 dB.
+
+        Returns
+        -------
+        filtered : array_like
+            An array containing the filtered EDA signal.
+        """
+        nyq = 0.5 * self.fs
+        wn = cutoff / nyq
+        b, a = ellip(order, rp, rs, wn, btype = 'low')
+        filtered = filtfilt(b, a, signal)
+        return filtered
+
+    def lowpass_gaussian(self, signal, cutoff: float = 1.0):
+        """
+        Apply a frequency-domain Gaussian low-pass filter to an EDA signal.
+
+        Parameters
+        ----------
+        signal : array_like
+            An array containing the raw EDA signal.
+        cutoff : float, optional
+            The desired cutoff frequency in Hz; by default, 1.0 Hz.
+
+        Returns
+        -------
+        filtered : array_like
+            An array containing the low-pass filtered EDA signal.
+
+        References
+        ----------
+        Nabian, M., et al. (2018). An open-source feature extraction tool for
+        the analysis of peripheral physiological data. IEEE Journal of
+        Translational Engineering in Health and Medicine, 6, 1-11.
+        """
+
+        n = len(signal)
+        freqs = fftfreq(n, d = 1 / self.fs)
+
+        # Compute the FFT of the EDA signal
+        sig_fft = fft(signal)
+
+        # Compute the Gaussian frequency response
+        # Attenuate frequencies above cutoff symmetrically for +/- freqs
+        gaussian_response = np.exp(-0.5 * (freqs / cutoff) ** 2)
+
+        # Filter in the frequency domain
+        sig_fft_filtered = sig_fft * gaussian_response
+
+        # Transform to time domain
+        filtered = np.real(ifft(sig_fft_filtered))
+        return filtered
+
+    def filter_signal(
+        self,
+        signal: np.ndarray,
+        fs: int = 4,
+        cutoff: float = 0.35,
+        filter_length: int = 2057,
+        window_type: Literal['hamming', 'hann', 'blackman'] = 'hamming'
+    ) -> np.ndarray:
+        """
+        Apply a FIR low-pass filter to an EDA signal.
+
+        Parameters
+        ----------
+        signal : array_like
+            An array containing the raw EDA signal to be filtered.
+        fs : int, optional
+            The sampling rate of the signal in Hz; by default, 4 Hz.
+        cutoff : float, optional
+            The cut-off frequency above which frequencies are attenuated;
+            by default, 0.35 Hz.
+        filter_length : int, optional
+            The length of the FIR filter (number of taps); by default, 2057.
+            Larger values give smoother filtering but increase computation
+            and delay.
+        window_type : {'hamming', 'hann', 'blackman'}, optional
+            The type of window function to use for FIR design;
+            by default, 'hamming'.
+
+        Returns
+        -------
+        filtered : array_like
+            An array containing the filtered EDA signal.
+
+        References
+        ----------
+        Kleckner, I.R., Jones, R.M., Wilder-Smith, O., Wormwood, J.B.,
+        Akcakaya, M., Quigley, K.S., ... & Goodwin, M.S. (2017). Simple,
+        transparent, and flexible automated quality assessment procedures for
+        ambulatory electrodermal activity data. IEEE Transactions on
+        Biomedical Engineering, 65(7), 1460-1467.
+
+        Notes
+        -----
+        This is the default filter used in the PhysioView Dashboard.
+        """
+
+        # Normalize cutoff frequency to Nyquist
+        cutoff_norm = cutoff / (fs / 2)
+
+        # Design FIR filter
+        fir_coeff = firwin(
+            numtaps = filter_length,
+            cutoff = cutoff_norm,
+            window = window_type
+        )
+
+        # Apply filter to signal
+        filtered = filtfilt(fir_coeff, [1.0], signal)
+        return filtered
+
     def moving_average(self, signal, window_len):
         """
         Apply a moving average filter to an EDA signal.
@@ -143,13 +210,202 @@ class Filters:
         """
         samples = int(window_len * self.fs)
         kernel = np.ones(samples) / samples
-        ma = np.convolve(signal, kernel, mode = 'valid')
+        ma = np.convolve(signal, kernel, mode = 'same')
         epsilon = np.finfo(float).eps   # pad the beginning with epsilons
         ma = np.concatenate((ma, np.full(len(signal) - len(ma), epsilon)))
         return ma
 
-# ====================== Other EDA Data Pre-Processing =======================
-def get_phasic_tonic(signal, fs, show_progress = True):
+# ======================== Other EDA Data Processing ========================
+def detect_scr_peaks(
+    phasic: Union[np.ndarray, pd.Series],
+    smooth_size: int = 20,
+    min_amp_thresh: float = 0.1,
+) -> np.ndarray:
+    """
+    Detect skin conductance response (SCR) peaks in a phasic EDA signal using
+    the Nabian et al. (2018) approach.
+
+    Parameters
+    ----------
+    phasic : array-like
+        Phasic component of EDA signal.
+    smooth_size : int, optional
+        The size of Bartlett window for smoothing derivative; by default, 20.
+    min_amp_thresh : float, optional
+        The minimum SCR amplitude threshold, relative to the max detected
+        amplitude; by default, 0.1 (i.e., 10%).
+
+    Returns
+    -------
+    peaks : np.ndarray
+        An array containing indices of detected SCR peaks.
+
+    References
+    ----------
+    Nabian, M., et al. (2018). An open-source feature extraction tool for
+    the analysis of peripheral physiological data. IEEE Journal of
+    Translational Engineering in Health and Medicine, 6, 1-11.
+    """
+
+    # Differentiate phasic signal
+    diff = np.diff(phasic, prepend = phasic[0])
+
+    # Smooth derivative with Bartlett kernel
+    kernel = np.bartlett(smooth_size)
+    kernel /= kernel.sum()
+    diff_smoothed = convolve(diff, kernel, mode="same")
+
+    # Find zero crossings
+    def _get_zero_crossings(sig, direction = 'positive'):
+        zc = np.where(np.diff(np.sign(sig)) != 0)[0]
+        if direction == 'positive':
+            return [i for i in zc if sig[i] < 0 and sig[i+1] >= 0]
+        elif direction == 'negative':
+            return [i for i in zc if sig[i] > 0 and sig[i+1] <= 0]
+        else:
+            return zc
+
+    pos_crossings = _get_zero_crossings(diff_smoothed, 'positive')
+    neg_crossings = _get_zero_crossings(diff_smoothed, 'negative')
+
+    # Ensure onset before offset
+    if len(neg_crossings) > 0 and len(pos_crossings) > 0:
+        if neg_crossings[0] < pos_crossings[0]:
+            neg_crossings = neg_crossings[1:]
+    n_pairs = min(len(pos_crossings), len(neg_crossings))
+    pos_crossings = pos_crossings[:n_pairs]
+    neg_crossings = neg_crossings[:n_pairs]
+
+    # Get peaks
+    candidates = []
+    for onset, offset in zip(pos_crossings, neg_crossings):
+        window = phasic[onset:offset]
+        if len(window) == 0:
+            continue
+        peak_idx = onset + np.argmax(window)
+        amp = phasic[peak_idx] - phasic[onset]
+        candidates.append((peak_idx, amp))
+
+    # Apply global amplitude threshold
+    if len(candidates) == 0:
+        return np.array([])
+    global_max_amp = max(amp for _, amp in candidates)
+    peaks = [idx for idx, amp in candidates if
+             amp >= min_amp_thresh * global_max_amp]
+
+    return np.array(peaks)
+
+def compute_tonic_scl(
+    signal: np.ndarray,
+    fs: int = 4,
+    seg_size: Optional[int] = None,
+) -> Union[float, np.ndarray]:
+    """
+    Compute the tonic skin conductance level (SCL) as the mean of the EDA
+    signal over a given segment, while excluding intervals corresponding to
+    skin conductance responses (SCRs).
+
+    Parameters
+    ----------
+    signal: array_like
+        An array containing the EDA signal.
+    fs : int, optional
+        The sampling rate of the EDA signal; by default, 4 Hz.
+    seg_size : int, optional
+        The segment size (in seconds) of the EDA signal; by default, None.
+        If given, the EDA signal is divided into non-overlapping segments of
+        this length and a tonic SCL is computed for each segment. If None,
+        the tonic SCL is computed once across the whole signal.
+
+    Returns
+    -------
+    tonic_scl : float or np.ndarray
+        The tonic skin conductance level (SCL).
+
+    Notes
+    -----
+    SCRs are detected based on amplitude and temporal criteria, and the data
+    from their onset through recovery are omitted from the calculation. If no
+    SCRs are detected, the tonic SCL is equivalent to the mean of the entire
+    signal.
+    """
+    def _scr_intervals(
+        min_height: float = 0.05,
+        min_rise_time: float = 1.0,
+        min_recovery_time: float = 2.0
+    ) -> list[tuple]:
+        """
+        Detect SCR intervals (start, end) from an EDA signal.
+
+        Parameters
+        ----------
+        min_height : float, optional
+            The minimum SCR amplitude (in µS) to be considered valid;
+            by default, 0.05 uS.
+        min_rise_time : float, optional
+            Minimum time (in seconds) from SCR onset to peak;
+            by default, 1 second.
+        min_recovery_time : float, optional
+            Minimum time (in seconds) from peak back to baseline;
+            by default, 2 seconds.
+
+        Returns
+        -------
+        scr_intervals : list of tuple
+            A list of (start_index, end_index) intervals for each detected
+            SCR.
+        """
+
+        # Differentiate signal to emphasize rises
+        diff_sig = np.diff(signal, prepend = signal[0])
+
+        # Detect candidate peaks in the EDA signal itself
+        min_distance = int((min_rise_time + min_recovery_time) * fs)
+        peaks, props = find_peaks(signal, height = min_height,
+                                  distance = min_distance)
+
+        # Get start and end indices of SCR intervals
+        scr_intervals = []
+        for peak in peaks:
+            start = peak
+            # where derivative last went negative before the peak
+            while start > 0 and diff_sig[start] > 0:
+                start -= 1
+            end = peak
+            # where derivative first goes negative after the peak
+            while end < len(signal) - 1 and diff_sig[end] < 0:
+                end += 1
+            scr_intervals.append((start, end))
+        return scr_intervals
+
+    def _masked_mean(sig_segment: np.ndarray) -> float:
+        """Compute mean excluding SCR intervals."""
+        scr_intervals = _scr_intervals()
+        mask = np.ones(len(sig_segment), dtype = bool)
+        for start, end in scr_intervals:
+            mask[start:end] = False
+        return np.mean(sig_segment[mask]) if np.any(mask) else np.nan
+
+    if seg_size is None:
+        # One tonic SCL for the whole signal
+        tonic_scl = _masked_mean(signal)
+    else:
+        # Segmented tonic SCL
+        seg_len = int(seg_size * fs)
+        n_segments = len(signal) // seg_len
+        tonic_scl = []
+        for i in range(n_segments):
+            start, end = i * seg_len, (i + 1) * seg_len
+            tonic_scl.append(_masked_mean(signal[start:end]))
+        tonic_scl = np.array(tonic_scl)
+
+    return tonic_scl
+
+def decompose_eda(
+    signal: np.ndarray,
+    fs: int,
+    show_progress: bool = True
+) -> tuple:
     """
     Extract the phasic and tonic components of an electrodermal activity (EDA)
     signal using the convex optimization approach by Greco et al. (2015).
@@ -179,52 +435,47 @@ def get_phasic_tonic(signal, fs, show_progress = True):
         signal, fs, options = {'show_progress': show_progress})
     return phasic, tonic
 
-def resample(signal, fs, new_fs):
+def resample(
+    signal: np.ndarray,
+    fs: int,
+    new_fs: int
+) -> np.ndarray:
     """
-    Resample electrodermal activity data to a new sampling frequency using
-    Fast Fourier Transform (FFT) and interpolation.
+    Resample a signal to a new sampling frequency using polyphase filtering.
 
     Parameters
     ----------
     signal : array_like
-        An array containing the EDA signal.
-    fs : int, float
-        The sampling rate of the EDA signal.
-    new_fs : int, float
-        The new sampling rate to which the signal should be resampled.
+        The input signal (1D array).
+    fs : int
+        The original sampling frequency of the signal.
+    new_fs : int
+        The desired sampling frequency.
 
     Returns
     -------
     rs : array_like
-        An array containing the resampled EDA signal.
+        The resampled signal.
     """
-    resampling_factor = int(new_fs // fs)
-    resampled = scipy_resample(signal, len(signal) * resampling_factor)
-    resampled = np.array(resampled).flatten()
-    return resampled
+    # Ensure integer values
+    fs = int(round(fs))
+    new_fs = int(round(new_fs))
 
-def segment_data(resampled, original, seg_size = 60, ts_col = None):
-    """
-    Segment electrodermal activity (EDA) data into windows for further
-    processing.
+    # Simplify the up/down ratio
+    g = gcd(fs, new_fs)
+    up = new_fs // g
+    down = fs // g
 
-    Parameters
-    ----------
-    resampled : array_like
-        An array containing the resampled EDA data.
-    original : pandas.DataFrame
-        The original DataFrame containing the raw EDA data.
-    seg_size : int
-        The size of the segment, in seconds; by default, 60.
-    ts_col : str, optional
-        The name of the column containing timestamps; by default, None.
-        If a string value is given, the output will contain a timestamps
-        column.
-    """
-    segmented = pd.DataFrame()
-    return segmented
+    # Polyphase resampling with anti-aliasing
+    rs = resample_poly(signal, up, down)
+    rs = np.asarray(rs).flatten()
+    return rs
 
-def preprocess_e4(file, resample_data = False, resample_fs = 64):
+def preprocess_e4(
+    file: str,
+    resample_data: bool = False,
+    resample_fs: int = 64
+) -> Union[pd.DataFrame, tuple]:
     """
     Pre-process electrodermal and temperature data from Empatica E4 files,
     including comma-separated values (.csv) or archive (.zip) files.
@@ -323,9 +574,17 @@ def preprocess_e4(file, resample_data = False, resample_fs = 64):
                     temp_data = pd.concat([timestamps, temp], axis = 1)
             return eda_data, temp_data
         
-def _cvxEDA(signal, fs, tau0 = 2., tau1 = 0.7, delta_knot = 10., alpha = 8e-4,
-           gamma = 1e-2, solver = None,
-           options = {'reltol': 1e-9, 'show_progress': True}):
+def _cvxEDA(
+    signal: np.ndarray,
+    fs: int = 4,
+    tau0: float = 2.,
+    tau1: float = 0.7,
+    delta_knot: float = 10.,
+    alpha: float = 8e-4,
+    gamma: float = 1e-2,
+    solver: 'QP solver' = None,
+    options: dict = {'reltol': 1e-9, 'show_progress': True}
+) -> tuple:
     """
     Decompose an EDA signal into its phasic and tonic components using the
     convex optimization approach by Greco et al. (2015).
@@ -334,17 +593,17 @@ def _cvxEDA(signal, fs, tau0 = 2., tau1 = 0.7, delta_knot = 10., alpha = 8e-4,
     ----------
     signal : array_like
         An array containing the EDA signal.
-    fs : float
-        The sampling rate of the EDA signal.
-    tau0 : float
+    fs : int, optional
+        The sampling rate of the EDA signal; by default, 4 Hz.
+    tau0 : float, optional
         Slow time constant of the Bateman function; by default, 2.0.
-    tau1 : float
+    tau1 : float, optional
         Fast time constant of the Bateman function; by default, 0.7.
-    delta_knot : float
+    delta_knot : float, optional
         Time between knots of the tonic spline function; by default, 10.0.
-    alpha : float
+    alpha : float, optional
         Penalization for the sparse SMNA driver; by default, 8e-4.
-    gamma : float
+    gamma : float, optional
         Penalization for the tonic spline coefficients; by default, 1e-2.
     solver : object, optional
         Sparse QP solver to be used.
@@ -391,7 +650,7 @@ def _cvxEDA(signal, fs, tau0 = 2., tau1 = 0.7, delta_knot = 10., alpha = 8e-4,
 
     References
     ----------
-    A Greco, G. Valenza, A. Lanata, E. P. Scilingo, & L. Citi. (2015). cvxEDA:
+    A. Greco, G. Valenza, A. Lanata, E. P. Scilingo, & L. Citi. (2015). cvxEDA:
     A convex optimization approach to electrodermal activity processing. IEEE
     Transactions on Biomedical Engineering, 63(4): 797-804.
     """
@@ -417,13 +676,14 @@ def _cvxEDA(signal, fs, tau0 = 2., tau1 = 0.7, delta_knot = 10., alpha = 8e-4,
 
     # Spline
     delta_knot_s = int(round(delta_knot / delta))
-    spl = np.r_[np.arange(1., delta_knot_s), np.arange(delta_knot_s, 0.,
-                                                       -1.)]  # order 1
+    spl = np.r_[np.arange(1., delta_knot_s),
+                np.arange(delta_knot_s, 0., -1.)]  # order 1
     spl = np.convolve(spl, spl, 'full')
     spl /= max(spl)
+
     # Matrix of spline regressors
-    i = np.c_[np.arange(-(len(spl) // 2), (len(spl) + 1) // 2)] + np.r_[
-        np.arange(0, n, delta_knot_s)]
+    i = (np.c_[np.arange(-(len(spl) // 2), (len(spl) + 1) // 2)] +
+         np.r_[np.arange(0, n, delta_knot_s)])
     nB = i.shape[1]
     j = np.tile(np.arange(nB), (len(spl), 1))
     p = np.tile(spl, (nB, 1)).T
@@ -482,4 +742,4 @@ def _cvxEDA(signal, fs, tau0 = 2., tau1 = 0.7, delta_knot = 10., alpha = 8e-4,
     p = A * q
     r = M * q
     e = y - r - t
-    return (np.array(a).ravel() for a in (r, p, t, l, d, e, obj))
+    return tuple(np.array(a).ravel() for a in (r, p, t, l, d, e, obj))
