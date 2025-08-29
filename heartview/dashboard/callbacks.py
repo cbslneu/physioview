@@ -1129,7 +1129,7 @@ def get_callbacks(app):
                         next_tt_open = True
                 # If beat correction status is suggested, render the corrected ibis
                 if beat_correction_status[selected_subject] == 'suggested':
-                    ibi_corrected = pd.read_csv(str(temp_path / f'{file}_IBI_corrected.csv'))
+                    ibi_corrected = pd.read_csv(str(render_subdir / 'ibi_corrected.csv'))
                 else:
                     ibi_corrected = None
 
