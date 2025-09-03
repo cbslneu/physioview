@@ -1934,8 +1934,9 @@ class EDA:
             'Timestamp': timestamps if timestamps is not None else np.arange(
                 len(signal)),
             'EDA': signal,
-            'Temp': temp if temp is not None else np.nan,
         })
+        if temp is not None:
+            eda_validity['TEMP'] = temp
         eda_validity.loc[valid_ix, 'Valid'] = 1
         eda_validity.loc[invalid_ix, 'Invalid'] = 1
 
@@ -1994,13 +1995,17 @@ class EDA:
             combined_invalid |= mask_temp
 
         eda_quality = pd.DataFrame({
-            'Timestamp': timestamps if timestamps is not None else np.arange(
-                len(signal)),
             'EDA': signal,
-            'Temp': temp if temp is not None else np.nan,
             'Out of Range': np.where(mask_out_of_range, 1, np.nan),
             'Excessive Slope': np.where(mask_excessive_slope, 1, np.nan),
         })
+        if temp is not None:
+            eda_quality['TEMP'] = temp
+        if timestamps is not None:
+            eda_quality.insert(0, 'Timestamp', timestamps)
+        else:
+            eda_quality.insert(0, 'Sample', np.arange(len(signal)) + 1)
+
         if mask_temp is not None:
             eda_quality['Temp Out of Range'] = np.where(mask_temp, 1, np.nan)
         return eda_quality
@@ -2148,8 +2153,7 @@ class EDA:
         if temp is not None:
             if len(signal) != len(temp):
                 temp = self._equalize_temp(signal, temp)
-            temp_out_of_range_mask = self._check_temp_out_of_range(
-                temp)
+            temp_out_of_range_mask = self._check_temp_out_of_range(temp)
 
         # Combine rule masks
         if temp_out_of_range_mask is not None:
@@ -2228,7 +2232,8 @@ class EDA:
 
     def plot_validity(
         self,
-        metrics: pd.DataFrame
+        metrics: pd.DataFrame,
+        title: Optional[str] = None,
     ) -> go.Figure:
         fig = go.Figure(
             data = [
@@ -2262,26 +2267,33 @@ class EDA:
             xaxis = dict(
                 title = dict(
                     text = 'Segment',
-                    font = dict(size = 16)),
+                    font = dict(size = 16),
+                    standoff = 5),
                 tickfont = dict(size = 14)
             ),
             yaxis = dict(
                 title = dict(
                     text = 'Proportion',
-                    font = dict(size = 16)),
+                    font = dict(size = 16),
+                    standoff = 2),
                 tickfont = dict(size = 14)
             ),
-            legend = dict(font = dict(size = 16), orientation = 'h',
+            legend = dict(font = dict(size = 14), orientation = 'h',
                           yanchor = 'bottom', y = 1.05,
                           xanchor = 'right', x = 1.0),
             template = 'simple_white',
-            margin = dict(l = 20, r = 20, t = 50, b = 50)
+            margin = dict(l = 30, r = 15, t = 60, b = 50)
         )
+        if title is not None:
+            fig.update_layout(
+                title = title
+            )
         return fig
 
     def plot_quality_metrics(
         self,
-        metrics: pd.DataFrame
+        metrics: pd.DataFrame,
+        title: Optional[str] = None,
     ) -> go.Figure:
         traces = [
             go.Bar(
@@ -2333,21 +2345,27 @@ class EDA:
             xaxis = dict(
                 title = dict(
                     text = 'Segment',
-                    font = dict(size = 16)),
+                    font = dict(size = 16),
+                    standoff = 5),
                 tickfont = dict(size = 14)
             ),
             yaxis = dict(
                 title = dict(
                     text = 'Proportion',
-                    font = dict(size = 16)),
+                    font = dict(size = 16),
+                    standoff = 2),
                 tickfont = dict(size = 14)
             ),
-            legend = dict(font = dict(size = 16), orientation = 'h',
+            legend = dict(font = dict(size = 14), orientation = 'h',
                           yanchor = 'bottom', y = 1.05,
                           xanchor = 'right', x = 1.0),
             template = 'simple_white',
-            margin = dict(l = 20, r = 20, t = 50, b = 50)
+            margin = dict(l = 30, r = 15, t = 60, b = 50)
         )
+        if title is not None:
+            fig.update_layout(
+                title = title
+            )
         return fig
 
     def _equalize_temp(self, eda, temp):
