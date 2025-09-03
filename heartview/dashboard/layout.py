@@ -12,13 +12,16 @@ layout = html.Div(id = 'main', children = [
         dcc.Store(id = 'memory-load', storage_type = 'memory'),
         dcc.Store(id = 'config-memory', storage_type = 'memory'),
         dcc.Store(id = 'config-download-memory', storage_type = 'memory'),
+        dcc.Store(id = 'temperature-load', storage_type = 'memory'),
         dcc.Store(id = 'memory-db', storage_type = 'memory'),
         html.Span(className = 'h5',
-                  children = ['Welcome to HeartView']),
+                  children = ['Welcome to PhysioView']),
         html.P(children = [
-            'Explore signal quality metrics for ambulatory cardiac '
+            'Explore signal quality metrics for ambulatory physiological '
             'data collected with devices such as the Empatica E4 or Actiwave '
             'Cardio.']),
+
+        # ============================= Load Data ============================
         html.H4(children = [
             'Load Data',
             html.I(className = 'fa-regular fa-circle-question',
@@ -26,9 +29,10 @@ layout = html.Div(id = 'main', children = [
                    id = 'load-data-help')],
                 style = {'display': 'flex', 'alignItems': 'center'}),
         dbc.Tooltip(
-            'Valid file types: .edf (Actiwave); .zip (E4); .csv (other '
-            'ECG/PPG sources).',
-            target = 'load-data-help'),
+            'Valid file types: .edf (Actiwave); .zip (E4 or batch of CSV '
+            'files); .csv (other sources).',
+            target = 'load-data-help',
+            style = {'--bs-tooltip-max-width': '225px'}),
         du.Upload(id = 'dash-uploader',
                   text = 'Select Data File...',
                   filetypes = ['EDF', 'edf', 'zip', 'csv'],
@@ -40,6 +44,8 @@ layout = html.Div(id = 'main', children = [
                                    'minHeight': '50px',
                                    'borderRadius': '5px'}),
         html.Div(id = 'file-check', children = []),
+
+        # === Configuration File =============================================
         daq.BooleanSwitch(
             id = 'toggle-config',
             color = '#ee8a78',
@@ -54,6 +60,20 @@ layout = html.Div(id = 'main', children = [
                       upload_id = 'cfg',
                       text_completed = '',
                       cancel_button = True)]),
+
+        # =========================== Setup E4 Data ==========================
+        html.Div(id = 'e4-data-type-container', children = [
+            html.Span('Select Empatica Data Type: '),
+            dbc.RadioItems(
+                id = 'e4-data-types',
+                options = [
+                    {'label': 'PPG', 'value': 'PPG'},
+                    {'label': 'EDA', 'value': 'EDA'},
+                ],
+                inline = True)
+        ], hidden = True),
+
+        # ============================ Setup Data ============================
         html.Div(id = 'setup-data', hidden = True, children = [
             html.H4(children = [
                 'Setup Data',
@@ -61,8 +81,9 @@ layout = html.Div(id = 'main', children = [
                        style = {'marginLeft': '5px'},
                        id = 'data-var-help')],
                 style = {'display': 'flex', 'alignItems': 'center'}),
-            dbc.Tooltip('Set your sampling rate and/or map the headers in '
-                        'your file to the corresponding data variables.',
+            dbc.Tooltip('Set your sampling rate and select the '
+                        'matching headers in your file(s) to the corresponding '
+                        'data variables.',
                         target = 'data-var-help'),
             html.Div(id = 'data-type-container', children = [
                 html.Span('Data Type: '),
@@ -71,15 +92,14 @@ layout = html.Div(id = 'main', children = [
                     options = [
                         {'label': 'ECG', 'value': 'ECG'},
                         {'label': 'PPG', 'value': 'PPG'},
+                        {'label': 'EDA', 'value': 'EDA'},
                     ],
-                    inline = True
-                )]
-            ),
+                    inline = True)
+            ]),
             html.Span('Sampling Rate: '),
             dcc.Input(id = 'sampling-rate', value = 500, type = 'number',
                       style = {'display': 'inline', 'marginLeft': '3px'}),
-            # ========================== TO DO ===============================
-            html.Div(id = 'resample', hidden = True, children = [
+            html.Div(id = 'resample', hidden = False, children = [
                 daq.BooleanSwitch(
                     id = 'toggle-resample',
                     color = '#ee8a78',
@@ -87,10 +107,9 @@ layout = html.Div(id = 'main', children = [
                     labelPosition = 'right',
                     on = False
                 ),
-                dcc.Input(id = 'resampling-rate', value = 64,
+                dcc.Input(id = 'resampling-rate', value = None,
                           type = 'number', disabled = True)
             ]),
-            # ================================================================
             html.Div(id = 'data-variables', children = [
                 html.Div(id = 'variables-header', children = [
                     html.Span('Variables:', style = {'display': 'inlineBlock'}),
@@ -99,9 +118,8 @@ layout = html.Div(id = 'main', children = [
                                style = {'fontSize': '12px',
                                         'marginRight': '3px'}),
                         'Header mismatch in files!'],
-                        id = 'variable-mapping-check')
-                ]),
-                dbc.Row([
+                        id = 'variable-mapping-check')]),
+                dbc.Row(className = 'setup-data-dropdowns', children = [
                     dbc.Col(
                         dcc.Dropdown(id = 'data-type-dropdown-1',
                                      placeholder = 'Time/Sample',
@@ -111,7 +129,7 @@ layout = html.Div(id = 'main', children = [
                         dcc.Dropdown(id = 'data-type-dropdown-2',
                                      placeholder = 'Signal',
                                      options = ['<Var>', '<Var>']),
-                        id = 'setup-cardio'),
+                        id = 'setup-signal'),
                     dbc.Col(
                         dcc.Dropdown(id = 'data-type-dropdown-3',
                                      placeholder = 'X',
@@ -123,8 +141,46 @@ layout = html.Div(id = 'main', children = [
                     dbc.Col(
                         dcc.Dropdown(id = 'data-type-dropdown-5',
                                      placeholder = 'Z',
-                                     options = ['<Var>', '<Var>'])),
-                ], className = 'setup-data-dropdowns')
+                                     options = ['<Var>', '<Var>']))
+                ])
+            ]),
+            html.Div(id = 'load-temperature', hidden = True, children = [
+                html.Div(children = [
+                    daq.BooleanSwitch(
+                        id = 'toggle-temp-data',
+                        color = '#ee8a78',
+                        label = 'Load Temperature Data',
+                        labelPosition = 'left',
+                        on = False),
+                    html.I(className = 'fa-regular fa-circle-question',
+                           id = 'temp-help'),
+                    dbc.Tooltip('Optional: Upload temperature data (.csv) or '
+                                'select the matching header in your file for '
+                                'the temperature variable. Uploaded data '
+                                'must have at most one header row and one column.',
+                                style = {'--bs-tooltip-max-width': '235px'},
+                                target = 'temp-help'),
+                ], style = {'display': 'inline-flex', 'alignItems': 'center',
+                            'gap': '0.25em'}),
+                html.Div(id = 'temp-upload-section', hidden = True, children = [
+                    html.Div(id = 'temp-upload-div', children = [
+                        html.Span('Upload:'),
+                        dcc.Upload(id = 'temp-uploader',
+                            children = html.Span('Select File...'),
+                            multiple = False,
+                            disabled = True,
+                            # text_disabled = 'Enabled for single-file uploads only.',
+                            accept = '.csv'),
+                        html.I(id = 'clear-temp-upload', title = 'Clear upload',
+                               className = 'fa-solid fa-eraser'),
+                    ]),
+                    html.Div(id = 'temp-file-check', children = []),
+                    html.Div(id = 'temp-variable-mapping', children = [
+                        html.Span('Temperature:', style = {'width': '150px'}),
+                        dcc.Dropdown(id = 'temp-variable',
+                                     options = ['<Var>', '<Var>'])
+                    ])
+                ]),
             ]),
         ]),
         html.Div(id = 'preprocess-data', hidden = True, children = [
@@ -179,6 +235,26 @@ layout = html.Div(id = 'main', children = [
                                  options = [], clearable = False)
                 ]),
             ]),
+            html.Div(id = 'eda-preprocessing', hidden = True, children = [
+                daq.BooleanSwitch(
+                    id = 'toggle-scr-detection',
+                    color = '#ee8a78',
+                    label = 'Detect SCR Peaks',
+                    labelPosition = 'left',
+                    on = False,
+                    style = {'paddingBottom:': '10px'}),
+                html.Div(id = 'scr-amplitude-threshold', children = [
+                    html.Span('Minimum Peak Amplitude (µS):'),
+                    dcc.Input(id = 'scr-amp-thresh', value = 0.1, type = 'number')
+                ], hidden = True),
+                html.Div(id = 'valid-amplitude-range', children = [
+                    html.Span('Valid EDA Range (µS):'),
+                    html.Span('Min:'),
+                    dcc.Input(id = 'eda-valid-min', value = 0.2, type = 'number'),
+                    html.Span('Max:'),
+                    dcc.Input(id = 'eda-valid-max', value = 40, type = 'number'),
+                ])
+            ], style = {'padding': '5px 0px 7px 0px'}),
             html.Div(id = 'segment-data', children = [
                 html.Span('Segment Size (sec):'),
                 dcc.Input(id = 'seg-size', value = 60, type = 'number'),
@@ -199,46 +275,63 @@ layout = html.Div(id = 'main', children = [
         ]),
 
         # Variable Mappings Validator
-        dbc.Modal([
-            dbc.ModalBody([
-                html.Div(className = 'validation-content', children = [
-                    html.I(className = 'fa-solid fa-circle-xmark'),
-                    html.Div(className = 'validation-error', children = [
-                        html.H5('Missing variable mappings'),
-                        html.P('Please ensure at least both \'Time/Sample\' '
-                               'and \'Signal\' are mapped to your data.')]),
-                    html.Button(
-                        html.I(className = 'fa-solid fa-xmark'),
-                        id = 'close-mapping-validator')
-                ])
+        dbc.Modal(id = 'mapping-validator', is_open = False, children = [
+            dbc.ModalHeader(children = [
+                html.I(className = 'fa-solid fa-circle-xmark'),
+                dbc.ModalTitle('Missing variable mappings')
+            ]),
+            dbc.ModalBody(className = 'popup-error', children = [
+                html.Span('Please ensure at least both \'Time/Sample\' '
+                          'and \'Signal\' are mapped to your data.')
             ])
-        ], className = 'validation-error-modal',
-            id = 'mapping-validator', is_open = False, centered = True),
+        ], className = 'validation-error-modal', centered = True),
 
         # Data Type Input Validator
-        dbc.Modal([
-            dbc.ModalBody([
-                html.Div(className = 'validation-content', children = [
-                    html.I(className = 'fa-solid fa-circle-xmark'),
-                    html.Div(className = 'validation-error', children = [
-                        html.H5('Missing data type'),
-                        html.P('Please ensure a data type is selected.')]),
-                    html.Button(
-                        html.I(className = 'fa-solid fa-xmark'),
-                        id = 'close-dtype-validator')
-                ])
+        dbc.Modal(id = 'dtype-validator', is_open = False, children = [
+            dbc.ModalHeader(children = [
+                html.I(className = 'fa-solid fa-circle-xmark'),
+                dbc.ModalTitle('Missing data type')
+            ], close_button = True),
+            dbc.ModalBody(className = 'popup-error', children = [
+                html.Span('Please ensure a data type is selected.')
             ])
-        ], className = 'validation-error-modal',
-            id = 'dtype-validator', is_open = False, centered = True),
+        ], className = 'validation-error-modal', centered = True),
+
+        # Duplicate Temperature Input Modal
+        dbc.Modal(id = 'duplicate-temp-error-modal', is_open = False, children = [
+            dbc.ModalHeader([
+                html.I(className = 'fa-solid fa-circle-xmark'),
+                dbc.ModalTitle('Duplicate temperature sources')
+            ], close_button = True),
+            dbc.ModalBody(className = 'popup-error', children = [
+                html.Span('Two temperature sources were given. Please use '
+                          'either an uploaded file or a column mapping.')
+            ])
+        ], className = 'validation-error-modal', centered = True),
+
+        # Pipeline Error Modal
+        dbc.Modal(id = 'pipeline-error-modal', is_open = False, children = [
+            dbc.ModalHeader([
+                html.I(className = 'fa-solid fa-circle-xmark'),
+                dbc.ModalTitle('Error')
+            ], close_button = True),
+            dbc.ModalBody([
+                html.Span('An unexpected error occurred:',
+                          style = {'fontWeight': '600'}),
+                html.Div(id = 'pipeline-error-message', children = [])
+            ])
+        ], className = 'validation-error-modal', centered = True),
 
         # Artifact Identification Method Information
-        dbc.Modal([
+        dbc.Modal(id = 'artifact-identification-modal', children = [
+            dbc.ModalHeader(children = [
+                html.I(className = 'fa-regular fa-circle-question',
+                       style = {'color': '#333333'}),
+                dbc.ModalTitle('Artifact Identification Methods'),
+            ]),
             dbc.ModalBody([
                 html.Div(className = 'information-content', children = [
-                    html.I(className = 'fa-regular fa-circle-question',
-                           style = {'color': '#333333'}),
                     html.Div(className = 'artifact-method-info', children = [
-                        html.H5('Artifact Identification Methods'),
                         html.P(children = [
                             html.Span('Berntson et al. (1990)',
                                       style = {'fontWeight': 600}),
@@ -258,14 +351,9 @@ layout = html.Div(id = 'main', children = [
                                       'fall outside a predefined acceptable '
                                       'range.')])
                     ]),
-                    html.Button(
-                        html.I(className = 'fa-solid fa-xmark'),
-                        id = 'close-artifact-method-info')
                 ])
             ])
-        ], className = 'validation-error-modal',
-            id = 'artifact-identification-modal', is_open = False,
-            centered = True),
+        ], className = 'validation-error-modal', is_open = False, centered = True),
 
         # Configuration File Exporter
         dbc.Modal(id = 'config-modal', is_open = False, children = [
@@ -306,7 +394,7 @@ layout = html.Div(id = 'main', children = [
     # NAVIGATION BAR
     html.Div(className = 'banner', children = [
        dbc.Row(children = [
-           dbc.Col(html.Img(src = './assets/heartview-logo.png',
+           dbc.Col(html.Img(src = './assets/physioview-logo.png',
                             className = 'logo')),
            dbc.Col(html.Div(html.A(
                'Documentation',
@@ -445,11 +533,8 @@ layout = html.Div(id = 'main', children = [
                         html.I(className = 'fa-solid fa-eye'),
                         dcc.Dropdown(
                             id = 'qa-charts-dropdown',
-                            options = [
-                                {'label': 'Missing Beats', 'value': 'missing'},
-                                {'label': 'Artifact Beats',
-                                 'value': 'artifact'}],
-                            value = 'missing',  # default chart
+                            options = [],
+                            value = '',
                             clearable = False
                         ),
                     ]),
@@ -495,10 +580,10 @@ layout = html.Div(id = 'main', children = [
                     ])
                 ]),
                 html.Div(className = 'processing-buttons', children = [
-                    html.Button(children = [
+                    html.Button(id = 'beat-correction', children = [
                         html.I(className = 'fa-solid fa-wand-magic-sparkles'),
                         html.Span('Auto Beat Correction')
-                    ], id = 'beat-correction', hidden = False, disabled = True),
+                    ], hidden = False, disabled = True),
                     html.Button(children = [
                         html.I(className = 'fa-solid fa-circle-check'),
                         html.Span('Accept')
@@ -513,22 +598,19 @@ layout = html.Div(id = 'main', children = [
                     ], id = 'revert-corrections', hidden = True, disabled = False),
                     html.Div(id = 'beat-editor-option', children = [
                         html.Span('|', className = 'separator'),
-                        html.Button(children = [
-                        dbc.Spinner(
-                            children = [
+                        html.Button(id = 'open-beat-editor', children = [
+                            dbc.Spinner(id = 'beat-editor-spinner', children = [
                                 html.I(className = 'fa-solid fa-arrow-up-right-from-square')
-                            ], id = 'beat-editor-spinner', size = 'sm'),
+                            ], size = 'sm'),
                             html.Span('Beat Editor', id = 'beat-editor-btn-label'),
-                        ], id = 'open-beat-editor', n_clicks = 0,
-                            disabled = True),
+                        ], n_clicks = 0, disabled = True),
                     ]),
                     html.Div(id = 'postprocess-option', children = [
                         html.Span('|', className = 'separator'),
-                        html.Button(children = [
+                        html.Button(id = 'postprocess-data', children = [
                             html.I(className = 'fa-solid fa-hammer'),
                             html.Span('Postprocess')
-                        ], id = 'postprocess-data', n_clicks = 0,
-                            disabled = True),
+                        ], n_clicks = 0, disabled = True),
                     ])
                 ])
             ]),
@@ -543,7 +625,6 @@ layout = html.Div(id = 'main', children = [
 
         # Beat Editor Modal
         dcc.Store(id = 'beat-editor-iframe-listener'),
-        html.Div(id = 'be-create-file', style = {'display': 'none'}),
         html.Div(id = 'be-edited-trigger', style = {'display': 'none'},
                  children = [None]),
         dbc.Modal(id = 'beat-editor-modal', children = [

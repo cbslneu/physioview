@@ -4,12 +4,12 @@ from pathlib import Path
 from shutil import rmtree
 from zipfile import ZipFile
 from scipy.signal import filtfilt, firwin
-from heartview.pipeline import ECG, SQA, PPG
+from heartview.pipeline import ECG, EDA, PPG, SQA
 from heartview.heartview import compute_ibis
 from dash import html
 from requests import get as http_get
 from os import path
-from io import BytesIO
+from io import BytesIO, StringIO
 from time import sleep
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 import pyedflib
 import json
+import base64
 
 # ============================= Startup Functions ============================
 def _make_subdirs():
@@ -62,8 +63,7 @@ def _preprocess_cardiac(
     artifact_tol: float,
     filt_on: bool,
     acc_data: Optional[pd.DataFrame] = None,
-    downsample: bool = True,
-    set_progress: Callable[[tuple[Union[int, float], str]], None] = None
+    downsample: bool = True
 ) -> tuple:
     """Run the HeartView pipeline on ECG/PPG data."""
     is_preprocessed = False if not filt_on else True
@@ -77,16 +77,9 @@ def _preprocess_cardiac(
     preprocessed_data = data.copy()
 
     # Filter ECG and detect beats
-    if set_progress is not None:
-        total_progress = 6                              # 33% progress
-        perc = (2 / total_progress) * 100
-        set_progress((perc * 100, f'{perc:.0f}'))
     if filt_on:
         preprocessed_data['Filtered'] = filt.filter_signal(
             preprocessed_data[dtype])
-        if set_progress is not None:
-            perc = (3 / total_progress) * 100           # 50% progress
-            set_progress((perc * 100, f'{perc:.0f}%'))
         beats_ix = getattr(detect_beats, beat_detector)(
             preprocessed_data['Filtered'])
     else:
@@ -95,30 +88,26 @@ def _preprocess_cardiac(
     preprocessed_data.loc[beats_ix, 'Beat'] = 1
     preprocessed_data.insert(
         0, 'Segment', preprocessed_data.index // (seg_size * fs) + 1)
-    if set_progress is not None:
-        perc = (3.5 / total_progress) * 100             # 58% progress
-        set_progress((perc * 100, f'{perc:.0f}%'))
 
     # Identify artifactual beats
     sqa = SQA.Cardio(fs)
     artifacts_ix = sqa.identify_artifacts(
         beats_ix, method = artifact_method, tol = artifact_tol)
     preprocessed_data.loc[artifacts_ix, 'Artifact'] = 1
-    if set_progress is not None:
-        perc = (4 / total_progress) * 100               # 66% progress
-        set_progress((perc * 100, f'{perc:.0f}%'))
 
     # Compute IBIs and SQA metrics
     ts_col = 'Timestamp' if 'Timestamp' in preprocessed_data.columns else None
+    if ts_col == 'Timestamp':
+        unix_fmt = _check_unix(preprocessed_data.Timestamp)
+        if unix_fmt is not None:
+            preprocessed_data.Timestamp = pd.to_datetime(
+                preprocessed_data.Timestamp, unit = unix_fmt)
     ibi = compute_ibis(preprocessed_data, fs, beats_ix, ts_col)
     metrics = sqa.compute_metrics(
         preprocessed_data, beats_ix, artifacts_ix, seg_size = seg_size,
         show_progress = False)
-    if set_progress is not None:
-        perc = (5 / total_progress) * 100               # 83% progress
-        set_progress((perc * 100, f'{perc:.0f}%'))
 
-    # Downsample data to at least 125 Hz for quicker plot rendering
+    # Downsample data to at least 250 Hz for quicker plot rendering
     if downsample:
         ds_data, ds_ibi, _, ds_acc, ds_fs = _downsample_data(
             preprocessed_data, fs, 'ECG', beats_ix, artifacts_ix,
@@ -130,17 +119,16 @@ def _preprocess_cardiac(
 def _correct_beats(
     signal: pd.DataFrame,
     fs: int,
-    beats_ix: list[int],
-    segment_size: int
+    beats_ix: np.ndarray,
 ):
     """Correct the beats in a signal."""
     signal = signal.copy()
     sqa = SQA.Cardio(fs)
-    beats_ix_corrected, _, _, _ = \
-        sqa.correct_interval(beats_ix, seg_size = segment_size, print_estimated_hr = False)
+    beats_ix_corrected, _, _, _, = sqa.correct_interval(
+        beats_ix, print_estimated_hr = False)
     signal.loc[beats_ix_corrected, 'Corrected'] = 1
-    ibi_corrected = compute_ibis(signal, fs, beats_ix_corrected, 'Timestamp')
-    
+    ts_col = 'Timestamp' if 'Timestamp' in signal.columns else None
+    ibi_corrected = compute_ibis(signal, fs, beats_ix_corrected, ts_col)
     return signal, beats_ix_corrected, ibi_corrected
 
 def _accept_beat_corrections(
@@ -151,13 +139,17 @@ def _accept_beat_corrections(
 ):
     """Accept the suggested automatic beat corrections in a signal."""
     signal = signal.copy()
+
     # Save original beat indices
     signal.loc[signal['Beat'] == 1, 'Original Beat'] = 1
+
     # Reset beat column
     signal['Beat'] = None
+
     # Update beat column with corrected beats
     signal.loc[signal['Corrected'] == 1, 'Beat'] = 1
     signal.drop(columns = ['Corrected'], inplace = True)
+
     # Update artifacts
     beats_ix = signal.loc[signal['Beat'] == 1].index.values
     sqa = SQA.Cardio(fs)
@@ -187,6 +179,93 @@ def _revert_beat_corrections(
     signal.loc[artifacts_ix, 'Artifact'] = 1
     return signal, beats_ix, artifacts_ix
 
+def _preprocess_eda(
+    data: pd.DataFrame,
+    fs: int,
+    rs: Optional[int] = None,
+    temp: Optional[np.ndarray] = None,
+    seg_size: int = 60,
+    filt_on: bool = True,
+    scr_on: bool = True,
+    scr_amp: float = 0.1,
+    eda_min: float = 0.2,
+    eda_max: float = 40,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Run the PhysioView data processing pipeline on EDA data."""
+    preprocessed_data = data.copy()
+    signal = preprocessed_data['EDA'].values
+    has_ts = 'Timestamp' in preprocessed_data.columns
+    ts_col = 'Timestamp' if has_ts else 'Sample'
+
+    # Decide target sampling rate
+    target_fs = rs if rs is not None else (8 if fs > 8 else fs)
+
+    # Resample data if requested
+    if target_fs != fs:
+        signal_rs = EDA.resample(signal, fs, target_fs)
+        fs_eff = target_fs
+    else:
+        signal_rs = signal
+        fs_eff = fs
+
+    # Build timestamps/sample indices
+    n_samples = len(signal_rs)
+    if has_ts:
+        unix_fmt = _check_unix(preprocessed_data.Timestamp)
+        if unix_fmt is not None:
+            preprocessed_data.Timestamp = pd.to_datetime(
+                preprocessed_data.Timestamp, unit = unix_fmt)
+        t0 = preprocessed_data['Timestamp'].iloc[0]
+        step = pd.to_timedelta(1, unit = 's') / fs_eff
+        ts_rs = pd.date_range(start = t0, periods = n_samples, freq = step)
+    else:
+        ts_rs = np.arange(n_samples)
+
+    # Create resampled data
+    data_rs = pd.DataFrame({ts_col: ts_rs, 'EDA': signal_rs})
+    preprocessed_data = data_rs
+    fs = fs_eff  # update sampling rate to resampled rate
+
+    # Apply filter if requested
+    if filt_on:
+        filter_eda = EDA.Filters(fs)
+        preprocessed_data['Filtered'] = filter_eda.filter_signal(
+            preprocessed_data['EDA'], fs)
+        is_preprocessed = True
+        if temp is not None:
+            preprocessed_data['TEMP'] = filter_eda.moving_average(
+                temp, window_len = 5)
+            temp = preprocessed_data['TEMP'].values
+    else:
+        is_preprocessed = False
+
+    # Decompose to phasic and tonic components with convex optimization
+    phasic, tonic = EDA.decompose_eda(
+        preprocessed_data['EDA'], fs, show_progress = False)
+    preprocessed_data['Phasic'] = phasic
+    preprocessed_data['Tonic'] = tonic
+
+    # Detect SCR peaks if requested
+    if scr_on:
+        scr_ix = EDA.detect_scr_peaks(preprocessed_data['Phasic'],
+                                      min_amp_thresh = scr_amp)
+        preprocessed_data.loc[scr_ix, 'SCR'] = 1
+
+    # Compute quality metrics
+    edaqa = SQA.EDA(fs, eda_min, eda_max)
+    ycol = 'Filtered' if 'Filtered' in preprocessed_data.columns else 'EDA'
+    eda_validity = edaqa.get_validity_metrics(preprocessed_data[ycol])
+    preprocessed_data = pd.concat([
+        preprocessed_data, eda_validity['Invalid']], axis = 1)
+    eda_quality = edaqa.get_quality_metrics(preprocessed_data[ycol])
+    preprocessed_data = pd.concat([
+        preprocessed_data, eda_quality[eda_quality.columns[-3:]]], axis = 1)
+    metrics = edaqa.compute_metrics(
+        preprocessed_data[ycol], temp, is_preprocessed, seg_size,
+        show_progress = False)
+
+    return preprocessed_data, metrics
+
 # ===================== HeartView Dashboard UI Functions =====================
 def _check_csv(name) -> bool:
     """Check if a CSV file is valid."""
@@ -215,6 +294,26 @@ def _get_configs() -> list[str]:
     else:
         return []
 
+
+def _check_unix(ts: pd.Series) -> Union[str, None]:
+    """Check whether a given timestamps column contains Unix timestamps in
+    s, ms, or µs."""
+    try:
+        vals = pd.to_numeric(ts, errors = "coerce").dropna()
+    except Exception:
+        return None
+    if vals.empty:
+        return None
+    median_val = vals.median()
+    if 1e8 < median_val < 2e9:
+        return 's'
+    elif 1e11 < median_val < 2e13:
+        return 'ms'
+    elif 1e14 < median_val < 2e16:
+        return 'us'
+    else:
+        return None
+
 def _create_configs(
     source: str,
     dtype: str,
@@ -223,6 +322,8 @@ def _create_configs(
     artifact_method: str,
     artifact_tol: float,
     filter_on: bool,
+    scr_on: bool,
+    scr_amp: float,
     headers: Optional[dict] = None
 ) -> str:
     """Create a JSON-formatted configuration file of user SQA parameters."""
@@ -233,6 +334,8 @@ def _create_configs(
                'sampling rate': fs,
                'segment size': seg_size,
                'filters': filter_on,
+               'scr detection': scr_on,
+               'scr amplitude': scr_amp,
                'artifact identification method': artifact_method,
                'artifact tolerance': artifact_tol}
 
@@ -306,45 +409,69 @@ def _get_csv_headers(
     headers = initial.columns.tolist()
     return headers
 
-def _setup_data_ts(
+def _parse_temp_csv(contents: str) -> pd.DataFrame:
+    """Parse temperature data uploaded with dcc.Upload component."""
+    content_type, content_string = contents.split(',')
+    raw = base64.b64decode(content_string)
+    buf = StringIO(raw.decode('utf-8'))
+    return pd.read_csv(buf)
+
+def _setup_data(
     csv: str,
     dtype: str,
-    dropdown: list[str]
-) -> pd.DataFrame:
-    """Read uploaded CSV data into a data frame with timestamps."""
-    df = pd.read_csv(csv, usecols = dropdown)
-    if len(dropdown) > 2:
-        df = df.rename(columns = {
-            dropdown[0]: 'Timestamp',
-            dropdown[1]: dtype,
-            dropdown[2]: 'X',
-            dropdown[3]: 'Y',
-            dropdown[4]: 'Z'})
-    else:
-        df = df.rename(columns = {
-            dropdown[0]: 'Timestamp',
-            dropdown[1]: dtype})
-    return df
+    dropdowns: list[str],
+    temp_var: Optional[str] = None,
+    has_ts: bool = True,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Read and map columns of uploaded CSV data to variables."""
+    cols = dropdowns.copy()
 
-def _setup_data_samples(
-    csv: str, dtype:
-    str, dropdown:
-    list[str]
-) -> pd.DataFrame:
-    """Read uploaded CSV data into a data frame with sample counts."""
-    df = pd.read_csv(csv, usecols = dropdown)
-    if len(dropdown) > 1:
-        df = df.rename(columns = {
-            dropdown[0]: dtype,
-            dropdown[1]: 'X',
-            dropdown[2]: 'Y',
-            dropdown[3]: 'Z'})
+    # Check if acceleration data is provided
+    has_acc = len(dropdowns) > (1 if has_ts else 0) + 1
+
+    # Add temperature column if given
+    has_temp = temp_var is not None
+    if has_temp: cols.append(temp_var)
+
+    # Read data with the given columns
+    df = pd.read_csv(csv, usecols = cols)
+    df = df[cols].copy()
+
+    # Rename columns
+    rename_map, i = {}, 0
+    if has_ts:
+        rename_map[dropdowns[i]] = 'Timestamp'
+        i += 1
+    rename_map[dropdowns[i]] = dtype
+    i += 1
+    if has_acc:
+        for ax in ['X', 'Y', 'Z']:
+            rename_map[dropdowns[i]] = ax
+            i += 1
+    if has_temp:
+        rename_map[temp_var] = 'TEMP'
+    df.rename(columns = rename_map, inplace = True)
+
+    # Insert 'Sample column' if no timestamp
+    if not has_ts:
+        df.insert(0, 'Sample', np.arange(len(df)) + 1)
+        ts_col = 'Sample'
     else:
-        df = df.rename(columns = {
-            dropdown[0]: dtype})
-    samples = np.arange(len(df)) + 1
-    df.insert(0, 'Sample', samples)
-    return df
+        ts_col = 'Timestamp'
+
+    # Build signal DataFrame with 'TEMP' if it exists
+    data_cols = [ts_col, dtype]
+    if 'TEMP' in df.columns:
+        data_cols.append('TEMP')
+    data = df[data_cols]
+
+    # Build acceleration DataFrame
+    acc = None
+    if has_acc:
+        acc_cols = [ts_col, 'X', 'Y', 'Z']
+        acc = df[acc_cols]
+
+    return data, acc
 
 def _downsample_data(
     df: pd.DataFrame,
@@ -353,83 +480,115 @@ def _downsample_data(
     beats_ix: Union[list[int], np.ndarray],
     artifacts_ix: Union[list[int], np.ndarray],
     corrected_beats_ix: Union[list[int], np.ndarray] = None,
+    temp_col: Optional[str] = None,
     ds_target: int = 250,
     acc: Optional[pd.DataFrame] = None
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, float]:
-    """Downsample pre-processed cardio data and any acceleration data for
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, float]:
+    """Downsample pre-processed data and any acceleration data for
     quicker plot rendering on the dashboard."""
+    def __decimate(y: np.ndarray) -> np.ndarray:
+        """Helper function for zero-phase anti-alias filtering and decimation."""
+        if ds_factor == 1:
+            return y
+        cutoff = min(0.45 / ds_factor, 0.49)
+        b = firwin(numtaps = 129, cutoff = cutoff)
+        y_f = filtfilt(b, [1.0], y, method = "pad",
+                       padlen = min(3 * max(len(b), 1), len(y) - 1)) \
+            if len(y) > 10 else y
+        return y_f[::ds_factor]
+
+    # Validate column inputs
+    if signal_type not in df.columns:
+        raise KeyError(f'{signal_type} not found in input DataFrame.')
+    if temp_col is not None and temp_col not in df.columns:
+        raise KeyError(f'{temp_col} not found in input DataFrame.')
 
     # Choose x and y columns
     x_col = 'Timestamp' if 'Timestamp' in df.columns else 'Sample'
     y_col = 'Filtered' if 'Filtered' in df.columns else signal_type
 
+    # Calculate downsampling factor
     ds_factor = max(1, int(fs) // ds_target)
-    ds_fs = int(fs / ds_factor)
-    ds_idx = np.arange(0, len(df), ds_factor)
 
-    # Zero-phase anti-alias before decimation
-    b = firwin(numtaps = 129, cutoff = 0.45 / ds_factor)
-    y_src = df[y_col].to_numpy()
-    y_aa = filtfilt(b, [1.0], y_src)
-    y_dec = y_aa[::ds_factor]
-    ds = pd.DataFrame({
-        x_col: df[x_col].iloc[ds_idx].to_numpy(),
-        y_col: y_dec
-    })
+    if ds_factor != 1:
+        ds_fs = int(fs / ds_factor)
+        ds_idx = np.arange(0, len(df), ds_factor)
 
+        # Decimate primary signal
+        y_dec = __decimate(df[y_col])
+        ds = pd.DataFrame({x_col: df[x_col].iloc[ds_idx].to_numpy(), y_col: y_dec})
 
-    # Rescale detected and artifactual beat indices
-    down_beats = np.rint(
-        beats_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
-    down_artifacts = np.rint(
-        artifacts_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
-    ds.loc[down_beats, 'Beat'] = 1
-    ds.loc[down_artifacts, 'Artifact'] = 1
-    if corrected_beats_ix is not None:
-        down_corrected_beats = np.rint(
-            corrected_beats_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
-        ds.loc[down_corrected_beats, 'Corrected'] = 1
+        # Rescale detected, artifactual, and corrected beat indices
+        if beats_ix is not None:
+            down_beats = np.rint(
+                beats_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
+            ds.loc[down_beats, 'Beat'] = 1
+        if artifacts_ix is not None:
+            down_artifacts = np.rint(
+                artifacts_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
+            ds.loc[down_artifacts, 'Artifact'] = 1
+        if corrected_beats_ix is not None:
+            down_corrected_beats = np.rint(
+                corrected_beats_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
+            ds.loc[down_corrected_beats, 'Corrected'] = 1
 
-    # Downsample IBI data
-    ds_ibi = compute_ibis(ds, ds_fs, down_beats, ts_col = x_col)
-    if corrected_beats_ix is not None:
-        ds_ibi_corrected = compute_ibis(ds, ds_fs, down_corrected_beats, ts_col = x_col)
-    else:
-        ds_ibi_corrected = None
-
-    # Downsample acceleration data
-    if acc is not None:
-        acc_mag = acc['Magnitude'].to_numpy()
-
-        # Anti-alias and then decimate ACC signal
-        b = firwin(numtaps = 129, cutoff = 0.45 / ds_factor)
-        acc_aa = filtfilt(b, [1.0], acc_mag)
-        acc_dec = acc_aa[::ds_factor]
-        ds_acc = pd.DataFrame({x_col: df[x_col].iloc[ds_idx].to_numpy(),
-                               'Magnitude': acc_dec})
-    else:
+        # Downsample acceleration data
         ds_acc = None
-    return ds, ds_ibi, ds_ibi_corrected, ds_acc, ds_fs
+        if acc is not None:
+            acc_dec = __decimate(acc['Magnitude'])
+            ds_acc = pd.DataFrame(
+                {x_col: df[x_col].iloc[ds_idx].to_numpy(),
+                 'Magnitude': acc_dec})
+
+        # Downsample IBI data for cardiac signals
+        ds_ibi, ds_ibi_corrected = None, None
+        if signal_type in ('ECG', 'PPG', 'BVP'):
+            ds_ibi = compute_ibis(ds, ds_fs, down_beats, ts_col = x_col)
+            if corrected_beats_ix is not None:
+                ds_ibi_corrected = compute_ibis(
+                    ds, ds_fs, down_corrected_beats, ts_col = x_col)
+
+            # Downsample optional TEMP data for EDA signal
+            if temp_col is not None:
+                ds['TEMP'] = __decimate(df[temp_col])
+            return ds, ds_ibi, ds_ibi_corrected, ds_acc, ds_fs
+        else:
+            return ds, ds_ibi, ds_ibi_corrected, ds_acc, ds_fs
+
+    else:
+        ibi, ibi_corrected = None, None
+        if signal_type in ('ECG', 'PPG', 'BVP'):
+            ibi = compute_ibis(df, fs, beats_ix, ts_col = x_col)
+            if corrected_beats_ix is not None:
+                ibi_corrected = compute_ibis(
+                    df, fs, corrected_beats_ix, ts_col = x_col)
+        return df, ibi, ibi_corrected, acc, fs
+
 
 def _cardiac_summary_table(sqa_df: pd.DataFrame) -> dbc.Table:
-    """Display the SQA summary table."""
+    """Display the cardiac SQA summary table."""
 
     # Calculate average heart rate
     valid_df = sqa_df[sqa_df.Invalid != 1].copy().reset_index(drop = True)
     valid_ix = np.where(np.diff(valid_df['N Detected']) < 10)[0]
     valid_df = valid_df.loc[valid_ix].reset_index(drop = True)
-    avg_hr = '{0:.2f}'.format(valid_df['N Detected'].mean())
+    avg_n = '{0:.2f}'.format(valid_df['N Detected'].mean())
     missing_n = len(sqa_df.loc[sqa_df['N Missing'] > 0])
     artifact_n = len(sqa_df.loc[sqa_df['N Artifact'] > 0])
     invalid_n = len(sqa_df.loc[sqa_df['Invalid'] == 1])
     invalid_prop = '{0:.2f}%'.format(
         (invalid_n / sqa_df['Segment'].max()) * 100)
     avg_missing = '{0:.2f}%'.format(sqa_df['% Missing'].mean())
-    avg_artifact = '{0:.2f}%'.format(
-        sqa_df.loc[sqa_df['% Artifact'] > 0, '% Artifact'].mean())
+    avg_artifact = sqa_df.loc[sqa_df['% Artifact'] > 0, '% Artifact'].mean()
 
+    # Set NaN average artifact values to zero
+    if pd.isna(avg_artifact):
+        avg_artifact = 0
+    avg_artifact = f'{avg_artifact:.2f}%'
+
+    # Build summary table data
     data = [
-        ('Average Heart Rate', avg_hr),
+        ('Average Number of Beats', avg_n),
         ('Segments with Missing Beats', missing_n),
         ('Segments with Artifactual Beats', artifact_n),
         ('Segments with Invalid Beats', invalid_n),
@@ -438,15 +597,68 @@ def _cardiac_summary_table(sqa_df: pd.DataFrame) -> dbc.Table:
         ('Average % Artifactual Beats/Segment', avg_artifact)
     ]
 
-    # Manually build the table body
+    # Wrap in a dbc.Table
     rows = [
         html.Tr([
             html.Td(label),
             html.Td(value)
         ]) for label, value in data
     ]
+    table = dbc.Table(
+        rows,
+        className = 'segmentTable',
+        striped = False,
+        bordered = False,
+        hover = False
+    )
+
+    return table, data
+
+def _eda_summary_table(
+    sqa_df: pd.DataFrame,
+    tonic_scl: np.ndarray,
+    scr_series: Optional[np.ndarray] = None,
+    seg_size: Optional[int] = None
+) -> dbc.Table:
+    """Display the EDA SQA summary table."""
+
+    if scr_series is not None:
+        scr_peaks = np.nan_to_num(scr_series, nan = 0)
+        n_seg = int(np.ceil(len(scr_peaks)) / seg_size)
+        scr_segments = scr_peaks[:n_seg * seg_size].reshape(n_seg, seg_size)
+        avg_scr_seg = round(scr_segments.sum(axis = 1).mean(), 2)
+    else:
+        avg_scr_seg = 'N/A'
+
+    med_scl = round(np.median(tonic_scl), 2)
+    invalid_n = len(sqa_df.loc[sqa_df['N Invalid'] > 0])
+    invalid_prop = '{0:.2f}%'.format(sqa_df['% Invalid'].mean())
+    oor_prop = '{0:.2f}%'.format(sqa_df['% Out of Range'].mean())
+    excess_slope_prop = '{0:.2f}%'.format(sqa_df['% Excessive Slope'].mean())
+    temp_oor_mean = sqa_df['% Temp Out of Range'].mean()
+    if pd.isna(temp_oor_mean):
+        temp_oor_prop = 'N/A'
+    else:
+        temp_oor_prop = f'{temp_oor_mean:.2f}%'
+
+    # Build summary table data
+    data = [
+        ('Median Tonic SCL', med_scl),
+        ('Average SCR Peaks/Segment', avg_scr_seg),
+        ('Segments with Invalid Data', invalid_n),
+        ('Average % Invalid Data', invalid_prop),
+        ('Average % Out of Range', oor_prop),
+        ('Average % Excessive Slope', excess_slope_prop),
+        ('Average % Temp Out of Range', temp_oor_prop)
+    ]
 
     # Wrap in a dbc.Table
+    rows = [
+        html.Tr([
+            html.Td(label),
+            html.Td(value)
+        ]) for label, value in data
+    ]
     table = dbc.Table(
         rows,
         className = 'segmentTable',

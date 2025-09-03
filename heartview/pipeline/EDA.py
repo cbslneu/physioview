@@ -308,7 +308,7 @@ def compute_tonic_scl(
     Parameters
     ----------
     signal: array_like
-        An array containing the EDA signal.
+        An array containing the filtered EDA signal.
     fs : int, optional
         The sampling rate of the EDA signal; by default, 4 Hz.
     seg_size : int, optional
