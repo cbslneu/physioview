@@ -1301,22 +1301,6 @@ def plot_signal(
                 row = row_id, col = 1
             )
 
-        # Plot artifactual beats if provided
-        if has_artifacts:
-            artifacts_col = artifacts_map.get(stype, None)
-            first_y = axes_dict[stype][0]
-            fig.add_trace(
-                go.Scatter(
-                    x = sig_seg.loc[sig_seg[artifacts_col] == 1, ax_x],
-                    y = sig_seg.loc[sig_seg[artifacts_col] == 1, first_y],
-                    name = 'Potential Artifact',
-                    mode = 'markers',
-                    showlegend = True,
-                    marker = dict(color = 'red', size = 8),
-                    hovertemplate = f'<b>Potential Artifact</b><extra></extra>'
-                ),
-                row = row_id, col = 1
-            )
 
         # Plot corrected peaks if provided
         if has_corrected_peaks:
@@ -1378,6 +1362,23 @@ def plot_signal(
                         ),
                         row = row_id, col = 1
                     )
+                    
+        # Plot artifactual beats if provided
+        if has_artifacts:
+            artifacts_col = artifacts_map.get(stype, None)
+            first_y = axes_dict[stype][0]
+            fig.add_trace(
+                go.Scatter(
+                    x = sig_seg.loc[sig_seg[artifacts_col] == 1, ax_x],
+                    y = sig_seg.loc[sig_seg[artifacts_col] == 1, first_y],
+                    name = 'Potential Artifact',
+                    mode = 'markers',
+                    showlegend = True,
+                    marker = dict(color = 'red', size = 8),
+                    hovertemplate = f'<b>Potential Artifact</b><extra></extra>'
+                ),
+                row = row_id, col = 1
+            )
 
     # Plot IBI signal in the last subplot if provided
     if ibi is not None:
