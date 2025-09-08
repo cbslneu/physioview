@@ -220,6 +220,7 @@ def detect_scr_peaks(
     phasic: Union[np.ndarray, pd.Series],
     smooth_size: int = 20,
     min_amp_thresh: float = 0.1,
+    min_peak_amp: Optional[float] = None,
 ) -> np.ndarray:
     """
     Detect skin conductance response (SCR) peaks in a phasic EDA signal using
@@ -234,6 +235,9 @@ def detect_scr_peaks(
     min_amp_thresh : float, optional
         The minimum SCR amplitude threshold, relative to the max detected
         amplitude; by default, 0.1 (i.e., 10%).
+    min_peak_amp : float, optional
+        The minimum amplitude for a SCR peak to be considered valid; by
+        default, None.
 
     Returns
     -------
@@ -286,12 +290,21 @@ def detect_scr_peaks(
         amp = phasic[peak_idx] - phasic[onset]
         candidates.append((peak_idx, amp))
 
-    # Apply global amplitude threshold
+    # Apply sequential amplitude threshold
     if len(candidates) == 0:
         return np.array([])
-    global_max_amp = max(amp for _, amp in candidates)
-    peaks = [idx for idx, amp in candidates if
-             amp >= min_amp_thresh * global_max_amp]
+    peaks, amps = [], []
+    for idx, amp in candidates:
+        if not amps:
+            if (min_peak_amp is None) or (amp >= min_peak_amp):
+                peaks.append(idx)
+                amps.append(amp)
+        else:
+            use_rel = amp >= (min_amp_thresh * max(amps))
+            use_abs = (min_peak_amp is None) or (amp >= min_peak_amp)
+            if use_abs and use_rel:
+                peaks.append(idx)
+                amps.append(amp)
 
     return np.array(peaks)
 

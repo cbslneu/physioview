@@ -248,7 +248,7 @@ def _preprocess_eda(
     # Detect SCR peaks if requested
     if scr_on:
         scr_ix = EDA.detect_scr_peaks(preprocessed_data['Phasic'],
-                                      min_amp_thresh = scr_amp)
+                                      min_peak_amp = scr_amp)
         preprocessed_data.loc[scr_ix, 'SCR'] = 1
 
     # Compute quality metrics
@@ -260,8 +260,13 @@ def _preprocess_eda(
     eda_quality = edaqa.get_quality_metrics(preprocessed_data[ycol])
     preprocessed_data = pd.concat([
         preprocessed_data, eda_quality[eda_quality.columns[-3:]]], axis = 1)
+
+    # Filter out SCRs from invalid data points
+    preprocessed_data.loc[preprocessed_data.Invalid == 1, 'SCR'] = np.nan
+    peaks_ix = preprocessed_data.loc[preprocessed_data.SCR == 1].index.values
+
     metrics = edaqa.compute_metrics(
-        preprocessed_data[ycol], temp, is_preprocessed, seg_size,
+        preprocessed_data[ycol], temp, is_preprocessed, peaks_ix, seg_size,
         show_progress = False)
 
     return preprocessed_data, metrics
