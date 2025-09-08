@@ -2020,6 +2020,7 @@ class EDA:
         signal: np.ndarray,
         temp: Optional[np.ndarray] = None,
         preprocessed: bool = True,
+        peaks_ix: Optional[np.ndarray] = None,
         seg_size: int = 60,
         rolling_window: Optional[int] = None,
         rolling_step: int = 15,
@@ -2037,10 +2038,14 @@ class EDA:
         ----------
         signal : array_like
             An array containing the EDA signal in microsiemens.
-        temp : array_like
-            An array containing temperature data in Celsius; by default, None.
+        temp : array_like, optional
+            An optional array containing temperature data in Celsius; by
+            default, None.
         preprocessed : boolean, optional
             Whether filtered EDA data is being inputted; by default, True.
+        peaks_ix : array_like, optional
+            An optional array containing locations of SCR peaks; by default,
+            None. If provided, an 'N SCRs' metric is included in the output.
         seg_size : int
             The segment size in seconds; by default, 60.
         rolling_window : int, optional
@@ -2070,6 +2075,10 @@ class EDA:
         seg_name = 'Moving Window' if rolling_window else 'Segment'
         metrics = []
 
+        has_scr = peaks_ix is not None
+        if has_scr:
+            peaks_ix = np.asarray(peaks_ix, dtype = int)
+
         # Rolling window approach
         if rolling_window is not None:
             step = int(rolling_step * fs)
@@ -2086,14 +2095,18 @@ class EDA:
                 valid_ix, invalid_ix, seg_metrics = self._edaqa(
                     segment, seg_temp, preprocessed)
                 total_len = len(segment)
-                metrics.append({
+                row = {
                     seg_name: i + 1,
                     'N Valid': len(valid_ix),
                     '% Valid': round((len(valid_ix) / total_len) * 100, 2),
                     'N Invalid': len(invalid_ix),
                     '% Invalid': round((len(invalid_ix) / total_len) * 100, 2),
                     **seg_metrics
-                })
+                }
+                if has_scr:
+                    n_scr = np.count_nonzero((peaks_ix >= start) & (peaks_ix < end))
+                    row['N SCRs'] = int(n_scr)
+                metrics.append(row)
 
         # Segmented approach
         else:
@@ -2109,14 +2122,18 @@ class EDA:
                 valid_ix, invalid_ix, seg_metrics = self._edaqa(
                     segment, seg_temp, preprocessed)
                 total_len = len(segment)
-                metrics.append({
+                row = {
                     seg_name: i + 1,
                     'N Valid': len(valid_ix),
                     '% Valid': round((len(valid_ix) / total_len) * 100, 2),
                     'N Invalid': len(invalid_ix),
                     '% Invalid': round((len(invalid_ix) / total_len) * 100, 2),
                     **seg_metrics
-                })
+                }
+                if has_scr:
+                    n_scr = np.count_nonzero((peaks_ix >= start) & (peaks_ix < end))
+                    row['N SCRs'] = int(n_scr)
+                metrics.append(row)
         metrics = pd.DataFrame(metrics)
         return metrics
 
@@ -2266,6 +2283,27 @@ class EDA:
                                     'valid<extra></extra>')
             ]
         )
+
+        # If N SCRs exist, add markers above bars
+        if 'N SCRs' in metrics.columns:
+            y_top = metrics['% Invalid'] + metrics['% Valid']
+            mask = metrics['N SCRs'] > 0
+
+            fig.add_trace(
+                go.Scatter(
+                    x = metrics.loc[mask, 'Segment'],
+                    y = (y_top + 3).loc[mask],
+                    mode = 'text+markers',
+                    text = ['✦'] * mask.sum(),  # star only where SCRs exist
+                    textposition = 'middle center',
+                    textfont = dict(color = '#f9c669'),
+                    marker = dict(size = 1, color = '#f9c669',
+                                  symbol = 'circle'),
+                    showlegend = False,
+                    hovertemplate = 'SCR(s) detected<extra></extra>',
+                )
+            )
+
         fig.update_layout(
             barmode = 'stack',
             font = dict(family = 'Poppins', color = 'black'),
