@@ -985,6 +985,8 @@ def plot_signal(
     acc: Optional[pd.DataFrame] = None,
     ibi: Optional[pd.DataFrame] = None,
     ibi_corrected: Optional[pd.DataFrame] = None,
+    hline: Optional[float] = None,
+    hline_name: Optional[str] = None,
     seg_number: Optional[int] = 1,
     seg_size: Optional[int] = 60,
     n_segments: Optional[int] = 1,
@@ -1045,6 +1047,11 @@ def plot_signal(
         {'ECG': {'Added': 'Added Beat',
                  'Deleted': 'Deleted Beat',
                  'Unusable': 'Unusable'}}.
+    hline : float, optional
+        If provided, plots a horizontal dotted line for a given reference
+        amplitude value in the primary signal plot(s); by default, None.
+    hline_name : str, optional
+        A label for the horizontal line; by default, None.
     acc : pandas.DataFrame, optional
         DataFrame containing accelerometer data. If present, plotted
         as a secondary signal in the first subplot. Must contain
@@ -1241,6 +1248,23 @@ def plot_signal(
         acc_y_seg = acc_y[seg_start:seg_end].copy()
         fig = _acc_subplot(sig_seg[ax_x], acc_y_seg, fig)
         start_row = 2
+
+    # Plot horizontal line if requested
+    has_hline = (hline is not None)
+    if has_hline:
+        unit = _DEFAULT_SIGNAL_PARAMS.get(signal_type[0], None)['unit']
+        fig.add_trace(
+            go.Scatter(
+                x = sig_seg[ax_x],
+                y = [hline] * len(sig_seg[ax_x]),
+                mode = 'lines',
+                line = dict(color = 'red', dash = 'dot', width = 1),
+                showlegend = False,
+                hovertemplate = (f'{hline_name}: {hline} {unit}<extra></extra>'
+                                 if hline_name is not None else '<extra></extra>'),
+            ),
+            row = start_row, col = 1
+        )
 
     # Plot primary signals
     for i, stype in enumerate(signal_type):

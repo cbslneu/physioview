@@ -257,7 +257,7 @@ layout = html.Div(id = 'main', children = [
             ], style = {'padding': '5px 0px 7px 0px'}),
             html.Div(id = 'segment-data', children = [
                 html.Span('Segment Size (sec):'),
-                dcc.Input(id = 'seg-size', value = 60, type = 'number'),
+                dcc.Input(id = 'seg-size', type = 'number'),
                 html.I(className = 'fa-regular fa-circle-question',
                        id = 'seg-data-help'),
                 dbc.Tooltip(

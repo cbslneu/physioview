@@ -183,7 +183,8 @@ def get_callbacks(app):
          Output('eda-preprocessing', 'hidden', allow_duplicate = True),
          Output('scr-amplitude-threshold', 'hidden'),
          Output('beat-detectors', 'options'),
-         Output('beat-detectors', 'value')],
+         Output('beat-detectors', 'value'),
+         Output('seg-size', 'value', allow_duplicate = True)],
         [Input('e4-data-types', 'value'),
          Input('data-types', 'value'),
          Input('toggle-resample', 'on'),
@@ -206,12 +207,14 @@ def get_callbacks(app):
         beat_detectors = []
         default_beat_detector = None
         data_source = loaded_data['source']
+        seg_size = 60
 
         # Handle EDA components
         if dtype == 'EDA' or e4_dtype == 'EDA':
             resample_hidden = False
             load_temp_hidden = False
             eda_preprocess_hidden = False
+            seg_size = 180
             if toggle_rs_on is True:
                 resample_disabled = False
             if toggle_scr_on is True:
@@ -239,7 +242,8 @@ def get_callbacks(app):
         return [resample_hidden, resample_disabled,
                 load_temp_hidden, temp_upload_hidden,
                 cardio_preprocess_hidden, eda_preprocess_hidden,
-                scr_amp_thresh_hidden, beat_detectors, default_beat_detector]
+                scr_amp_thresh_hidden, beat_detectors, default_beat_detector,
+                seg_size]
 
     # === Read temperature data file if provided ==============================
     @app.callback(
@@ -324,7 +328,7 @@ def get_callbacks(app):
          Output('temp-uploader', 'disabled'),
          Output('temp-uploader', 'children', allow_duplicate = True),
          Output('sampling-rate', 'value'),
-         Output('seg-size', 'value'),
+         Output('seg-size', 'value', allow_duplicate = True),
          Output('artifact-method', 'value'),
          Output('artifact-tol', 'value'),
          Output('toggle-filter', 'on'),
@@ -380,6 +384,7 @@ def get_callbacks(app):
                 hide_data_types = True
                 hide_data_vars = True
                 fs = 64
+                seg_size = 180
                 if toggle_config_on:
                     seg_size = configs['segment size']
                     fs = configs['sampling rate']
@@ -835,7 +840,6 @@ def get_callbacks(app):
                     dtype = 'ECG'
 
                     # Prepare Actiwave Cardio data
-                    # is Actiwave downsampling automatically handled?
                     actiwave = heartview.Actiwave(filepath)
                     actiwave_data = actiwave.preprocess(time_aligned = True)
                     data = actiwave_data[['Timestamp', dtype]].copy()
@@ -846,8 +850,6 @@ def get_callbacks(app):
 
                 # -- Empatica E4 sources -------------------------------------
                 elif file_type == 'E4':
-                    # is E4 downsampling automatically handled? should be false
-                    # ds = False
                     E4 = heartview.Empatica(filepath)
                     e4_data = E4.preprocess()
 
@@ -961,6 +963,12 @@ def get_callbacks(app):
                     if temp_data is not None:
                         temp = temp_data['TEMP']
                     elif 'TEMP' in data.columns:
+                        temp = data['TEMP'].values
+                    elif (temp_path / f'{file}_TEMP.csv').exists():
+                        temperature = pd.read_csv(str(temp_path / f'{file}_TEMP.csv'))
+                        temperature.Timestamp = pd.to_datetime(temperature.Timestamp)
+                        data = pd.merge(data, temperature, on = 'Timestamp',
+                                        how = 'inner')
                         temp = data['TEMP'].values
                     else:
                         temp = None
@@ -1396,7 +1404,8 @@ def get_callbacks(app):
          State('segment-dropdown', 'options'),
          State('artifact-method', 'value'),
          State('artifact-tol', 'value'),
-         State('temperature-load', 'data')],
+         State('temperature-load', 'data'),
+         State('eda-valid-min', 'value'),],
         prevent_initial_call = True
     )
     def update_signal_plots(memory, selected_segment, selected_subject,
@@ -1404,7 +1413,8 @@ def get_callbacks(app):
                             accept_corrections_n, reject_corrections_n,
                             revert_corrections_n, beats_edited, all_subjects,
                             beat_correction_status, segment_size, filt_on,
-                            segments, artifact_method, artifact_tol, temp_data):
+                            segments, artifact_method, artifact_tol,
+                            temp_data, eda_min):
         """Update the raw data plot based on the selected segment view."""
         if memory is None:
             raise PreventUpdate
@@ -1652,6 +1662,7 @@ def get_callbacks(app):
                     axes = (x_axis, eda_subplots),
                     fs = fs,
                     peaks_map = {data_type: 'SCR'} if has_scr else None,
+                    hline = eda_min, hline_name = 'Min. Valid EDA',
                     acc = acc, seg_number = selected_segment,
                     seg_size = segment_size)
                 for trace in signal_plots.data:
