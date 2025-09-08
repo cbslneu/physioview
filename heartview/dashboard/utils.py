@@ -187,7 +187,7 @@ def _preprocess_eda(
     seg_size: int = 60,
     filt_on: bool = True,
     scr_on: bool = True,
-    scr_amp: float = 0.1,
+    scr_amp: float = 0.25,
     eda_min: float = 0.2,
     eda_max: float = 40,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -259,7 +259,7 @@ def _preprocess_eda(
         preprocessed_data, eda_validity['Invalid']], axis = 1)
     eda_quality = edaqa.get_quality_metrics(preprocessed_data[ycol])
     preprocessed_data = pd.concat([
-        preprocessed_data, eda_quality[eda_quality.columns[-3:]]], axis = 1)
+        preprocessed_data, eda_quality[eda_quality.columns[-2:]]], axis = 1)
 
     # Filter out SCRs from invalid data points
     preprocessed_data.loc[preprocessed_data.Invalid == 1, 'SCR'] = np.nan

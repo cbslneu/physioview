@@ -245,7 +245,7 @@ layout = html.Div(id = 'main', children = [
                     style = {'paddingBottom:': '10px'}),
                 html.Div(id = 'scr-amplitude-threshold', children = [
                     html.Span('Minimum Peak Amplitude (µS):'),
-                    dcc.Input(id = 'scr-amp-thresh', value = 0.1, type = 'number')
+                    dcc.Input(id = 'scr-amp-thresh', value = 0.25, type = 'number')
                 ], hidden = True),
                 html.Div(id = 'valid-amplitude-range', children = [
                     html.Span('Valid EDA Range (µS):'),
