@@ -1565,6 +1565,36 @@ def get_callbacks(app):
                     ibi_edited = heartview.compute_ibis(
                         data_edited, fs, data_edited_beats_ix, ts_col)
 
+                    # Remove invalid IBIs + artifacts from any 'Unusable' portions
+                    if 'Unusable' in data_edited.columns:
+                        unusable_ix = data_edited[data_edited.Unusable == 1].index.values
+                        breaks = np.where(np.diff(unusable_ix) > 1)[0]
+                        if len(breaks) == 0:
+                            starts = [unusable_ix[0]]
+                            ends = [unusable_ix[-1]]
+                        else:
+                            starts = np.insert(unusable_ix[breaks + 1], 0, unusable_ix[0])
+                            ends = np.insert(unusable_ix[breaks], 0, unusable_ix[-1])
+
+                        unusable_bounds = list(zip(starts, ends))
+                        for s, e in unusable_bounds:
+
+                            # Get the last valid values before 'Unusable'
+                            ibi_pre_ix = ibi_edited['IBI'].loc[:s-1].last_valid_index()
+                            artif_pre_ix = data_edited['Artifact'].loc[:s-1].last_valid_index()
+                            if ibi_pre_ix is not None:
+                                ibi_edited.loc[ibi_pre_ix] = np.nan
+                            if artif_pre_ix is not None:
+                                data_edited.loc[artif_pre_ix, 'Artifact'] = np.nan
+
+                            # Get the first valid values after 'Unusable'
+                            ibi_post_ix = ibi_edited['IBI'].loc[e+1:].first_valid_index()
+                            artif_post_ix = data_edited['Artifact'].loc[e+1:].first_valid_index()
+                            if ibi_post_ix is not None:
+                                ibi_edited.loc[ibi_post_ix] = np.nan
+                            if artif_post_ix is not None:
+                                data_edited.loc[artif_post_ix, 'Artifact'] = np.nan
+
                     # Render updated signal plots
                     signal_plots = heartview.plot_signal(
                         signal = data_edited, signal_type = data_type,
