@@ -567,8 +567,13 @@ class Cardio:
         last_seg_len = len(seconds) % seg_size
         if last_seg_len > 0:
             last_detected = n_detected.iloc[-1]
-            last_expected_ratio = min_hr / n_expected.iloc[:-1].median()
-            last_expected = last_expected_ratio * last_seg_len
+            med_expected = n_expected.iloc[:-1].median()
+            if med_expected == 0:
+                # Fallback to an estimate based on min_hr
+                last_expected = min_hr * (last_seg_len / seg_size)
+            else:
+                last_expected_ratio = min_hr / med_expected
+                last_expected = last_expected_ratio * last_seg_len
             if last_expected > last_detected:
                 last_n_missing = last_expected - last_detected
                 last_perc_missing = round(
