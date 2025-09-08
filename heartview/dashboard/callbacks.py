@@ -741,6 +741,11 @@ def get_callbacks(app):
                     if acc is not None:
                         acc['Magnitude'] = ACC.compute_magnitude(
                             acc['X'], acc['Y'], acc['Z'])
+                        if has_ts:
+                            unix_fmt = utils._check_unix(acc.Timestamp)
+                            if unix_fmt is not None:
+                                acc.Timestamp = pd.to_datetime(
+                                    acc.Timestamp, unit = unix_fmt)
                         acc.to_csv(
                             str(temp_path / f'{fname}_ACC.csv'),
                             index = False)
@@ -774,7 +779,8 @@ def get_callbacks(app):
 
                     # ---- EDA data ------------------------------------------
                     else:
-                        temp = data[temp_var].values if temp_var else None
+                        temp = data['TEMP'].values if 'TEMP' in data.columns \
+                            else None
                         try:
                             preprocessed = utils._preprocess_eda(
                                 data, fs, rs, temp, seg_size, filt_on, scr_on,
@@ -923,6 +929,11 @@ def get_callbacks(app):
                 if acc is not None and not acc.empty:
                     acc['Magnitude'] = ACC.compute_magnitude(
                         acc['X'], acc['Y'], acc['Z'])
+                    if 'Timestamp' in acc.columns:
+                        unix_fmt = utils._check_unix(acc.Timestamp)
+                        if unix_fmt is not None:
+                            acc.Timestamp = pd.to_datetime(
+                                acc.Timestamp, unit = unix_fmt)
                     acc.to_csv(str(temp_path / f'{file}_ACC.csv'),
                                index = False)
 
@@ -1739,6 +1750,7 @@ def get_callbacks(app):
             return [False, None, True, False, True]
         else:
             data_type = memory['data type']
+            file_type = memory['file type']
             if export_mode == 'Single':
                 file = selected_subject
                 files2export = [temp_path / f'{file}_SQA.csv']
@@ -1759,11 +1771,19 @@ def get_callbacks(app):
                         temp_path / f'{file}_PPG.csv',
                         temp_path / f'{file}_IBI.csv',
                         temp_path / f'{file}_quality_summary.txt'])
-                else:  # if data_type == 'ECG'
+                elif data_type == 'ECG':
                     files2export.extend([
                         temp_path / f'{file}_ECG.csv',
                         temp_path / f'{file}_IBI.csv',
                         temp_path / f'{file}_quality_summary.txt'])
+                elif data_type == 'EDA':
+                    files2export.extend([
+                        temp_path / f'{file}_EDA.csv',
+                        temp_path / f'{file}_quality_summary.txt'])
+                    if file_type == 'E4':
+                        files2export.extend([
+                            temp_path / f'{file}_TEMP.csv'
+                        ])
                 if (temp_path / f'{file}_ACC.csv').exists():
                     files2export.append(temp_path / f'{file}_ACC.csv')
 
@@ -1790,12 +1810,20 @@ def get_callbacks(app):
                             temp_path / f'{f}_IBI.csv',
                             temp_path / f'{f}_quality_summary.txt'
                         ])
-                    else:  # if data_type == 'ECG'
+                    elif data_type == 'ECG':
                         files2export.extend([
                             temp_path / f'{f}_ECG.csv',
                             temp_path / f'{f}_IBI.csv',
                             temp_path / f'{f}_quality_summary.txt'
                         ])
+                    elif data_type == 'EDA':
+                        files2export.extend([
+                            temp_path / f'{f}_EDA.csv',
+                            temp_path / f'{f}_quality_summary.txt'])
+                        if file_type == 'E4':
+                            files2export.extend([
+                                temp_path / f'{f}_TEMP.csv'
+                            ])
                     if (temp_path / f'{f}_ACC.csv').exists():
                         files2export.append(temp_path / f'{f}_ACC.csv')
 
@@ -2328,7 +2356,7 @@ def get_callbacks(app):
             if want_signal:
                 sig_files = [p for p in signal_files if s in str(p)]
                 for sig_path in sig_files:
-                    if sig_path.stem.endswith(data_type):
+                    if sig_path.stem.endswith(('ECG', 'PPG', 'BVP')):
                         cleaned = temp_path / f'{s}_{data_type}_cleaned.csv'
                         if cleaned.exists():
                             out.append(cleaned)
