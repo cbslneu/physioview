@@ -329,7 +329,11 @@ def _create_configs(
     filter_on: bool,
     scr_on: bool,
     scr_amp: float,
-    headers: Optional[dict] = None
+    headers: Optional[dict] = None,
+    temp_on: bool = False,
+    temp_var: Optional[str] = None,
+    eda_min: Optional[float] = None,
+    eda_max: Optional[float] = None
 ) -> str:
     """Create a JSON-formatted configuration file of user SQA parameters."""
 
@@ -342,7 +346,11 @@ def _create_configs(
                'scr detection': scr_on,
                'scr amplitude': scr_amp,
                'artifact identification method': artifact_method,
-               'artifact tolerance': artifact_tol}
+               'artifact tolerance': artifact_tol,
+               'use temperature': temp_on,
+               'temperature variable': temp_var,
+               'minimum eda': eda_min,
+               'maximum eda': eda_max}
 
     if headers is not None:
         configs['headers'] = headers

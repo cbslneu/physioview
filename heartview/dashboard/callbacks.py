@@ -323,6 +323,7 @@ def get_callbacks(app):
          Output('data-type-dropdown-4', 'value'),
          Output('data-type-dropdown-5', 'options'),
          Output('data-type-dropdown-5', 'value'),
+         Output('toggle-temp-data', 'on'),
          Output('temp-variable', 'options'),
          Output('temp-variable', 'value'),
          Output('temp-uploader', 'disabled'),
@@ -332,7 +333,9 @@ def get_callbacks(app):
          Output('artifact-method', 'value'),
          Output('artifact-tol', 'value'),
          Output('toggle-filter', 'on'),
-         Output('toggle-scr-detection', 'on')],
+         Output('toggle-scr-detection', 'on'),
+         Output('eda-valid-min', 'value'),
+         Output('eda-valid-max', 'value')],
         [Input('memory-load', 'data'),
          Input('config-memory', 'data'),
          State('toggle-config', 'on')],
@@ -353,18 +356,25 @@ def get_callbacks(app):
         hide_data_vars = False
         hide_variable_error = True
 
+        # Default toggler states
+        temp_on = False
+        filter_on = False
+        scr_on = False
+
         # Default parameter values
         base_headers = ['<Var>', '<Var>']
         drop_values = [base_headers[:] for _ in range(6)]
-        filter_on = False
-        scr_on = False
         temp_uploader_disabled = False
         temp_uploader_text = 'Select File...'
+        temp_options = []
+        temp_value = None
         artifact_method = 'cbd'
         artifact_tol = 1
         seg_size = 60
         fs = 500
         dtype = None
+        eda_min = 0.2
+        eda_max = 40
 
         if loaded == 'memory-load':
 
@@ -457,6 +467,9 @@ def get_callbacks(app):
             artifact_tol = configs['artifact tolerance']
             filter_on = configs['filters']
             scr_on = configs['scr detection']
+            temp_on = configs['use temperature']
+            eda_min = configs['minimum eda']
+            eda_max = configs['maximum eda']
 
             if device in ('E4', 'Actiwave'):
                 hide_setup = hide_data_types = hide_data_vars = True
@@ -465,11 +478,27 @@ def get_callbacks(app):
             else:
                 headers = list(configs['headers'].values())
                 base_headers = headers
-                drop_values = [[h for h in headers if h is not None] for _
-                               in range(6)]
+                drop_values = [h for h in configs['headers'].values()
+                               if h is not None]
+                # drop_values = [[h for h in headers if h is not None] for _
+                #                in range(6)]
+
+            # Populate temperature dropdown
+            if temp_on:
+                tv = configs.get('temperature variable')
+                if tv:
+                    temp_options = [{'label': tv, 'value': tv}]
+                    temp_value = tv
 
         dropdown_options = [{'label': h, 'value': h} for h in base_headers
                             if h is not None]
+
+        if not temp_options:
+            temp_options = dropdown_options[:]
+        if temp_value is not None:
+            pass
+        else:
+            temp_value = None
 
         return (
             hide_setup, hide_preprocess, hide_eda_preprocess, hide_segsize,
@@ -481,12 +510,15 @@ def get_callbacks(app):
             dropdown_options, drop_values[2],
             dropdown_options, drop_values[3],
             dropdown_options, drop_values[4],
-            dropdown_options, drop_values[5],
+
+            # temperature toggle and dropdown options
+            temp_on, temp_options, temp_value,
 
             # temperature data upload
             temp_uploader_disabled, temp_uploader_text,
 
-            fs, seg_size, artifact_method, artifact_tol, filter_on, scr_on
+            fs, seg_size, artifact_method, artifact_tol, filter_on, scr_on,
+            eda_min, eda_max
         )
 
     # =================== TOGGLE EXPORT CONFIGURATION MODAL ===================
@@ -566,14 +598,19 @@ def get_callbacks(app):
          State('artifact-method', 'value'),
          State('artifact-tol', 'value'),
          State('toggle-filter', 'on'),
+         State('toggle-temp-data', 'on'),
+         State('temp-variable', 'value'),
          State('toggle-scr-detection', 'on'),
          State('scr-amp-thresh', 'value'),
+         State('eda-valid-min', 'value'),
+         State('eda-valid-max', 'value'),
          State('config-filename', 'value')],
         prevent_initial_call = True
     )
     def write_confirm_config(n, data, dtype, fs, d1, d2, d3, d4, d5,
                              seg_size, artifact_method, artifact_tol,
-                             filter_on, scr_on, scr_amp, filename):
+                             filter_on, temp_on, temp_var, scr_on,
+                             scr_amp, eda_min, eda_max, filename):
         """Export the configuration file."""
         if n:
             headers = None
@@ -595,7 +632,8 @@ def get_callbacks(app):
                     'Z': d5}
             json_object = utils._create_configs(
                 device, dtype, fs, seg_size, artifact_method, artifact_tol,
-                filter_on, scr_on, scr_amp, headers)
+                filter_on, scr_on, scr_amp, headers, temp_on, temp_var,
+                eda_min, eda_max)
             download = {'content': json_object, 'filename': f'{filename}.json'}
             return [download, 1]
 
