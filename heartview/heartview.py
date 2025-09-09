@@ -548,7 +548,7 @@ class Empatica:
                 raise ValueError('No "TEMP.csv" file found.')
             with archive.open(temp_file) as temp_file:
                 temp, temp_start, temp_fs = self._get_e4_data(
-                    temp_file, name = 'Temp')
+                    temp_file, name = 'TEMP')
             temp_data = self.Data(**{'temp': temp,
                                      'start': temp_start,
                                      'fs': temp_fs})
@@ -985,6 +985,8 @@ def plot_signal(
     acc: Optional[pd.DataFrame] = None,
     ibi: Optional[pd.DataFrame] = None,
     ibi_corrected: Optional[pd.DataFrame] = None,
+    hline: Optional[float] = None,
+    hline_name: Optional[str] = None,
     seg_number: Optional[int] = 1,
     seg_size: Optional[int] = 60,
     n_segments: Optional[int] = 1,
@@ -1002,9 +1004,20 @@ def plot_signal(
     signal_type : str or list of str
         The name(s) of the primary signal type(s) to plot. Possible values
         include 'ECG', 'PPG', 'BVP', 'EDA', 'HR', 'RESP', and 'TEMP'.
-    axes : tuple of (str, str or list of str)
-        A tuple of column names for the x- and y-axis signal(s) in
-        `signal`.
+    axes : tuple of (str, str or list of str or dict)
+        A tuple specifying the x-axis column and the y-axis signal(s) to plot.
+        The first element must be the name of the column in `signal` to use
+        for the x-axis (e.g., `'Timestamp'`).
+        The second element can take one of the following forms:
+        - str : a single y-axis column to plot for one signal type.
+          Example: `('Timestamp', 'EDA')`.
+        - list of str : multiple y-axis columns to plot for the same signal type.
+          Example: `('Timestamp', ['EDA', 'Phasic'])`.
+        - dict : mapping of signal types to one or more y-axis columns,
+          allowing multiple signal types to be plotted in separate subplots.
+          Example:
+          `('Timestamp', {'EDA': 'EDA', 'ECG': 'ECG'})`
+          `('Timestamp', {'EDA': ['EDA', 'Phasic'], 'ECG': ['ECG']})`.
     fs : int
         The sampling rate (Hz) of the signal data.
     peaks_map : dict of {str: str}, optional
@@ -1034,6 +1047,11 @@ def plot_signal(
         {'ECG': {'Added': 'Added Beat',
                  'Deleted': 'Deleted Beat',
                  'Unusable': 'Unusable'}}.
+    hline : float, optional
+        If provided, plots a horizontal dotted line for a given reference
+        amplitude value in the primary signal plot(s); by default, None.
+    hline_name : str, optional
+        A label for the horizontal line; by default, None.
     acc : pandas.DataFrame, optional
         DataFrame containing accelerometer data. If present, plotted
         as a secondary signal in the first subplot. Must contain
@@ -1071,7 +1089,7 @@ def plot_signal(
     >>> fig = heartview.plot_signal(
     >>>     signal = data,
     >>>     signal_type = ['ECG', 'EDA'],
-    >>>     axes = ('Timestamp', ['II', 'GSR']),
+    >>>     axes = ('Timestamp', {'ECG': 'II', 'EDA': 'GSR'}),
     >>>     fs = 256,
     >>>     peaks_map = {'ECG': 'Beat', 'EDA', 'SCR'},
     >>>     artifacts_map = {'ECG': 'Artifact'},
@@ -1079,14 +1097,29 @@ def plot_signal(
     >>>     ibi = ibi_data)
     >>> fig.show()
     """
+
     # Validate axes
     ax_x, ax_y = axes[0], axes[1]
-    ax_y = ax_y if isinstance(ax_y, list) else [ax_y]
-    if ax_x not in signal.columns:
-        raise KeyError(f'{ax_x} not found in `signal` columns.')
-    for y in ax_y:
-        if y not in signal.columns:
-            raise KeyError(f'{y} not found in `signal` columns.')
+    if isinstance(ax_y, str):
+        if ax_y not in signal.columns:
+            raise KeyError(f'{ax_y} not found in `signal` columns.')
+    elif isinstance(ax_y, list):
+        for y in ax_y:
+            if y not in signal.columns:
+                raise KeyError(f'{y} not found in `signal` columns.')
+    elif isinstance(ax_y, dict):
+        for stype, ycols in ax_y.items():
+            ycols = [ycols] if isinstance(ycols, str) else ycols
+            for y in ycols:
+                if y not in signal.columns:
+                    raise KeyError(f'{y} not found in `signal` columns.')
+            if stype not in signal_type:
+                raise KeyError(f'{stype} not given in `signal_type`.')
+    else:
+        raise TypeError(
+            '`axes[1]` must be a str, list of str, or dict '
+            'mapping signal types to column(s).'
+        )
 
     # Validate peaks map keys
     if peaks_map is not None:
@@ -1121,6 +1154,37 @@ def plot_signal(
 
         row_ids = list(range(1, len(row_heights) + 1))
         return row_heights, row_ids
+
+    # Normalize axes
+    if isinstance(ax_y, str):
+        if isinstance(signal_type, list):
+            if len(signal_type) != 1:
+                raise ValueError(
+                    'If `axes` is a tuple with a single y-column, '
+                    '`signal_type` must also be a single string.')
+            axes_dict = {signal_type[0]: [ax_y]}
+        else:
+            axes_dict = {signal_type: [ax_y]}
+    elif isinstance(ax_y, list):
+        # Multiple traces but still one signal type
+        if isinstance(signal_type, list):
+            if len(signal_type) != 1:
+                raise ValueError(
+                    'If `axes` is a tuple with a list of y-columns, '
+                    '`signal_type` must be a single string.')
+            axes_dict = {signal_type[0]: ax_y}
+        else:
+            axes_dict = {signal_type: ax_y}
+    elif isinstance(ax_y, dict):
+        axes_dict = {
+            stype: ([val] if isinstance(val, str) else val)
+            for stype, val in ax_y.items()
+        }
+
+    else:
+        raise TypeError(
+            '`axes[1]` must be a str, list of str, or dict '
+            'mapping signal types to column(s).')
 
     # Count and extract secondary signals
     has_acc, has_ibi, has_ibi_corrected = False, False, False
@@ -1185,6 +1249,23 @@ def plot_signal(
         fig = _acc_subplot(sig_seg[ax_x], acc_y_seg, fig)
         start_row = 2
 
+    # Plot horizontal line if requested
+    has_hline = (hline is not None)
+    if has_hline:
+        unit = _DEFAULT_SIGNAL_PARAMS.get(signal_type[0], None)['unit']
+        fig.add_trace(
+            go.Scatter(
+                x = sig_seg[ax_x],
+                y = [hline] * len(sig_seg[ax_x]),
+                mode = 'lines',
+                line = dict(color = 'red', dash = 'dot', width = 1),
+                showlegend = False,
+                hovertemplate = (f'{hline_name}: {hline} {unit}<extra></extra>'
+                                 if hline_name is not None else '<extra></extra>'),
+            ),
+            row = start_row, col = 1
+        )
+
     # Plot primary signals
     for i, stype in enumerate(signal_type):
         row_id = start_row + i
@@ -1194,27 +1275,30 @@ def plot_signal(
         has_artifacts = (artifacts_map is not None)
         has_edits = (edits_map is not None)
         has_corrected_peaks = (correction_map is not None)
-        if (has_edits and 'Unusable' in list(edits_map.values())[0].keys()
-                and 'Unusable' in sig_seg.columns):
-            sig_traces = dict(
-                x = sig_seg[ax_x],
-                y = sig_seg[ax_y[i]].where(sig_seg.Unusable != 1, np.nan)
-                # x = sig_seg.loc[sig_seg.Unusable != 1, ax_x],
-                # y = sig_seg.loc[sig_seg.Unusable != 1, ax_y[i]]
-            )
-        else:
-            sig_traces = dict(x = sig_seg[ax_x], y = sig_seg[ax_y[i]])
 
-        fig.add_trace(
-            go.Scatter(
-                **sig_traces,
-                mode = 'lines',
-                connectgaps = False,
-                line = dict(color = color),
-                hovertemplate = f'%{{x}}<br>%{{y:.2f}} {unit}<extra></extra>',
-                name = stype
-            ),
-            row = row_id, col = 1)
+        for j, ycol in enumerate(axes_dict[stype]):
+            if (has_edits and 'Unusable' in list(edits_map.values())[0].keys()
+                    and 'Unusable' in sig_seg.columns):
+                sig_traces = dict(
+                    x = sig_seg[ax_x],
+                    y = sig_seg[ycol].where(sig_seg.Unusable != 1, np.nan)
+                )
+            else:
+                sig_traces = dict(x = sig_seg[ax_x], y = sig_seg[ycol])
+
+            trace_name = ycol if len(axes_dict[stype]) > 1 else stype
+
+            fig.add_trace(
+                go.Scatter(
+                    **sig_traces,
+                    mode = 'lines',
+                    connectgaps = False,
+                    line = dict(color = color),
+                    hovertemplate = f'%{{x}}<br><b>{trace_name}:</b> %{{y:.2f}} '
+                                    f'{unit}<extra></extra>',
+                    name = trace_name
+                ),
+                row = row_id, col = 1)
 
         # Plot peaks if provided
         if has_peaks:
@@ -1224,11 +1308,14 @@ def plot_signal(
             )
             hover = f'<b>{label}</b><extra></extra>'
             peaks_col = peaks_map.get(stype, None)
+            if not peaks_col:
+                continue
             _peak_color = '#f9c669' if peaks_color is None else peaks_color
+            first_y = axes_dict[stype][0]
             fig.add_trace(
                 go.Scatter(
                     x = sig_seg.loc[sig_seg[peaks_col] == 1, ax_x],
-                    y = sig_seg.loc[sig_seg[peaks_col] == 1, ax_y[i]],
+                    y = sig_seg.loc[sig_seg[peaks_col] == 1, first_y],
                     name = label,
                     mode = 'markers',
                     showlegend = True,
@@ -1238,29 +1325,15 @@ def plot_signal(
                 row = row_id, col = 1
             )
 
-        # Plot artifactual beats if provided
-        if has_artifacts:
-            artifacts_col = artifacts_map.get(stype, None)
-            fig.add_trace(
-                go.Scatter(
-                    x = sig_seg.loc[sig_seg[artifacts_col] == 1, ax_x],
-                    y = sig_seg.loc[sig_seg[artifacts_col] == 1, ax_y[i]],
-                    name = 'Potential Artifact',
-                    mode = 'markers',
-                    showlegend = True,
-                    marker = dict(color = 'red', size = 8),
-                    hovertemplate = f'<b>Potential Artifact</b><extra></extra>'
-                ),
-                row = row_id, col = 1
-            )
-        
+
         # Plot corrected peaks if provided
         if has_corrected_peaks:
             corrected_peaks_col = correction_map.get(stype, None)
+            first_y = axes_dict[stype][0]
             fig.add_trace(
                 go.Scatter(
                     x = sig_seg.loc[sig_seg[corrected_peaks_col] == 1, ax_x],
-                    y = sig_seg.loc[sig_seg[corrected_peaks_col] == 1, ax_y[i]],
+                    y = sig_seg.loc[sig_seg[corrected_peaks_col] == 1, first_y],
                     name = 'Auto-Corrected Beat',
                     mode = 'markers',
                     showlegend = True,
@@ -1289,7 +1362,7 @@ def plot_signal(
                 x_vals = sig_seg[ax_x]
                 if col == 'Unusable':
                     # Draw a line only where Unusable == 1
-                    y_vals = sig_seg[ax_y[i]].where(unus_mask, np.nan)
+                    y_vals = sig_seg[ycol].where(unus_mask, np.nan)
                     fig.add_trace(
                         go.Scatter(
                             x = x_vals, y = y_vals,
@@ -1302,7 +1375,7 @@ def plot_signal(
                     )
                 else:
                     mask = edit_mask & ~unus_mask
-                    y_vals = sig_seg[ax_y[i]].where(mask, np.nan)
+                    y_vals = sig_seg[ycol].where(mask, np.nan)
                     fig.add_trace(
                         go.Scatter(
                             x = x_vals, y = y_vals,
@@ -1313,25 +1386,23 @@ def plot_signal(
                         ),
                         row = row_id, col = 1
                     )
-                # fig.add_trace(
-                #     go.Scatter(
-                #         x = sig_seg.loc[sig_seg[col] == 1, ax_x],
-                #         y = sig_seg.loc[sig_seg[col] == 1, ax_y[i]],
-                #         showlegend = True,
-                #         connectgaps = False,
-                #         hovertemplate = hover,
-                #         **style
-                #     ),
-                #     row = row_id, col = 1
-                # )
-
-        # Format primary signal subplot
-        fig.update_yaxes(
-            title_text = unit, title_standoff = 5,
-            showgrid = True, gridwidth = 0.5, gridcolor = 'lightgrey',
-            griddash = 'dot', tickcolor = 'grey', linecolor = 'grey',
-            row = row_id, col = 1
-        )
+                    
+        # Plot artifactual beats if provided
+        if has_artifacts:
+            artifacts_col = artifacts_map.get(stype, None)
+            first_y = axes_dict[stype][0]
+            fig.add_trace(
+                go.Scatter(
+                    x = sig_seg.loc[sig_seg[artifacts_col] == 1, ax_x],
+                    y = sig_seg.loc[sig_seg[artifacts_col] == 1, first_y],
+                    name = 'Potential Artifact',
+                    mode = 'markers',
+                    showlegend = True,
+                    marker = dict(color = 'red', size = 8),
+                    hovertemplate = f'<b>Potential Artifact</b><extra></extra>'
+                ),
+                row = row_id, col = 1
+            )
 
     # Plot IBI signal in the last subplot if provided
     if ibi is not None:
@@ -1346,7 +1417,11 @@ def plot_signal(
         if has_ibi_corrected:
             ibi_y = ibi_corrected[ibi_corrected_col]
             ibi_y_seg = ibi_y[seg_start:seg_end].copy()
-            fig = _ibi_subplot(sig_seg[ax_x], ibi_y_seg, fig, line_dict = dict(color = 'rgba(34, 139, 33, 0.5)', width = 2.0), name = 'Auto-Corrected IBI')
+            fig = _ibi_subplot(
+                sig_seg[ax_x], ibi_y_seg, fig,
+                line_dict = dict(color = 'rgba(34, 139, 33, 0.5)',
+                                 width = 2.0),
+                name = 'Auto-Corrected IBI')
 
     # General figure formatting
     x_min, x_max = sig_seg[ax_x].min(), sig_seg[ax_x].max()
@@ -1370,6 +1445,27 @@ def plot_signal(
         )],
         margin = dict(l = 20, r = 20, t = 60, b = 70)
     )
+
+    # Add y-axis labels
+    for i, stype in enumerate(signal_type):
+        row_id = start_row + i
+        unit = _DEFAULT_SIGNAL_PARAMS.get(stype, {}).get('unit', stype)
+        fig.update_yaxes(
+            title_text = unit,
+            title_standoff = 5,
+            row = row_id, col = 1
+        )
+
+    # Enforce grid lines on all subplots
+    for yaxis_name in [k for k in fig.layout if k.startswith('yaxis')]:
+        fig.layout[yaxis_name].update(
+            showgrid = True,
+            gridcolor = 'lightgrey',
+            griddash = 'dot',
+            gridwidth = 0.5,
+            tickcolor = 'grey',
+            linecolor = 'grey'
+        )
 
     return fig
 
@@ -1524,8 +1620,8 @@ def process_beat_edits(
     if has_ts:
         # Convert all timestamps to datetime format
         if not np.issubdtype(processed['Timestamp'].dtype, np.datetime64):
-            processed['Timestamp'] = pd.to_datetime(processed['Timestamp'],
-                                                    errors = 'coerce')
+            processed['Timestamp'] = pd.to_datetime(
+                processed['Timestamp'], errors = 'coerce')
 
         # Map timestamps of edited beats to nearest timestamp
         if not beat_edits.empty:

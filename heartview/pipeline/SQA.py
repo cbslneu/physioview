@@ -1,9 +1,10 @@
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
+from typing import Literal, Optional, Union
 from tqdm import tqdm
 from math import ceil
 from scipy.interpolate import interp1d
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
 
 DEBUGGING = False
 
@@ -19,7 +20,7 @@ class Cardio:
         The sampling rate of the cardiovascular data.
     """
 
-    def __init__(self, fs):
+    def __init__(self, fs: int):
         """
         Initialize the Cardiovascular object.
 
@@ -30,9 +31,18 @@ class Cardio:
         """
         self.fs = int(fs)
 
-    def compute_metrics(self, data, beats_ix, artifacts_ix, ts_col = None,
-                        seg_size = 60, min_hr = 40, rolling_window = None,
-                        rolling_step = 15, show_progress = True):
+    def compute_metrics(
+        self,
+        data: pd.DataFrame,
+        beats_ix: np.ndarray,
+        artifacts_ix: np.ndarray,
+        ts_col: Optional[str] = None,
+        seg_size: int = 60,
+        min_hr: float = 40,
+        rolling_window: Optional[int] = None,
+        rolling_step: int = 15,
+        show_progress: bool = True
+    ) -> pd.DataFrame:
         """
         Compute all SQA metrics for cardiovascular data by segment or
         moving window. Metrics per segment or moving window include numbers
@@ -47,15 +57,15 @@ class Cardio:
             An array containing the indices of detected beats.
         artifacts_ix : array_like
             An array containing the indices of artifactual beats.
-        seg_size : int
-            The segment size in seconds; by default, 60.
-        min_hr : int, float
-            The minimum acceptable heart rate against which the number of
-            beats in the last partial segment will be compared; by default, 40.
         ts_col : str, optional
             The name of the column containing timestamps; by default, None.
             If a string value is given, the output will contain a timestamps
             column.
+        seg_size : int, optional
+            The segment size in seconds; by default, 60.
+        min_hr : float, optional
+            The minimum acceptable heart rate against which the number of
+            beats in the last partial segment will be compared; by default, 40.
         rolling_window : int, optional
             The size, in seconds, of the sliding window across which to
             compute the SQA metrics; by default, None.
@@ -209,8 +219,14 @@ class Cardio:
 
         return metrics
 
-    def get_artifacts(self, data, beats_ix, artifacts_ix,
-                      seg_size = 60, ts_col = None):
+    def get_artifacts(
+        self,
+        data: pd.DataFrame,
+        beats_ix: np.ndarray,
+        artifacts_ix: np.ndarray,
+        seg_size: int = 60,
+        ts_col: Optional[str] = None
+    ) -> pd.DataFrame:
         """
         Summarize the number and proportion of artifactual beats per segment.
 
@@ -281,8 +297,15 @@ class Cardio:
             ]
         return artifacts
 
-    def identify_artifacts(self, beats_ix, method, initial_hr = None,
-                           prev_n = None, neighbors = None, tol = None):
+    def identify_artifacts(
+        self,
+        beats_ix: np.ndarray,
+        method: Literal['hegarty', 'cbd', 'both'],
+        initial_hr: Union[float, Literal['auto'], None] = None,
+        prev_n: Optional[int] = None,
+        neighbors: Optional[int] = None,
+        tol: Optional[float] = None
+    ) -> np.ndarray:
         """
         Identify locations of artifactual beats in cardiovascular data based
         on the criterion beat difference approach by Berntson et al. (1990),
@@ -292,10 +315,10 @@ class Cardio:
         ----------
         beats_ix : array_like
             An array containing the indices of detected beats.
-        method : str
+        method : {'hegarty', 'cbd', 'both'}
             The artifact identification method for identifying artifacts.
             This must be 'hegarty', 'cbd', or 'both'.
-        initial_hr : int, float, or 'auto', optional
+        initial_hr : float, or 'auto', optional
             The heart rate value for the first interbeat interval (IBI) to be
             validated against; by default, 'auto' for automatic calculation
             using the mean heart rate value obtained from six consecutive
@@ -337,8 +360,11 @@ class Cardio:
         Reports, 10(1), 1–16.
         """
 
-        def identify_artifacts_hegarty(beats_ix, initial_hr = 'auto',
-                                       prev_n = 6):
+        def identify_artifacts_hegarty(
+            beats_ix: np.ndarray,
+            initial_hr: Union[float, Literal['auto']] = 'auto',
+            prev_n: int = 6
+        ) -> np.ndarray:
             """Identify locations of artifactual beats in cardiovascular data
             based on the approach by Hegarty-Craver et al. (2018)."""
 
@@ -383,7 +409,11 @@ class Cardio:
 
             return np.array(valid_beats), np.array(artifact_beats)
 
-        def identify_artifacts_cbd(beats_ix, neighbors = 5, tol = 1):
+        def identify_artifacts_cbd(
+            beats_ix: np.ndarray,
+            neighbors: int = 5,
+            tol: float = 1
+        ) -> np.ndarray:
             """Identify locations of abnormal interbeat intervals (IBIs) using
              the criterion beat difference test by Berntson et al. (1990)."""
 
@@ -483,8 +513,15 @@ class Cardio:
                 'or \'both\'.')
         return artifacts_ix
 
-    def get_missing(self, data, beats_ix, seg_size = 60, min_hr = 40,
-                    ts_col = None, show_progress = True):
+    def get_missing(
+        self,
+        data: pd.DataFrame,
+        beats_ix: np.ndarray,
+        seg_size: int = 60,
+        min_hr: float = 40,
+        ts_col: Optional[str] = None,
+        show_progress: bool = True
+    ) -> pd.DataFrame:
         """
         Summarize the number and proportion of missing beats per segment.
 
@@ -494,9 +531,9 @@ class Cardio:
             The DataFrame containing the pre-processed ECG or PPG data.
         beats_ix : array-like
             An array containing the indices of detected beats.
-        seg_size : int
+        seg_size : int, optional
             The size of the segment in seconds; by default, 60.
-        min_hr : int, float
+        min_hr : float, optional
             The minimum acceptable heart rate against which the number of
             beats in the last partial segment will be compared; by default, 40.
         ts_col : str, optional
@@ -530,8 +567,13 @@ class Cardio:
         last_seg_len = len(seconds) % seg_size
         if last_seg_len > 0:
             last_detected = n_detected.iloc[-1]
-            last_expected_ratio = min_hr / n_expected.iloc[:-1].median()
-            last_expected = last_expected_ratio * last_seg_len
+            med_expected = n_expected.iloc[:-1].median()
+            if med_expected == 0:
+                # Fallback to an estimate based on min_hr
+                last_expected = min_hr * (last_seg_len / seg_size)
+            else:
+                last_expected_ratio = min_hr / med_expected
+                last_expected = last_expected_ratio * last_seg_len
             if last_expected > last_detected:
                 last_n_missing = last_expected - last_detected
                 last_perc_missing = round(
@@ -579,13 +621,19 @@ class Cardio:
             ]
         return missing
 
-    def get_seconds(self, data, beats_ix, ts_col = None, show_progress = True):
-        """Get second-by-second HR, IBI, and beat counts from ECG or PPG data
-        according to the approach by Graham (1978).
+    def get_seconds(
+        self,
+        data: pd.DataFrame,
+        beats_ix: np.ndarray,
+        ts_col: Optional[str] = None,
+        show_progress: bool = True
+    ) -> pd.DataFrame:
+        """Get instantaneous (second-by-second) HR, IBI, and beat counts from
+        ECG or PPG data according to the approach by Graham (1978).
 
         Parameters
         ----------
-        data : pd.DataFrame
+        data : pandas.DataFrame
             The DataFrame containing the pre-processed ECG or PPG data.
         beats_ix : array-like
             An array containing the indices of detected beats.
@@ -599,8 +647,8 @@ class Cardio:
 
         Returns
         -------
-        interval_data : pd.DataFrame
-            A DataFrame containing second-by-second HR and IBI values.
+        interval_data : pandas.DataFrame
+            A DataFrame containing instantaneous HR and IBI values.
 
         Notes
         -----
@@ -613,7 +661,6 @@ class Cardio:
         sequentially through real and cardiac time. Psychophysiology, 15(5),
         492–495.
         """
-
         df = data.copy()
         temp_beat = '_temp_beat'
         df.index = df.index.astype(int)
@@ -667,26 +714,40 @@ class Cardio:
             s += 1
         interval_data = pd.DataFrame(interval_data)
         return interval_data
-    
-    def correct_interval(self, beats_ix, seg_size = 60, initial_hr = 'auto', prev_n = 6, min_bpm = 40, max_bpm = 200, 
-                            hr_estimate_window = 6, print_estimated_hr = True, short_threshold = (24 / 32),  long_threshold = (44 / 32), extra_threshold = (52 / 32)):
+
+    def correct_interval(
+        self,
+        beats_ix: np.ndarray,
+        initial_hr: Union[float, Literal['auto']] = 'auto',
+        prev_n: int = 6,
+        min_bpm: int = 40,
+        max_bpm: int = 200,
+        hr_estimate_window: int = 6,
+        print_estimated_hr: bool = True,
+        short_threshold: float = (24 / 32),
+        long_threshold: float = (44 / 32),
+        extra_threshold: float = (52 / 32)
+    ) -> tuple[np.ndarray, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         '''
-        Correct artifactual beats in cardiovascular data based
-        on the approach by Hegarty-Craver et al. (2018).
+        Correct artifactual beats in cardiovascular data based on the
+        approach by Hegarty-Craver et al. (2018).
 
         Parameters
         ----------
         beats_ix : array_like
             An array containing the indices of detected beats.
-        initial_hr : int, float, optional
+        initial_hr : float or {'auto'}, optional
             The heart rate value for the first interbeat interval (IBI) to be
-            validated against; by default, automatically set ('auto').
+            validated against; by default, 'auto' (i.e., the value is
+            determined automatically).
         prev_n : int, optional
             The number of preceding IBIs to validate against; by default, 6.
         min_bpm : int, optional
-            The minimum possible heart rate in beats per minute (bpm); by default, 40.
+            The minimum possible heart rate in beats per minute (bpm);
+            by default, 40.
         max_bpm : int, optional
-            The maximum possible heart rate in beats per minute (bpm); by default, 200.
+            The maximum possible heart rate in beats per minute (bpm);
+            by default, 200.
         hr_estimate_window : int, optional
             The window size for estimating the heart rate; by default, 6.
         print_estimated_hr : bool, optional
@@ -702,10 +763,14 @@ class Cardio:
         -------
         beats_ix_corrected: array_like
             An array containing the indices of corrected beats.
+        corrected_ibis : array_like
+            An array containing the indices of corrected IBIs.
         original: pandas.DataFrame
-            A data frame containing the original IBIs (millisecond-based and index-based) and beat indices.
+            A DataFrame containing the original IBIs (millisecond-based and
+            index-based) and beat indices.
         corrected: pandas.DataFrame
-            A data frame containing the corrected IBIs (millisecond-based and index-based) and beat indices.
+            A DataFrame containing the corrected IBIs (millisecond-based and
+            index-based) and beat indices.
 
         References
         ----------
@@ -716,15 +781,18 @@ class Cardio:
         global MIN_BPM, MAX_BPM
         MIN_BPM = min_bpm
         MAX_BPM = max_bpm
-        
+
         ibis = np.diff(beats_ix)
         # drop the first beat
         beats = beats_ix[1:]
 
         global cnt, corrected_ibis, corrected_beats, corrected_flags
-        global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
+        global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, \
+            current_flag, correction_flags
+
         # increment when correcting the ibi and decrement when accepting the ibi
         cnt = 0
+
         # initialize
         prev_ibi = 0
         prev_beat = 0
@@ -736,58 +804,66 @@ class Cardio:
         corrected_beats = []
         corrected_flags = []
         correction_flags = [0 for i in range(len(beats))]
-        
+
         # Set the initial IBI to compare against
         global prev_ibis_fifo, first_ibi, correction_failed
         if initial_hr == 'auto':
             successive_diff = np.abs(np.diff(ibis))
-            min_diff_ix = np.convolve(successive_diff, np.ones(hr_estimate_window) / hr_estimate_window, mode = 'valid').argmin()
+            min_diff_ix = np.convolve(
+                successive_diff, np.ones(hr_estimate_window) / hr_estimate_window,
+                mode = 'valid').argmin()
             first_ibi = ibis[min_diff_ix:min_diff_ix + hr_estimate_window].mean()
             if print_estimated_hr:
                 print('Estimated average HR (bpm): ', np.floor(60 / (first_ibi / self.fs)))
         else:
             first_ibi = self.fs * 60 / initial_hr
-        
+
         # FIFO for the previous n+1 IBIs
         prev_ibis_fifo = self._MaxNFifo(prev_n, first_ibi)
         # Store whether the correction failed for the last n IBIs
         correction_failed = self._MaxNFifo(prev_n - 1)
 
-        def _estimate_ibi(prev_ibis):
+        def _estimate_ibi(prev_ibis: np.ndarray) -> int:
             '''
             Estimate IBI based on the previous IBIs.
-            
+
             Parameters
-            ---------------------
+            ----------
             prev_ibis: array_like
                 A list of prev_n number of previous IBIs.
-            
+
             Returns
-            ---------------------
+            -------
             estimated_ibi : int
             '''
             return np.median(prev_ibis)
 
-        def _return_flag(current_ibi, prev_ibis = None):
+        def _return_flag(
+            current_ibi: int,
+            prev_ibis: Optional[np.ndarray] = None
+        ) -> str:
             '''
-            Return whether the current IBI is correct, short, long, or extra long based on the previous IBIs.
+            Return whether the current IBI is correct, short, long, or extra
+            long based on the previous IBIs.
                 Correct: 26/32 - 44/32 of the estimated IBI
                 Short: < 26/32 of the estimated IBI
                 Long: > 44/32 and < 54/32 of the estimated IBI
                 Extra Long: > 54/32 of the estimated IBI
-            
+
             Parameters
-            ---------------------
+            ----------
             current_ibi: int
                 current IBI value in the number of indices.
             prev_ibis: array_like, optional
                 A list of prev_n number of previous IBIs.
-            
+
             Returns
-            ---------------------
+            -------
             flag : str
-                The flag of the current IBI: 'Correct', 'Short', 'Long', or 'Extra Long'.
+                The flag of the current IBI: 'Correct', 'Short', 'Long', or
+                'Extra Long'.
             '''
+
             # Calculate the estimated IBI
             estimated_ibi = _estimate_ibi(prev_ibis)
 
@@ -796,7 +872,7 @@ class Cardio:
             high = long_threshold * estimated_ibi
             extra = extra_threshold * estimated_ibi
 
-            # flag the ibi: correct, short, long, or extra long
+            # Flag the ibi: correct, short, long, or extra long
             if low <= current_ibi <= high:
                 flag = 'Correct'
             elif current_ibi < low:
@@ -805,28 +881,34 @@ class Cardio:
                 flag = 'Long'
             else:
                 flag = 'Extra Long'
-            
+
             return flag
-        
-        def _acceptance_check(corrected_ibi, prev_ibis):
+
+        def _acceptance_check(
+            corrected_ibi: int,
+            prev_ibis: np.ndarray
+        ) -> bool:
             '''
-            Check if the corrected IBI is acceptable (falls within the 27/32 - 42/32 of the estimated IBI).
+            Check if the corrected IBI is acceptable (falls within
+            27/32 to 42/32 of the estimated IBI).
 
             Parameters
-            ---------------------
+            ----------
             corrected_ibi: int
                 The corrected IBI value.
             prev_ibis: array_like
                 A list of prev_n number of previous IBIs.
-            
+
             Returns
-            ---------------------
+            -------
             bool
-                True if the corrected IBI is within the acceptable range, False otherwise.
+                True if the corrected IBI is within the acceptable range,
+                False otherwise.
             '''
+
             # Calculate the estimated IBI
             estimated_ibi = _estimate_ibi(prev_ibis)
-            
+
             # Set the acceptable/valid range of IBIs
             low = short_threshold * estimated_ibi
             high = long_threshold * estimated_ibi
@@ -838,23 +920,24 @@ class Cardio:
             else:
                 return False
 
-        def _accept_ibi(n, correction_failed_flag = 0):
+        def _accept_ibi(n: int, correction_failed_flag: int = 0) -> None:
             '''
             Accept the current IBI without correction.
 
             Parameters
-            ---------------------
+            ----------
             n : int
                 The index of the current IBI.
             correction_failed_flag : int, optional
-                Flag to indicate whether the correction failed for the current IBI; by default, 0.
-                If the flag is 1, the correction failed for the current IBI.
+                Flag to indicate whether the correction failed for the
+                current IBI; by default, 0. If the flag is 1, the correction
+                failed for the current IBI.
             '''
             global prev_ibis_fifo, cnt, correction_failed
             global corrected_ibis, corrected_beats, corrected_flags
             global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag
-            
-            # Check if the previous IBI is within the limits before accepting the current IBI
+
+            # Check if previous IBI is within limits before accepting current IBI
             _check_limits(n)
 
             # Fix the previous IBI
@@ -869,56 +952,63 @@ class Cardio:
             prev_ibi = current_ibi
             prev_beat = current_beat
             prev_flag = current_flag
-            
+
             # Decrement the counter
             cnt = max(0, cnt-1)
             if DEBUGGING:
-                print('accepted:', current_ibi, ' flag:', current_flag, ' based on ', prev_ibis_fifo.get_queue()[1:])
-            # If the correction failed for the current IBI, push 1 to the correction_failed FIFO, otherwise push 0
+                print('accepted:', current_ibi,
+                      ' flag:', current_flag,
+                      ' based on ', prev_ibis_fifo.get_queue()[1:])
+
+            # If the correction failed for the current IBI, push 1 to the
+            # correction_failed FIFO, otherwise push 0
             if correction_failed_flag == 0:
                 correction_failed.push(0)
             else:
                 correction_failed.push(1)
-        
-        def _add_prev_and_current(n):
+
+        def _add_prev_and_current(n: int) -> None:
             '''
-            Add the previous and current IBIs if the sum is less than 42/32 of the estimated IBI.
+            Add the previous and current IBIs if the sum is less than 42/32 of
+            the estimated IBI.
 
             Parameters
-            ---------------------
+            ----------
             n : int
                 The index of the current IBI.
             '''
             global prev_ibis_fifo, cnt
             global corrected_ibis, corrected_beats, corrected_flags
-            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
-            
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, \
+                current_flag, correction_flags
+
             # Add the previous and current IBIs
             corrected_ibi = prev_ibi + current_ibi
 
             # Check if the corrected IBI is acceptable
             if _acceptance_check(corrected_ibi, prev_ibis_fifo.get_queue()[1:]):
+
                 # Update the current IBI to the corrected IBI
                 current_ibi = corrected_ibi
                 current_beat = current_beat
                 current_flag = _return_flag(current_ibi, prev_ibis_fifo.get_queue()[1:])
-
                 if n == 1:
                     # Update the previous IBI to the current IBI
                     prev_ibi = current_ibi
                     prev_beat = current_beat
                     prev_flag = current_flag
-
                 else:
                     # Pull up the second previous IBI as previous IBI
                     prev_ibi = corrected_ibis[-1]
                     prev_beat = corrected_beats[-1]
                     prev_flag = corrected_flags[-1]
-                    
-                    # Check if the previous IBI is within the limits before accepting the current IBI
+
+                    # Check if the previous IBI is within the limits before
+                    # accepting the current IBI
                     _check_limits(n)
-                    
-                    # Check_limits function may update the previous IBI pulled, so update the value
+
+                    # Check_limits function may update the previous IBI pulled,
+                    # so update the value
                     corrected_ibis[-1] = prev_ibi
                     corrected_beats[-1] = prev_beat
                     corrected_flags[-1] = prev_flag
@@ -939,26 +1029,31 @@ class Cardio:
                 cnt += 1
 
                 if DEBUGGING:
-                    print('added:', current_ibi, ' flag:', current_flag, ' based on ', prev_ibis_fifo.get_queue()[1:])
+                    print('added:', current_ibi,
+                          ' flag:', current_flag,
+                          ' based on ', prev_ibis_fifo.get_queue()[1:])
             else:
                 if DEBUGGING:
                     print('acceptance check failed for adding: ', corrected_ibi)
+
                 # If the corrected IBI is not acceptable, accept the current IBI
-                _accept_ibi(n, correction_failed_flag=1)
-        
-        def _add_secondprev_and_prev(n):
+                _accept_ibi(n, correction_failed_flag = 1)
+
+        def _add_secondprev_and_prev(n: int) -> None:
             '''
-            Add the second previous and previous IBIs if the sum is less than 42/32 of the estimated IBI.
+            Add the second previous and previous IBIs if the sum is less than
+            42/32 of the estimated IBI.
 
             Parameters
-            ---------------------
+            ----------
             n : int
                 The index of the current IBI.
             '''
             global prev_ibis_fifo, cnt
             global corrected_ibis, corrected_beats, corrected_flags
-            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
-            
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, \
+                current_flag, correction_flags
+
             # Add the previous and current IBIs
             corrected_ibi = corrected_ibis[-1] + prev_ibi
 
@@ -966,15 +1061,15 @@ class Cardio:
             # Use IBIs before the second previous IBI
             if _acceptance_check(corrected_ibi, prev_ibis_fifo.get_queue()[:-2]):
                 # Update the current IBI to the corrected IBI
-                
+
                 # Pull up the second previous IBI as previous IBI
                 prev_ibi = corrected_ibi
                 prev_beat = prev_beat
                 prev_flag = _return_flag(prev_ibi, prev_ibis_fifo.get_queue()[:-2])
-                
+
                 # Check if the previous IBI is within the limits before accepting the current IBI
                 _check_limits(n)
-                
+
                 # Update the value
                 corrected_ibis[-1] = prev_ibi
                 corrected_beats[-1] = prev_beat
@@ -996,35 +1091,41 @@ class Cardio:
                 cnt += 1
 
                 if DEBUGGING:
-                    print('added second prev + prev:', prev_ibi, ' flag:', prev_flag, ' based on ', prev_ibis_fifo.get_queue()[:-2])
+                    print('added second prev + prev:', prev_ibi,
+                          ' flag:', prev_flag,
+                          ' based on ', prev_ibis_fifo.get_queue()[:-2])
             else:
                 if DEBUGGING:
                     print('acceptance check failed for adding second prev + prev: ', corrected_ibi)
+
                 # If the corrected IBI is not acceptable, accept the current IBI
-                _accept_ibi(n, correction_failed_flag=1)
-                
-        def _insert_interval(n):
+                _accept_ibi(n, correction_failed_flag = 1)
+
+        def _insert_interval(n: int) -> None:
             '''
-            Split the (previous IBI + current IBI) into multiple intervals. 
+            Split the (previous IBI + current IBI) into multiple intervals.
             The number of splits is determined based on the initial_hr parameter.
-            
+
             Parameters
-            ---------------------
+            ----------
             n : int
                 The index of the current IBI.
             '''
             global prev_ibis_fifo, cnt, first_ibi
             global corrected_ibis, corrected_beats, corrected_flags
-            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, \
+                current_flag, correction_flags
 
             # Calculate the number of splits
-            n_split = round((prev_ibi + current_ibi) / _estimate_ibi(prev_ibis_fifo.get_queue()[1:]), 0).astype(int)
+            n_split = round((prev_ibi + current_ibi) / _estimate_ibi(
+                prev_ibis_fifo.get_queue()[1:]), 0).astype(int)
 
             # Calculate the new IBI
             ibi = np.floor((prev_ibi + current_ibi) / n_split)
 
             # Check if the corrected IBI is acceptable
             if _acceptance_check(ibi, prev_ibis_fifo.get_queue()[1:]):
+
                 # Fix inserted IBIs other than previous/current IBIs
                 for i in range(n_split - 2):
                     corrected_ibis.append(ibi)
@@ -1033,6 +1134,7 @@ class Cardio:
                         corrected_beats.append(beats_ix[0] + ibi)
                     else:
                         corrected_beats.append(corrected_beats[-1] + ibi)
+
                     # Add to the queue
                     prev_ibis_fifo.push(ibi)
 
@@ -1058,7 +1160,7 @@ class Cardio:
 
                 # Add to the queue
                 prev_ibis_fifo.push(prev_ibi)
-                
+
                 # Update the previous IBI to the current IBI
                 prev_ibi = current_ibi
                 prev_beat = current_beat
@@ -1072,29 +1174,33 @@ class Cardio:
                 cnt += n_split - 1
 
                 if DEBUGGING:
-                    print('inserted ',n_split - 2, ' intervals: ', ibi, ' flag:', current_flag, ' based on ', prev_ibis_fifo.get_queue()[1:])
+                    print('inserted ', n_split - 2,
+                          ' intervals: ', ibi,
+                          ' flag:', current_flag,
+                          ' based on ', prev_ibis_fifo.get_queue()[1:])
             else:
                 if DEBUGGING:
                     print('acceptance check failed for inserting: ', ibi)
-                # If the corrected IBI is not acceptable, accept the current IBI
-                _accept_ibi(n, correction_failed_flag=1)
 
-        def _average_prev_and_current(n):
+                # If the corrected IBI is not acceptable, accept the current IBI
+                _accept_ibi(n, correction_failed_flag = 1)
+
+        def _average_prev_and_current(n: int) -> None:
             '''
             Average the previous and current IBIs.
 
             Parameters
-            ---------------------
+            ----------
             n : int
                 The index of the current IBI.
             '''
             global prev_ibis_fifo, cnt
             global corrected_ibis, corrected_beats, corrected_flags
             global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
-            
+
             # Average the previous and current IBIs
             ibi = np.floor((prev_ibi + current_ibi) / 2)
-            
+
             # Check if the corrected IBI is acceptable
             if _acceptance_check(ibi, prev_ibis_fifo.get_queue()[1:]):
                 # Update the previous and current IBI
@@ -1122,7 +1228,7 @@ class Cardio:
                 prev_ibi = current_ibi
                 prev_beat = current_beat
                 prev_flag = current_flag
-                
+
                 # Flag that previous and current IBIs are corrected
                 correction_flags[n-1] = 1
                 correction_flags[n] = 1
@@ -1136,7 +1242,6 @@ class Cardio:
                 if DEBUGGING:
                     print('acceptance check failed for averaging: ', ibi)
                 _accept_ibi(n, correction_failed_flag=1)
-                
 
         def _check_limits(n):
             '''
@@ -1151,7 +1256,8 @@ class Cardio:
             '''
             global prev_ibis_fifo, cnt
             global corrected_ibis, corrected_beats, corrected_flags
-            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, current_flag, correction_flags
+            global prev_ibi, prev_beat, prev_flag, current_ibi, current_beat, \
+                current_flag, correction_flags
             MIN_IBI = np.floor(self.fs * 60 / MAX_BPM)         # minimum IBI in indices
             MAX_IBI = np.floor(self.fs * 60 / MIN_BPM)         # maximum IBI in indices
 
@@ -1193,11 +1299,11 @@ class Cardio:
                 if DEBUGGING:
                     print('Longer than the maximum IBI and corrected: ', prev_ibi, ' ', prev_flag, ' | ', current_ibi, ' ', current_flag)
             return
-        
+
         for n in range(len(ibis)):
             current_ibi = ibis[n]
             current_beat = beats[n]
-                
+
             # Accept the first ibi
             if n == 0:
                 current_flag = _return_flag(current_ibi, prev_ibis = prev_ibis_fifo.get_queue())
@@ -1205,48 +1311,65 @@ class Cardio:
                 prev_ibi = current_ibi
                 prev_beat = current_beat
                 prev_flag = current_flag
-            
+
             else:
                 current_flag = _return_flag(current_ibi, prev_ibis = prev_ibis_fifo.get_queue()[:-1])
-                # If the current ibi is correct
+
                 if DEBUGGING:
                     print('n:', n)
-                    print('prev:', prev_ibi, ' ', prev_flag, ' | current:', current_ibi, ' ', current_flag)
+                    print('prev:', prev_ibi, ' ', prev_flag,
+                          ' | current:', current_ibi, ' ', current_flag)
+
+                # If current IBI is correct
                 if current_flag == 'Correct':
+                    # If previous IBI is correct/long, accept current
                     if prev_flag == 'Correct' or prev_flag == 'Long':
-                        _accept_ibi(n)                           # If the previous ibi is correct or long, then accept the current ibi
+                        _accept_ibi(n)
                     elif prev_flag == 'Short':
                         if n == 1:
-                            _add_prev_and_current(n) 
+                            _add_prev_and_current(n)
                         else:
+                            # If previous IBI is shorter than current IBI, add them together
                             if corrected_ibis[-1] > current_ibi:
-                                _add_prev_and_current(n)                 # If the previous ibi is short, add previous and current intervals
+                                _add_prev_and_current(n)
                             else:
                                 _add_secondprev_and_prev(n)
+                    # If previous IBI is extra long, split previous and current
                     elif prev_flag == 'Extra Long':
-                        _insert_interval(n)                      # If the previous ibi is extra long, split the previous and current intervals
-                # If the current ibi is short
+                        _insert_interval(n)
+
+                # If current IBI is short
                 elif current_flag == 'Short':
+                    # If previous IBI is correct, accept it
                     if prev_flag == 'Correct':
-                        _accept_ibi(n)                           # If the previous ibi is correct, accept previous
+                        _accept_ibi(n)
+                    # If previous IBI is short, add previous + current
                     elif prev_flag == 'Short':
-                        _add_prev_and_current(n)                 # If the previous ibi is short, add previous and current intervals
+                        _add_prev_and_current(n)
+                    # If previous IBI is long/extra long, average previous and current
                     elif prev_flag == 'Long' or prev_flag == 'Extra Long':
-                        _average_prev_and_current(n)             # If the previous ibi is long or extra long, average the previous and current intervals
-                # If the current ibi is long
+                        _average_prev_and_current(n)
+
+                # If the current IBI is long
                 elif current_flag == 'Long':
+                    # If previous IBI is correct or long, accept it
                     if prev_flag == 'Correct' or prev_flag == 'Long':
-                        _accept_ibi(n)                           # If the previous ibi is correct or long, accept previous
+                        _accept_ibi(n)
+                    # If previous IBI is short, average previous and current
                     elif prev_flag == 'Short':
-                        _average_prev_and_current(n)             # If the previous ibi is short, average previous and current intervals
+                        _average_prev_and_current(n)
+                    # If previous IBI is extra long, split previous and current
                     elif prev_flag == 'Extra Long':
-                        _insert_interval(n)                      # If the previous ibi is extra long, split the previous and current intervals
-                # If the current ibi is extra long
+                        _insert_interval(n)
+
+                # If current IBI is extra long
                 elif current_flag == 'Extra Long':
+                    # If previous IBI is correct, long, or extra long, split previous and current
                     if prev_flag == 'Correct' or prev_flag == 'Long' or prev_flag == 'Extra Long':
-                        _insert_interval(n)                      # If the previous ibi is correct, long, or extra long, split the previous and current intervals
+                        _insert_interval(n)
+                    # If previous IBI is short, average previous and current
                     elif prev_flag == 'Short':
-                        _average_prev_and_current(n)             # If the previous ibi is short, average previous and current intervals
+                        _average_prev_and_current(n)
 
             # If more than 3 corrections are made in the last prev_n IBIs, reset the FIFO
             if sum(correction_failed.get_queue()) >= 3:
@@ -1261,47 +1384,76 @@ class Cardio:
 
         # Convert the IBIs to milliseconds
         original_ibis_ms = np.round((np.array(ibis) / self.fs) * 1000, 2)
-        
-        original = pd.DataFrame(
-            {'Original IBI (ms)': np.insert(original_ibis_ms, 0, np.nan),
+
+        original = pd.DataFrame({
+            'Original IBI (ms)': np.insert(original_ibis_ms, 0, np.nan),
             'Original IBI (index)': np.insert(ibis.astype(object), 0, np.nan),
             'Original Beat': np.insert(beats, 0, beats_ix[0]),
-            'Correction': np.insert(correction_flags, 0, 0)}
-        )
-        
+            'Correction': np.insert(correction_flags, 0, 0)
+        })
+
         corrected_ibis_ms = np.round((np.array(corrected_ibis) / self.fs) * 1000, 2)
 
         corrected_ibis = np.array(corrected_ibis).astype(object)
         corrected_flags = np.array(corrected_flags).astype(object)
-            
+
         # Add the first beat and create a dataframe
-        corrected = pd.DataFrame(
-            {'Corrected IBI (ms)': np.insert(corrected_ibis_ms, 0, np.nan),
-            'Corrected IBI (index)': np.insert(corrected_ibis, 0, np.nan), 
+        corrected = pd.DataFrame({
+            'Corrected IBI (ms)': np.insert(corrected_ibis_ms, 0, np.nan),
+            'Corrected IBI (index)': np.insert(corrected_ibis, 0, np.nan),
             'Corrected Beat': np.insert(corrected_beats, 0, beats_ix[0]),
-            'Flag': np.insert(corrected_flags, 0, np.nan)}
-        )
-        beats_ix_corrected = np.insert(corrected_beats, 0, beats_ix[0])
+            'Flag': np.insert(corrected_flags, 0, np.nan)
+        })
+        beats_ix_corrected = np.insert(corrected_beats, 0, beats_ix[0]).astype(int)
         return beats_ix_corrected, corrected_ibis, original, corrected
-    
-    def get_corrected(self, beats_ix, seg_size = 60, initial_hr = 'auto', prev_n = 6, min_bpm = 40, max_bpm = 200, hr_estimate_window = 6, print_estimated_hr = True,
-                        short_threshold = (24 / 32),  long_threshold = (44 / 32), extra_threshold = (52 / 32)):
+
+    def get_corrected(
+        self,
+        beats_ix: np.ndarray,
+        seg_size: int = 60,
+        initial_hr: Union[float, Literal['auto']] = 'auto',
+        prev_n: int = 6,
+        min_bpm: int = 40,
+        max_bpm: int = 200,
+        hr_estimate_window: int = 6,
+        print_estimated_hr: bool = True,
+        short_threshold: float = (24 / 32),
+        long_threshold: float = (44 / 32),
+        extra_threshold: float = (52 / 32)
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Get the corrected interbeat intervals (IBIs) and beat indices.
 
         Parameters
         ----------
         data : pandas.DataFrame
-            A data frame containing the pre-processed ECG or PPG data.
+            A DataFrame containing the pre-processed ECG or PPG data.
         beats_ix : array_like
             An array containing the indices of detected beats.
         seg_size : int
             The size of the segment in seconds; by default, 60.
-        initial_hr : int, float, optional
+        initial_hr : float or {'auto'}, optional
             The heart rate value for the first interbeat interval (IBI) to be
-            validated against; by default, 80 bpm (750 ms).
+            validated against; by default, 'auto' (i.e., the value is
+            determined automatically).
         prev_n : int, optional
             The number of preceding IBIs to validate against; by default, 6.
+        min_bpm : int, optional
+            The minimum possible heart rate in beats per minute (bpm);
+            by default, 40.
+        max_bpm : int, optional
+            The maximum possible heart rate in beats per minute (bpm);
+            by default, 200.
+        hr_estimate_window : int, optional
+            The window size for estimating the heart rate; by default, 6.
+        print_estimated_hr : bool, optional
+            Whether to print the estimated heart rate; by default, True.
+        short_threshold : float, optional
+            The threshold for short IBIs; by default, 24/32.
+        long_threshold : float, optional
+            The threshold for long IBIs; by default, 44/32.
+        extra_threshold : float, optional
+            The threshold for extra long IBIs; by default, 52/32.
 
         Returns
         -------
@@ -1312,9 +1464,15 @@ class Cardio:
         combined : pandas.DataFrame
             A data frame containing the summary of flags in each segment.
         """
+
         # Get the corrected IBIs and beat indices
-        original, corrected = self.correct_interval(beats_ix=beats_ix, seg_size = seg_size, initial_hr=initial_hr, prev_n=prev_n, min_bpm=min_bpm, max_bpm=max_bpm, hr_estimate_window=hr_estimate_window, print_estimated_hr = print_estimated_hr,
-                                                short_threshold=short_threshold, long_threshold= long_threshold, extra_threshold=extra_threshold)
+        _, original, corrected = self.correct_interval(
+            beats_ix = beats_ix, initial_hr = initial_hr,
+            prev_n = prev_n, min_bpm = min_bpm, max_bpm = max_bpm,
+            hr_estimate_window = hr_estimate_window,
+            print_estimated_hr = print_estimated_hr,
+            short_threshold = short_threshold, long_threshold = long_threshold,
+            extra_threshold = extra_threshold)
 
         # Get the segment number for each beat
         for row in original.iterrows():
@@ -1325,7 +1483,7 @@ class Cardio:
             corrected.loc[row[0], 'Segment'] = seg
         original['Segment'] = original['Segment'].astype(pd.Int64Dtype())
         corrected['Segment'] = corrected['Segment'].astype(pd.Int64Dtype())
-        
+
         # Get the number and percentage of corrected beats in each segment
         original_seg = original.groupby('Segment')['Correction'].sum().astype(pd.Int64Dtype())
         original_seg = pd.DataFrame(original_seg.reset_index(name = '# Corrected'))
@@ -1341,53 +1499,65 @@ class Cardio:
         corrected_seg = corrected_seg.pivot(index = 'Segment', columns = 'Flag', values = 'Count').reset_index().fillna(0)
         corrected_seg.columns.name = None
         corrected_seg = corrected_seg.rename_axis(None, axis = 1)
-    
+
         combined = pd.merge(corrected_seg, original_seg, on='Segment')
 
         return original, corrected, combined
 
-    def plot_missing(self, df, invalid_thresh = 30, title = None):
+    def plot_missing(
+        self,
+        sqa_metrics: pd.DataFrame,
+        invalid_thresh = 30,
+        title = None
+    ) -> go.Figure:
         """
         Plot detected and missing beat counts.
 
         Parameters
         ----------
-        df : pandas.DataFrame()
+        sqa_metrics : pandas.DataFrame
             The DataFrame containing SQA metrics per segment.
         invalid_thresh : int, float
             The minimum number of beats detected for a segment to be considered
             valid; by default, 30.
         title : str, optional
+            The title of the plot.
+
+        Returns
+        -------
+        fig : plotly.graph_objects.Figure
+            A Plotly bar chart of detected and missing beat counts.
         """
-        max_beats = ceil(df['N Detected'].max() / 10) * 10
+        max_beats = ceil(sqa_metrics['N Detected'].max() / 10) * 10
         nearest = ceil(max_beats / 2) * 2
         dtick_value = nearest / 5
 
         fig = go.Figure(
             data = [
                 go.Bar(
-                    x = df['Segment'],
-                    y = df['N Expected'],
+                    x = sqa_metrics['Segment'],
+                    y = sqa_metrics['N Expected'],
                     name = 'Missing',
                     marker = dict(color = '#f2816d'),
                     hovertemplate = '<b>Segment %{x}:</b> %{customdata:.0f} '
                                     'missing<extra></extra>'),
                 go.Bar(
-                    x = df['Segment'],
-                    y = df['N Detected'],
+                    x = sqa_metrics['Segment'],
+                    y = sqa_metrics['N Detected'],
                     name = 'Detected',
                     marker = dict(color = '#313c42'),
                     hovertemplate = '<b>Segment %{x}:</b> %{y:.0f} '
                                     'detected<extra></extra>')
             ]
         )
-        fig.data[0].update(customdata = df['N Missing'])
+        fig.data[0].update(customdata = sqa_metrics['N Missing'])
 
         # Get invalid segment data points
         invalid_x = []
         invalid_y = []
         invalid_text = []
-        for segment_num, n_detected in zip(df['Segment'], df['N Detected']):
+        for segment_num, n_detected in zip(
+                sqa_metrics['Segment'], sqa_metrics['N Detected']):
             if n_detected < invalid_thresh:
                 invalid_x.append(segment_num)
                 invalid_y.append(
@@ -1422,8 +1592,8 @@ class Cardio:
             xaxis = dict(
                 tickmode = 'linear',
                 dtick = 1,
-                range = [df['Segment'].min() - 0.5,
-                         df['Segment'].max() + 0.5]),
+                range = [sqa_metrics['Segment'].min() - 0.5,
+                         sqa_metrics['Segment'].max() + 0.5]),
             yaxis = dict(
                 title = 'Number of Beats',
                 range = [0, max_beats],
@@ -1446,35 +1616,46 @@ class Cardio:
             )
         return fig
 
-    def plot_artifact(self, df, invalid_thresh = 30, title = None):
+    def plot_artifact(
+        self,
+        sqa_metrics: pd.DataFrame,
+        invalid_thresh: int = 30,
+        title: Optional[str] = None
+    ) -> go.Figure:
         """
         Plot detected and artifact beat counts.
 
         Parameters
         ----------
-        df : pandas.DataFrame()
+        sqa_metrics : pandas.DataFrame
             The DataFrame containing SQA metrics per segment.
         invalid_thresh : int, float
             The minimum number of beats detected for a segment to be considered
             valid; by default, 30.
         title : str, optional
+            The title of the plot.
+
+        Returns
+        -------
+        fig : plotly.graph_objects.Figure
+            A Plotly bar chart of detected and missing beat counts.
         """
-        max_beats = ceil(df['N Detected'].max() / 10) * 10
+        max_beats = ceil(sqa_metrics['N Detected'].max() / 10) * 10
         nearest = ceil(max_beats / 2) * 2
         dtick_value = nearest / 5
 
         fig = go.Figure(
             data = [
                 go.Bar(
-                    x = df['Segment'],
-                    y = df['N Detected'],
+                    x = sqa_metrics['Segment'],
+                    y = sqa_metrics['N Detected'],
                     name = 'Detected',
                     marker = dict(color = '#313c42'),
                     hovertemplate = '<b>Segment %{x}:</b> %{y:.0f} '
                                     'detected<extra></extra>'),
                 go.Bar(
-                    x = df['Segment'],
-                    y = df['N Artifact'],
+                    x = sqa_metrics['Segment'],
+                    y = sqa_metrics['N Artifact'],
                     name = 'Artifact',
                     marker = dict(color = '#f2b463'),
                     hovertemplate = '<b>Segment %{x}:</b> %{y:.0f} '
@@ -1486,7 +1667,8 @@ class Cardio:
         invalid_x = []
         invalid_y = []
         invalid_text = []
-        for segment_num, n_detected in zip(df['Segment'], df['N Detected']):
+        for segment_num, n_detected in zip(
+                sqa_metrics['Segment'], sqa_metrics['N Detected']):
             if n_detected < invalid_thresh:
                 invalid_x.append(segment_num)
                 invalid_y.append(
@@ -1521,8 +1703,8 @@ class Cardio:
             xaxis = dict(
                 tickmode = 'linear',
                 dtick = 1,
-                range = [df['Segment'].min() - 0.5,
-                         df['Segment'].max() + 0.5]),
+                range = [sqa_metrics['Segment'].min() - 0.5,
+                         sqa_metrics['Segment'].max() + 0.5]),
             yaxis = dict(
                 title = 'Number of Beats',
                 range = [0, max_beats],
@@ -1546,94 +1728,99 @@ class Cardio:
             )
         return fig
 
-    def _get_iqr(self, data):
+    def _get_iqr(self, data: np.ndarray) -> float:
         """Compute the interquartile range of a data array."""
         q75, q25 = np.percentile(data, [75, 25])
         iqr = q75 - q25
         return iqr
 
-    def _quartile_deviation(self, data):
+    def _quartile_deviation(self, data: np.ndarray) -> float:
         """Compute the quartile deviation in the criterion beat difference
         test."""
         iqr = self._get_iqr(data)
         QD = iqr * 0.5
         return QD
-    class _MaxNFifo:
-            '''
-            A class for FIFO with N elements at maximum.
 
-            Parameters/Attributes
-            ---------------------
+    class _MaxNFifo:
+        """
+        A class for FIFO with N elements at maximum.
+
+        Parameters/Attributes
+        ---------------------
+        prev_n : int
+            The maximum number of elements in the FIFO.
+        item : int, optional
+            The initial item to add to the FIFO; by default, None.
+            The item is added twice if it is not None.
+        """
+
+        def __init__(self, prev_n: int, item: Optional[int] = None):
+            """
+            Initialize the FIFO object.
+
+            Parameters
+            ----------
             prev_n : int
                 The maximum number of elements in the FIFO.
-            '''
-            def __init__(self, prev_n, item = None):
-                '''
-                Initialize the FIFO object.
-                
-                Parameters
-                ---------------------
-                prev_n : int
-                    The maximum number of elements in the FIFO.
-                item : int, optional
-                    The initial item to add to the FIFO; by default, None.
-                    The item is added twice if it is not None.
-                '''
-                self.prev_n = prev_n
-                if item is not None:
-                    self.queue = [item, item]
-                else:
-                    self.queue = []
+            item : int, optional
+                The initial item to add to the FIFO; by default, None.
+                The item is added twice if it is not None.
+            """
+            self.prev_n = prev_n
+            if item is not None:
+                self.queue = [item, item]
+            else:
+                self.queue = []
 
-            def push(self, item):
-                '''
-                Push an item to the FIFO. If the number of elements exceeds the maximum, remove the first element.
+        def push(self, item: int) -> None:
+            """
+            Push an item to the FIFO. If the number of elements exceeds the maximum, remove the first element.
 
-                Parameters
-                ---------------------
-                item : int
-                    The item to add to the FIFO.
-                '''
-                self.queue.append(item)
-                if len(self.queue) > self.prev_n + 1:
-                    self.queue.pop(0)
+            Parameters
+            ----------
+            item : int
+                The item to add to the FIFO.
+            """
+            self.queue.append(item)
+            if len(self.queue) > self.prev_n + 1:
+                self.queue.pop(0)
 
-            def get_queue(self):
-                '''
-                Return the FIFO queue.
+        def get_queue(self) -> list:
+            """
+            Return the FIFO queue.
 
-                Return
-                ---------------------
-                queue : list
-                '''
-                return self.queue
-            
-            def change_last(self, item):
-                '''
-                Change the last item in the FIFO queue.
+            Return
+            ------
+            queue : list
+            """
+            return self.queue
 
-                Parameters
-                ---------------------
-                item : int
-                    The new item to replace the last item in the queue.
-                '''
-                self.queue[-1] = item
-            
-            def reset(self, item = None):
-                '''
-                Reset the FIFO queue. 
-                If an item is given, reset the queue with the item. If not, reset the queue with an empty list.
+        def change_last(self, item: int) -> None:
+            """
+            Change the last item in the FIFO queue.
 
-                Parameters
-                ---------------------
-                item: int, optional
-                    The item to add to the FIFO; by default, None.
-                    The item is added twice if it is not None.
-                '''
-                if item is None:
-                    self.queue = []
-                else:
-                    self.queue = [item, item]
+            Parameters
+            ----------
+            item : int
+                The new item to replace the last item in the queue.
+            """
+            self.queue[-1] = item
+
+        def reset(self, item: Optional[int] = None) -> None:
+            """
+            Reset the FIFO queue. If an item is given, reset the queue with
+            the item. If not, reset the queue with an empty list.
+
+            Parameters
+            ----------
+            item: int, optional
+                The item to add to the FIFO; by default, None.
+                The item is added twice if it is not None.
+            """
+            if item is None:
+                self.queue = []
+            else:
+                self.queue = [item, item]
 
 # =================================== EDA ====================================
 class EDA:
@@ -1664,8 +1851,16 @@ class EDA:
         The transition radius for artifacts in seconds; by default, 2.
     """
 
-    def __init__(self, fs, eda_min = 0.2, eda_max = 40, eda_max_slope = 5,
-                 temp_min = 20, temp_max = 40, invalid_spread_dur = 2):
+    def __init__(
+        self,
+        fs: int,
+        eda_min: float = 0.2,
+        eda_max: float = 40,
+        eda_max_slope: float = 5,
+        temp_min: float = 20,
+        temp_max: float = 40,
+        invalid_spread_dur: float = 2.5
+    ):
         """
         Initialize the EDA object.
 
@@ -1689,8 +1884,16 @@ class EDA:
             The maximum acceptable temperature in degrees Celsius; by
             default, 40.
         invalid_spread_dur : float, optional
-            The transition radius for artifacts in seconds; by default, 2.
+            The transition radius for artifacts in seconds; by default,
+            2.5 seconds.
         """
+
+        # Check inputs
+        if eda_min >= eda_max:
+            raise ValueError('`eda_min` must be smaller than `eda_max`.')
+        if temp_min >= temp_max:
+            raise ValueError('`temp_min` must be smaller than `temp_max`.')
+
         self.fs = fs
         self.eda_min = eda_min
         self.eda_max = eda_max
@@ -1699,103 +1902,150 @@ class EDA:
         self.temp_max = temp_max
         self.invalid_spread_dur = invalid_spread_dur
 
-    def compute_metrics(self, signal, temp, timestamps = None,
-                        preprocessed = True, seg_size = 60,
-                        rolling_window = None, rolling_step = None):
+    def get_validity_metrics(
+        self,
+        signal: np.ndarray,
+        temp: Optional[np.ndarray] = None,
+        timestamps: Optional[np.ndarray] = None,
+        preprocessed: bool = True,
+    ) -> pd.DataFrame:
         """
-        Summarize the number and proportion of valid and invalid data points
-        in an electrodermal activity (EDA) signal per segment or across sliding
-        windows.
+        Assess and flag valid and invalid EDA data points.
 
         Parameters
         ----------
         signal : array_like
             An array containing the EDA signal in microsiemens.
         temp : array_like, optional
-            An array containing temperature data in Celsius; by default, None.
+            An array containing temperature data in Celsius.
         timestamps : array_like, optional
-            An array containing timestamps corresponding to the EDA data
-            points; by default, None.
-        preprocessed : boolean, optional
+            An array of timestamps corresponding to each data point.
+        preprocessed : bool, optional
             Whether filtered EDA data is being inputted; by default, True.
-        seg_size : int
-            The segment size in seconds; by default, 60.
-        rolling_window : int, optional
-            The size, in seconds, of the sliding window across which to
-            compute the EDA SQA metrics; by default, None.
-        rolling_step : int, optional
-            The step size, in seconds, of the sliding windows; by default, 15.
+            If False, an FIR low-pass filter is applied.
 
         Returns
         -------
-        metrics : pandas.DataFrame
-            A DataFrame containing quality assessment metrics per segment.
-
-        Notes
-        -----
-        If a value is given in the `rolling_window` parameter, the rolling
-        window approach will override the segmented approach, ignoring any
-        `seg_size` value.
-
-        See Also
-        --------
-        SQA.EDA.assess_eda_quality :
-            Identify locations of invalid and valid EDA data points.
+        eda_validity : pd.DataFrame
+            A DataFrame with the columns:
+            - 'Timestamp' (if provided)
+            - 'EDA'
+            - 'Temp' (if provided)
+            - 'Valid' (1 if valid, NaN otherwise)
+            - 'Invalid' (1 if invalid, NaN otherwise)
         """
-        eda_min = self.eda_min
-        eda_max = self.eda_max
-        eda_max_slope = self.eda_max_slope
-        temp_min = self.temp_min
-        temp_max = self.temp_max
-        invalid_spread_dur = self.invalid_spread_dur
+        valid_ix, invalid_ix, _ = self._edaqa(signal, temp, preprocessed)
+        eda_validity = pd.DataFrame({
+            'Timestamp': timestamps if timestamps is not None else np.arange(
+                len(signal)),
+            'EDA': signal,
+        })
+        if temp is not None:
+            eda_validity['TEMP'] = temp
+        eda_validity.loc[valid_ix, 'Valid'] = 1
+        eda_validity.loc[invalid_ix, 'Invalid'] = 1
 
-        if seg_size < 0 or \
-                (rolling_window is not None and rolling_window < 0):
-            raise ValueError('Window size must be set to a positive integer.')
+        return eda_validity
 
-        metrics = pd.DataFrame()
-        seg_name = 'Moving Window' if rolling_window is not None else 'Segment'
+    def get_quality_metrics(
+        self,
+        signal: np.ndarray,
+        temp: Optional[np.ndarray] = None,
+        timestamps: Optional[np.ndarray] = None,
+    ) -> pd.DataFrame:
+        """
+        Assess and flag rule violations of EDA quality based on
+        the quality assessment procdure by Kleckner et al. (2017).
 
-        # Assess EDA quality
-        edaqa = self.assess_eda_quality(
-            signal, temp, preprocessed, seg_size, rolling_window, rolling_step)
+        Parameters
+        ----------
+        signal : array_like
+            The EDA signal in microsiemens.
+        temp : array_like, optional
+            Temperature data in Celsius.
+        timestamps : array_like, optional
+            Array of timestamps corresponding to each data point.
 
-        # Summarize EDA QA results
-        for segment, qa in edaqa.items():
-            metrics = pd.concat([metrics, pd.DataFrame.from_records([{
-                seg_name: segment,
-                'N Valid': len(qa['valid']),
-                '% Valid': round(
-                    (len(qa['valid']) / qa['length']) * 100, 2),
-                'N Invalid': len(qa['invalid']),
-                '% Invalid': round(
-                    (len(qa['invalid']) / qa['length']) * 100, 2)
-            }])], ignore_index = True)
+        Returns
+        -------
+        eda_quality : pd.DataFrame
+            A DataFrame with the columns:
+            - 'Timestamp'
+            - 'EDA'
+            - 'Temp' (if provided)
+            - 'Out of Range'
+            - 'Excessive Slope'
+            - 'Temp Out of Range' (if provided)
+
+        References
+        ----------
+        Kleckner, I.R., Jones, R. M., Wilder-Smith, O., Wormwood, J.B.,
+        Akcakaya, M., Quigley, K.S., ... & Goodwin, M.S. (2017). Simple,
+        transparent, and flexible automated quality assessment procedures for
+        ambulatory electrodermal activity data. IEEE Transactions on Biomedical
+        Engineering, 65(7), 1460-1467.
+        """
+        sampling_interval = 1 / self.fs
+
+        # Rule-specific masks
+        mask_out_of_range = self._check_out_of_range(signal)
+        mask_excessive_slope = self._check_excessive_slope(
+            signal, sampling_interval)
+        mask_temp = self._check_temp_out_of_range(
+            temp) if temp is not None else None
+
+        # Combine all available checks
+        combined_invalid = mask_out_of_range | mask_excessive_slope
+        if mask_temp is not None:
+            combined_invalid |= mask_temp
+
+        eda_quality = pd.DataFrame({
+            'EDA': signal,
+            'Out of Range': np.where(mask_out_of_range, 1, np.nan),
+            'Excessive Slope': np.where(mask_excessive_slope, 1, np.nan),
+        })
+        if temp is not None:
+            eda_quality['TEMP'] = temp
         if timestamps is not None:
-            if rolling_window is not None:
-                metrics.insert(1, 'Timestamp', np.array(
-                    timestamps[::int(rolling_step * self.fs)]))
-            else:
-                metrics.insert(1, 'Timestamp', np.array(
-                    timestamps[::int(seg_size * self.fs)]))
-        return metrics
+            eda_quality.insert(0, 'Timestamp', timestamps)
+        else:
+            eda_quality.insert(0, 'Sample', np.arange(len(signal)) + 1)
 
-    def assess_eda_quality(self, signal, temp = None, preprocessed = True,
-                           seg_size = 60, rolling_window = None,
-                           rolling_step = 15):
+        if mask_temp is not None:
+            eda_quality['Temp Out of Range'] = np.where(mask_temp, 1, np.nan)
+        return eda_quality
+
+    def compute_metrics(
+        self,
+        signal: np.ndarray,
+        temp: Optional[np.ndarray] = None,
+        preprocessed: bool = True,
+        peaks_ix: Optional[np.ndarray] = None,
+        seg_size: int = 60,
+        rolling_window: Optional[int] = None,
+        rolling_step: int = 15,
+        show_progress: bool = True,
+    ) -> pd.DataFrame:
         """
-        Identifies valid and invalid data points in electrodermal activity
-        using the automated quality assessment procedure by Kleckner et al.
-        (2017) by segment or across sliding windows.
+        Assess the quality of electrodermal activity (EDA) data using the rules
+        defined by Kleckner et al. (2017). The method identifies valid and
+        invalid data points and computes rule-specific quality metrics (e.g.,
+        proportions of out-of-range points, excessive slopes, temperature
+        violations, and spread-invalid counts), either by segment or across
+        sliding windows.
 
         Parameters
         ----------
         signal : array_like
             An array containing the EDA signal in microsiemens.
-        temp : array_like
-            An array containing temperature data in Celsius; by default, None.
+        temp : array_like, optional
+            An optional array containing temperature data in Celsius; by
+            default, None.
         preprocessed : boolean, optional
             Whether filtered EDA data is being inputted; by default, True.
+        peaks_ix : array_like, optional
+            An optional array containing locations of SCR peaks; by default,
+            None. If provided, an 'N SCRs' metric is included in the output.
         seg_size : int
             The segment size in seconds; by default, 60.
         rolling_window : int, optional
@@ -1803,180 +2053,357 @@ class EDA:
             compute the EDA SQA metrics; by default, None.
         rolling_step : int, optional
             The step size, in seconds, of the sliding windows; by default, 15.
+        show_progress : bool, optional
+            Whether to show a progress bar; by default, True.
 
         Returns
         -------
-        edaqa : dict
-            A dictionary containing key-value pairs of segment or rolling
-            window numbers and their corresponding dictionaries of valid and
-            invalid EDA indices and lengths. Keys of nested dictionaries are
-            'valid', 'invalid', and 'length'.
+        metrics : pd.DataFrame
+            A DataFrame containing EDA quality assessment metrics by segment
+            or sliding window.
 
         References
         ----------
-        Kleckner, I. R., Jones, R. M., Wilder-Smith, O., Wormwood, J. B.,
-        Akcakaya, M., Quigley, K. S., ... & Goodwin, M. S. (2017). Simple,
+        Kleckner, I.R., Jones, R. M., Wilder-Smith, O., Wormwood, J.B.,
+        Akcakaya, M., Quigley, K.S., ... & Goodwin, M.S. (2017). Simple,
         transparent, and flexible automated quality assessment procedures for
         ambulatory electrodermal activity data. IEEE Transactions on Biomedical
         Engineering, 65(7), 1460-1467.
         """
-        eda_min = self.eda_min
-        eda_max = self.eda_max
-        eda_max_slope = self.eda_max_slope
-        temp_min = self.temp_min
-        temp_max = self.temp_max
-        invalid_spread_dur = self.invalid_spread_dur
 
-        # Check inputs
-        if eda_min >= eda_max:
-            raise ValueError("`eda_min` must be smaller than `eda_max`.")
-        if temp_min >= temp_max:
-            raise ValueError("`temp_min` must be smaller than `temp_max`.")
+        fs = self.fs
+        seg_name = 'Moving Window' if rolling_window else 'Segment'
+        metrics = []
 
-        # Get the sampling interval
-        sampling_interval = 1 / self.fs
+        has_scr = peaks_ix is not None
+        if has_scr:
+            peaks_ix = np.asarray(peaks_ix, dtype = int)
 
-        # Filter data based on the methods in Kleckner et al. (2017)
+        # Rolling window approach
+        if rolling_window is not None:
+            step = int(rolling_step * fs)
+            win_len = int(rolling_window * fs)
+
+            for i, start in enumerate(
+                    tqdm(range(0, len(signal) - win_len + 1, step),
+                         desc = 'EDA QA', disable = not show_progress)):
+                end = start + win_len
+                segment = signal[start:end]
+                seg_temp = temp[start:end] if temp is not None else None
+
+                # Run EDA QA by sliding window
+                valid_ix, invalid_ix, seg_metrics = self._edaqa(
+                    segment, seg_temp, preprocessed)
+                total_len = len(segment)
+                row = {
+                    seg_name: i + 1,
+                    'N Valid': len(valid_ix),
+                    '% Valid': round((len(valid_ix) / total_len) * 100, 2),
+                    'N Invalid': len(invalid_ix),
+                    '% Invalid': round((len(invalid_ix) / total_len) * 100, 2),
+                    **seg_metrics
+                }
+                if has_scr:
+                    n_scr = np.count_nonzero((peaks_ix >= start) & (peaks_ix < end))
+                    row['N SCRs'] = int(n_scr)
+                metrics.append(row)
+
+        # Segmented approach
+        else:
+            seg_len = int(seg_size * fs)
+            n_segments = len(signal) // seg_len
+
+            for i in range(n_segments):
+                start, end = i * seg_len, (i + 1) * seg_len
+                segment = signal[start:end]
+                seg_temp = temp[start:end] if temp is not None else None
+
+                # Run EDA QA by segment
+                valid_ix, invalid_ix, seg_metrics = self._edaqa(
+                    segment, seg_temp, preprocessed)
+                total_len = len(segment)
+                row = {
+                    seg_name: i + 1,
+                    'N Valid': len(valid_ix),
+                    '% Valid': round((len(valid_ix) / total_len) * 100, 2),
+                    'N Invalid': len(invalid_ix),
+                    '% Invalid': round((len(invalid_ix) / total_len) * 100, 2),
+                    **seg_metrics
+                }
+                if has_scr:
+                    n_scr = np.count_nonzero((peaks_ix >= start) & (peaks_ix < end))
+                    row['N SCRs'] = int(n_scr)
+                metrics.append(row)
+        metrics = pd.DataFrame(metrics)
+        return metrics
+
+    def _edaqa(
+        self,
+        signal,
+        temp: Optional[np.ndarray] = None,
+        preprocessed: bool = True
+    ) -> tuple[np.ndarray, np.ndarray, dict]:
+        """Evaluate the input signal against Kleckner et al.'s (2017)
+        quality rules."""
+
+        # Filter EDA signal with a FIR low pass filter
         if not preprocessed:
+            from EDA import Filters as eda_filters
             try:
-                window = int(2 * self.fs)
-                b = np.ones(window) / window
-                signal = np.convolve(signal, b, mode = 'same')
-                signal = self._filter_data(signal, window = 2)
+                signal = eda_filters.lowpass_fir(signal)
             except ValueError:
                 pass
 
-        # Filter temperature data
-        if temp is not None:
-            window = int(2 * self.fs)
-            b = np.ones(window) / window
-            temp = np.convolve(temp, b, mode = 'same')
-            temp = self._filter_data(temp, window = 2)
-
-        def _edaqa(signal):
-            """Evaluate the input signal against the automated EDA QA rules in
-            Kleckner et al. (2017)."""
-            nonlocal eda_min, eda_max, eda_max_slope, temp, temp_min, \
-                temp_max, sampling_interval
-
-            slopes = np.concatenate([[0], np.diff(signal) / sampling_interval])
+            # Filter temperature data with a moving average filter
             if temp is not None:
-                # Handle unequal lengths of EDA and temp arrays
-                if len(signal) != len(temp):
-                    temp = self._equalize_temp(signal, temp)
-                invalid_checks = (
-                        (signal < eda_min) | (signal > eda_max) |  # Rule 1
-                        (np.abs(slopes) > eda_max_slope) |  # Rule 2
-                        (temp < temp_min) | (temp > temp_max)  # Rule 3
-                )
-            else:
-                invalid_checks = (
-                        (signal < eda_min) | (signal > eda_max) |  # Rule 1
-                        (np.abs(slopes) > eda_max_slope)  # Rule 2
-                )
+                window = int(2 * self.fs)
+                b = np.ones(window) / window
+                temp = np.convolve(temp, b, mode = 'same')
 
-            # Determine number of data points to spread for Rule 4
-            invalid_spread_length = int(
-                invalid_spread_dur / sampling_interval)
+        sampling_interval = 1 / self.fs
+        total_len = len(signal)
 
-            # Rule #4
-            invalid_data = np.zeros_like(signal, dtype = bool)
-            for d in range(len(invalid_checks)):
-                if invalid_checks[d]:
-                    start_idx = max(d - invalid_spread_length + 1, 0)
-                    end_idx = min(d + invalid_spread_length,
-                                  len(invalid_checks))
-                    invalid_data[start_idx:end_idx] = True
-            valid_ix = np.where(~invalid_data)[0]
-            invalid_ix = np.where(invalid_data)[0]
-            return valid_ix, invalid_ix
+        # Rule 1
+        out_of_range_mask = self._check_out_of_range(signal)
 
-        # Quality assessment of EDA data
-        edaqa = {}
-        if rolling_window is not None:
-            w = 1
-            for n in range(0, len(signal), rolling_step):
-                window = np.array(signal[n:n + int(self.fs * rolling_window)])
-                valid_ix, invalid_ix = _edaqa(window)
-                edaqa[w] = {'valid': valid_ix,
-                            'invalid': invalid_ix,
-                            'length': len(window)}
-                w += 1
+        # Rule 2
+        excessive_slope_mask = self._check_excessive_slope(
+            signal, sampling_interval)
+
+        # Rule 3
+        temp_out_of_range_mask = None
+        if temp is not None:
+            if len(signal) != len(temp):
+                temp = self._equalize_temp(signal, temp)
+            temp_out_of_range_mask = self._check_temp_out_of_range(temp)
+
+        # Combine rule masks
+        if temp_out_of_range_mask is not None:
+            invalid_mask = (out_of_range_mask | excessive_slope_mask |
+                            temp_out_of_range_mask)
         else:
-            s = 1
-            for n in range(0, len(signal), int(self.fs * seg_size)):
-                segment = np.array(signal[n:n + int(self.fs * seg_size)])
-                valid_ix, invalid_ix = _edaqa(segment)
-                edaqa[s] = {'valid': valid_ix,
-                            'invalid': invalid_ix,
-                            'length': len(segment)}
-                s += 1
-        return edaqa
+            invalid_mask = out_of_range_mask | excessive_slope_mask
 
-    def plot_edaqa(self, metrics, title = None):
-        """
-        Plot percentages of valid and invalid EDA data.
+        # Rule 4
+        invalid_data = self._set_neighbors_invalid(
+            invalid_mask, sampling_interval)
 
-        Parameters
-        ----------
-        metrics : pandas.DataFrame()
-            The DataFrame outputted from `SQA.EDA.compute_metrics()`
-            that contains EDA QA metrics per segment or sliding window.
-        title : str, optional
+        # Get indices of valid and invalid data points
+        valid_ix = np.where(~invalid_data)[0]
+        invalid_ix = np.where(invalid_data)[0]
 
-        Returns
-        -------
-        fig : plotly.graph_objects.Figure
-            A figure containing a bar chart of percentages of invalid and
-            valid EDA data points by segment or sliding window.
+        # Compute metrics
+        quality_metrics = {
+            'Out of Range': np.sum(out_of_range_mask),
+            '% Out of Range': round((np.sum(out_of_range_mask) / total_len) * 100, 2),
+            'Excessive Slope': np.sum(excessive_slope_mask),
+            '% Excessive Slope': round((np.sum(excessive_slope_mask) / total_len) * 100, 2),
+            'Temp Out of Range': (np.sum(temp_out_of_range_mask)
+                                  if temp_out_of_range_mask is not None
+                                  else np.nan),
+            '% Temp Out of Range': (round((np.sum(temp_out_of_range_mask) / total_len) * 100, 2)
+                                    if temp_out_of_range_mask is not None
+                                    else np.nan),
+        }
+        return valid_ix, invalid_ix, quality_metrics
 
-        See Also
-        --------
-        SQA.EDA.compute_metrics :
-            Summarize EDA QA metrics by segment or sliding window.
-        """
+    def _check_out_of_range(
+        self,
+        signal: np.ndarray
+    ) -> np.ndarray:
+        """Return a boolean mask where EDA values are below eda_min or
+        above eda_max (Rule 1)."""
+        return (signal < self.eda_min) | (signal > self.eda_max)
 
-        def colormap(value):
-            if value <= 25:
-                return '#139253'  # green
-            elif (value > 25) & (value <= 90):
-                return '#f2ac42'  # yellow
-            else:
-                return '#f25847'  # red
+    def _check_excessive_slope(
+        self,
+        signal: np.ndarray,
+        sampling_interval: float
+    ) -> np.ndarray:
+        """Return a boolean mask where the slope exceeds eda_max_slope
+        (Rule 2)."""
+        slopes = np.concatenate([[0], np.diff(signal) / sampling_interval])
+        return np.abs(slopes) > self.eda_max_slope
 
-        colors = [colormap(value) for value in metrics['% Invalid']]
+    def _check_temp_out_of_range(
+        self,
+        temp: Optional[np.ndarray] = None
+    ) -> Union[None, np.ndarray]:
+        """Return a boolean mask where temperature values are below temp_min
+        or above temp_max (Rule 3)."""
+        if temp is None:
+            return None
+        return (temp < self.temp_min) | (temp > self.temp_max)
 
+    def _set_neighbors_invalid(
+        self,
+        invalid_mask: np.ndarray,
+        sampling_interval: float
+    ) -> np.ndarray:
+        """Spread invalid labels ± invalid_spread_dur seconds around detected
+        invalid points (Rule 4)."""
+        invalid_spread_length = int(
+            self.invalid_spread_dur / sampling_interval)
+        spread = np.zeros_like(invalid_mask, dtype = bool)
+        for d, flag in enumerate(invalid_mask):
+            if flag:
+                start_idx = max(d - invalid_spread_length, 0)
+                end_idx = min(d + invalid_spread_length + 1, len(invalid_mask))
+                spread[start_idx:end_idx] = True
+        return spread
+
+    def plot_validity(
+        self,
+        metrics: pd.DataFrame,
+        title: Optional[str] = None,
+    ) -> go.Figure:
         fig = go.Figure(
             data = [
                 go.Bar(
                     x = metrics['Segment'],
-                    y = [100] * len(metrics),  # Height of 100% for each bar
-                    opacity = 0.3,  # Set opacity to make them light grey
-                    hoverinfo = 'none',
-                    showlegend = False,
-                    marker = dict(color = 'lightgrey')),
-                go.Bar(
-                    x = metrics['Segment'],
                     y = metrics['% Invalid'],
                     name = 'Invalid',
-                    marker = dict(color = colors),
-                    showlegend = False,
-                    hovertemplate = '<b>Segment %{x}:</b> %{y:.1f}% '
-                                    'invalid<extra></extra>')
+                    marker = dict(color = 'tomato'),
+                    hovertemplate = '<b>Segment %{x}:</b> %{y}% '
+                                    'invalid<extra></extra>'),
+                go.Bar(
+                    x = metrics['Segment'],
+                    y = metrics['% Valid'],
+                    name = 'Valid',
+                    marker = dict(
+                        color = 'white',
+                        pattern = dict(
+                            shape = '/',
+                            fgcolor = '#4aba74',
+                            size = 5,
+                            solidity = 0.2
+                        )
+                    ),
+                    hovertemplate = '<b>Segment %{x}:</b> %{y}% '
+                                    'valid<extra></extra>')
             ]
         )
+
+        # If N SCRs exist, add markers above bars
+        if 'N SCRs' in metrics.columns:
+            y_top = metrics['% Invalid'] + metrics['% Valid']
+            mask = metrics['N SCRs'] > 0
+
+            fig.add_trace(
+                go.Scatter(
+                    x = metrics.loc[mask, 'Segment'],
+                    y = (y_top + 3).loc[mask],
+                    mode = 'text+markers',
+                    text = ['✦'] * mask.sum(),  # star only where SCRs exist
+                    textposition = 'middle center',
+                    textfont = dict(color = '#f9c669'),
+                    marker = dict(size = 1, color = '#f9c669',
+                                  symbol = 'circle'),
+                    showlegend = False,
+                    hovertemplate = 'SCR(s) detected<extra></extra>',
+                )
+            )
+
         fig.update_layout(
-            xaxis_title = 'Segment Number',
-            xaxis = dict(tickmode = 'linear', dtick = 1),
+            barmode = 'stack',
+            font = dict(family = 'Poppins', color = 'black'),
+            xaxis = dict(
+                title = dict(
+                    text = 'Segment',
+                    font = dict(size = 16),
+                    standoff = 5),
+                tickfont = dict(size = 14)
+            ),
             yaxis = dict(
-                title = '% Invalid',
-                range = [0, 100],
-                dtick = 20),
-            font = dict(family = 'Poppins', size = 13),
-            height = 289,
-            margin = dict(t = 70, r = 20, l = 40, b = 65),
-            barmode = 'overlay',
+                title = dict(
+                    text = 'Proportion',
+                    font = dict(size = 16),
+                    standoff = 2),
+                tickfont = dict(size = 14)
+            ),
+            legend = dict(font = dict(size = 14), orientation = 'h',
+                          yanchor = 'bottom', y = 1.05,
+                          xanchor = 'right', x = 1.0),
             template = 'simple_white',
+            margin = dict(l = 30, r = 15, t = 60, b = 50)
+        )
+        if title is not None:
+            fig.update_layout(
+                title = title
+            )
+        return fig
+
+    def plot_quality_metrics(
+        self,
+        metrics: pd.DataFrame,
+        title: Optional[str] = None,
+    ) -> go.Figure:
+        traces = [
+            go.Bar(
+                x = metrics['Segment'],
+                y = metrics['% Out of Range'],
+                name = 'EDA Out of Range',
+                marker = dict(color = '#7cabcc'),
+                hovertemplate = '<b>Segment %{x}:</b> %{y}% '
+                                'EDA out of range<extra></extra>'),
+            go.Bar(
+                x = metrics['Segment'],
+                y = metrics['% Excessive Slope'],
+                name = 'Excessive Slope',
+                marker = dict(color = '#ed77aa'),
+                hovertemplate = '<b>Segment %{x}:</b> %{y}% '
+                                'excessive slope<extra></extra>'),
+        ]
+        if '% Temp Out of Range' in metrics.columns:
+            traces.append(
+                go.Bar(
+                    x = metrics['Segment'],
+                    y = metrics['% Temp Out of Range'],
+                    name = 'Temp Out of Range',
+                    marker = dict(color = '#b095c2'),
+                    hovertemplate = '<b>Segment %{x}:</b> %{y}% temp out of range<extra></extra>'
+                )
+            )
+
+        # Append '% Valid' trace
+        traces.append(
+            go.Bar(
+                x = metrics['Segment'],
+                y = metrics['% Valid'],
+                name = 'Valid',
+                marker = dict(
+                    color = 'rgba(0,0,0,0)',
+                    pattern = dict(
+                        shape = '/',
+                        fgcolor = '#4aba74',
+                        size = 5,
+                        solidity = 0.2)),
+                hovertemplate = '<b>Segment %{x}:</b> %{y}% valid<extra></extra>'
+            )
+        )
+        fig = go.Figure(data = traces)
+        fig.update_layout(
+            barmode = 'stack',
+            font = dict(family = 'Poppins', color = 'black'),
+            xaxis = dict(
+                title = dict(
+                    text = 'Segment',
+                    font = dict(size = 16),
+                    standoff = 5),
+                tickfont = dict(size = 14)
+            ),
+            yaxis = dict(
+                title = dict(
+                    text = 'Proportion',
+                    font = dict(size = 16),
+                    standoff = 2),
+                tickfont = dict(size = 14)
+            ),
+            legend = dict(font = dict(size = 14), orientation = 'h',
+                          yanchor = 'bottom', y = 1.05,
+                          xanchor = 'right', x = 1.0),
+            template = 'simple_white',
+            margin = dict(l = 30, r = 15, t = 60, b = 50)
         )
         if title is not None:
             fig.update_layout(
@@ -1996,11 +2423,3 @@ class EDA:
         if len(temp) > len(eda):
             temp = temp[:len(eda)]
         return temp
-
-    def _filter_data(self, data, window):
-        """Filter EDA and temperature data based on the approach in
-        Kleckner et al. (2017)."""
-        window = int(window * self.fs)
-        b = np.ones(window) / window
-        filtered = np.convolve(data, b, mode = 'same')
-        return filtered

@@ -51,7 +51,7 @@ h6 {
 .banner {  /* header */
     background-color: #313c42;
     color: #cbcacf;
-    padding: 15px;
+    padding: 15px 15px 10px 15px;
 }
 .logo {  /* app logo */
     height: 70px;
@@ -108,6 +108,7 @@ h6 {
 }
 .data-summary-divs {
     display: block;
+    height: 185px;
 }
 .data-summary h2 {  /* data summary title */
     margin-top: 0;
@@ -170,17 +171,7 @@ h6 {
 #qa-charts-dropdown .Select-control,
 #segment-dropdown .Select-control {
     border: 1px solid #de7765 !important;
-    height: 30px !important;
-}
-#subject-dropdown .Select-input {}
-#qa-charts-dropdown .Select-input,
-#segment-dropdown .Select-input {
-    height: 30px !important;
-}
-/*#subject-dropdown .Select-value,*/
-#qa-charts-dropdown .Select-value,
-#segment-dropdown .Select-value {
-    line-height: 30px !important;
+    /*height: 30px !important;*/
 }
 .bottom {  /* footer */
     position: fixed !important;
@@ -240,6 +231,13 @@ h6 {
 .Select-clear {
     font-weight: normal !important;
 }
+#e4-data-type-container {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    font-weight: 600;
+    padding: 3px 0px 3px 0px;
+}
 #data-type-container {
     display: flex;
     align-items: center;
@@ -253,7 +251,7 @@ h6 {
     padding-right: 5px;
 }
 #artifact-params > div {
-    padding: 8px 0px 0px 0px;
+    padding: 5px 0px 0px 0px;
 }
 #artifact-params > div > span {
     font-weight: 600;
@@ -280,6 +278,7 @@ h6 {
 }
 #select-beat-detector {
     margin-top: 5px;
+    padding-bottom: 10px;
 }
 #select-beat-detector > span {
     font-weight: 600;
@@ -313,10 +312,6 @@ h6 {
 #toggle-resample {
     display: inline-block;
 }
-#toggle-resample .igrnnx, #toggle-resample .dlqMgb {
-    width: 18px !important;
-    height: 18px !important;
-}
 #toggle-resample label {
     margin-top: 2px;
     margin-left: 5px;
@@ -325,35 +320,38 @@ h6 {
 }
 .sc-bxivhb {
     width: 40px !important;    /* all toggler size */
-    height: 22px !important;
+    height: 20px !important;
 }
 #toggle-config {
-    padding-top: 18px;
-    padding-bottom: 13px;
+    padding-top: 10px;
+    padding-bottom: 8px;
     display: inline-block;
 }
+#toggle-temp-data button,
+#toggle-resample button,
+#toggle-scr-detection button,
 #toggle-config button,
 #toggle-filter button {
     position: fixed;
     top: 2px;
     z-index: 999;
-    height: 18px;
-    width: 18px;
+    height: 16px;
+    width: 16px;
 }
-/*#toggle-config .cmSQpo,*/
-/*#toggle-config .iDDlvD {  !* toggle track *!*/
-/*    position: relative;*/
-/*    height: 22px;*/
-/*    width: 45px;*/
-/*}*/
+#toggle-temp-data .igrnnx,
+#toggle-resample .igrnnx,
+#toggle-scr-detection .igrnnx,
 #toggle-config .igrnnx,
 #toggle-filter .igrnnx {  /* toggle is OFF */
     left: 10%;
 }
+#toggle-temp-data .dlqMgb,
+#toggle-resample .dlqMgb,
+#toggle-scr-detection .dlqMgb,
 #toggle-config .dlqMgb,
 #toggle-filter .dlqMgb{  /* toggle is ON */
     left: 0px;
-    transform: translateX(22px)
+    transform: translateX(24px)
 }
 #toggle-config label {
     margin: 1px 0px 0px 5px;
@@ -362,23 +360,62 @@ h6 {
     font-weight: 600;
     letter-spacing: 0.5pt;
 }
+#toggle-scr-detection {
+    display: inline-flex;
+    padding-bottom: 10px;
+}
+#toggle-temp-data,
 #toggle-filter {
     display: inline-flex;
 }
+#toggle-temp-data label,
+#toggle-scr-detection label,
 #toggle-filter label {
     margin: 1px 0px 0px 5px;
     font-weight: 600;
     font-size: 11pt;
     padding-right: 0px;
 }
-/* -------------------------------------------------------------------------*/
+/* -- containers -----------------------------------------------------------*/
 #filter-data {
     display: flex;
+    padding-bottom: 5px;
 }
 #segment-data {
     display: flex;
     align-items: center;
-    margin-top: 10px;
+}
+#scr-amplitude-threshold {
+    display: inline-flex;
+    gap: 0.25em;
+    font-weight: 600;
+    align-items: center;
+    padding-bottom: 10px;
+}
+#valid-amplitude-range {
+    font-weight: 600;
+    padding-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 0.5em
+}
+#load-temperature {
+    padding-top: 8px;
+}
+#temp-upload-div {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    width: 410px;
+}
+/* -- dropdowns ----------------------------------------------------------- */
+.setup-data-dropdowns {  /* dbc.Row containing dropdowns */
+    --bs-gutter-x: 0.5rem !important;
+    font-size: 9.5pt;
+    margin-top: 3px;
+}
+.offcanvas-body .Select-value {
+    font-size: 9.5pt;
 }
 /* --- help icons ----------------------------------------------------------*/
 #filter-help {
@@ -393,9 +430,6 @@ h6 {
     margin-top: 1px;
 }
 /* --- file uploaders ------------------------------------------------------*/
-#dash-uploader label {  /* data file uplaoder */
-    margin-top: 0px;
-}
 #config-uploader { /* configuration file uploader */
     line-height: 30px !important;
     min-height: 30px !important;
@@ -406,9 +440,63 @@ h6 {
     border: 1px dashed;
     padding: 5px;
     cursor: pointer;
+    font-size: 10pt;
 }
+#dash-uploader label,
+#temp-uploader label,
 #config-uploader label {
     margin-top: 0px;
+    font-size: 10pt !important;
+}
+#temp-uploader {
+    height: 30px;
+    width: 310px;
+    line-height: 25px !important;
+    border: 1px dashed #ee8a78;
+    border-radius: 5px;
+    color: #de7765;
+    font-size: 10pt;
+    cursor: pointer;
+    text-align: center;
+}
+#temp-uploader [aria-disabled="true"],
+#temp-uploader [aria-disabled="true"]:hover,
+#temp-uploader [aria-disabled="true"] * {
+    cursor: default !important;
+}
+#fa-eraser {
+    font-size: 12pt;
+    color: #313c42;
+}
+#clear-temp-upload:hover {
+    cursor: pointer;
+}
+#temp-uploader > div { /* padding inside uploader */
+    padding: 2px 0px 3px 0px !important;
+}
+#temp-uploader span {
+    font-weight: normal;
+    font-size: 9.5pt !important;
+}
+#temp-upload-section span {
+    font-size: 10pt;
+}
+#temp-variable-mapping {
+    font-size: 10pt;
+    padding-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+#temp-variable {   /* temperature variable dropdown */
+    width: 100%
+}
+#temp-variable .Select-control {
+    border: 1px dashed #ee8a78 !important;
+}
+#temp-variable .Select-placeholder,
+#temp-variable .Select-value-label {
+    color: #ee8a78 !important;
 }
 #file-check {  /* data upload confirmation text */
     font-size: 11px;
@@ -416,6 +504,20 @@ h6 {
     margin-top: 5px;
     float: right;
     margin-top: 5px;
+}
+#temp-file-check {
+    float: right;
+    align-items: center;
+    display: inline-flex;
+    padding-top: 5px;
+    gap: 0.25em;
+}
+#temp-file-check span {
+    font-size: 11px;
+    font-style: italic;
+}
+#temp-file-check i {
+    font-size: 12px;
 }
 
 /* ====================== DATA UPLOAD & PROGRESS BARS ===================== */
@@ -429,17 +531,17 @@ h6 {
 }
 #progress-bar {
     float: right;
-    /*margin-right: 10px;*/
     margin-top: -30px;
     width: 175px;
     height: 20px;
-    background-color: transparent;
+    background-color: #f2e6ec;
     border-radius: 5px;
+    visibility: hidden;
 }
 #export-progress-bar {
     margin-top: 5px;
     height: 15px;
-    background: transparent;
+    background-color: #f2e6ec;
     border-radius: 5px;
     visibility: hidden;
 }
@@ -541,25 +643,29 @@ button:hover {
     margin-top: 0;
     padding-right: 10px;
 }
-.setup-data-dropdowns {  /* dbc.Row containing dropdowns */
-    --bs-gutter-x: 0.5rem !important;
-    font-size: 10pt;
-    margin-top: 3px;
-}
 .Select-control {  /* dropdown menus */
     border: 1px dashed #777777 !important;
     color: #372e27;
+    height: 32px;
+}
+.Select-value {
+    line-height: 32px !important;
 }
 .Select-placeholder {  /* placeholder text in dropdowns */
     color: #777777 !important;
+    line-height: 30px;
+}
+.Select-input {
+    height: 30px;
 }
 .Select-clear {  /* clear 'x' in dropdowns */
-    line-height: 34px !important;
+    line-height: 32px !important;
+    margin-right: -5px;
 }
 #setup-timestamp {  /* dropdown 1*/
     flex: 1 0 20%;
 }
-#setup-cardio {  /* dropdown 2*/
+#setup-signal {  /* dropdown 2*/
     flex: 1 0 8%;
 }
 #run-save-buttons {
@@ -604,17 +710,49 @@ label {
 }
 .fa-solid.fa-circle-xmark {
     color: #cf0e22;
-    margin-right: 5px;
+    font-size: 16pt;
 }
 /* ============================= ERROR POP-UPS ============================ */
 .validation-error-modal i {
-    font-size: 22pt;
-    margin-right: 20px !important;
+    font-size: 16pt;
 }
-#mapping-validator .modal-content {
+#duplicate-temp-error-modal .modal-content,
+#mapping-validator .modal-content{
+    min-width: 515px;
+    background-color: #fee4e1;
+    border-bottom: 5px solid #cf0e22;
+}
+#duplicate-temp-error-modal span {
+    font-size: 10pt;
+    color: #313c42;
+}
+#pipeline-error-modal .modal-content {
     min-width: 550px;
     background-color: #fee4e1;
     border-bottom: 5px solid #cf0e22;
+}
+#duplicate-temp-error-modal .modal-header,
+#pipeline-error-modal .modal-header,
+#mapping-validator .modal-header,
+#artifact-identification-modal .modal-header,
+#dtype-validator .modal-header {
+    padding: 10px 10px 5px 13px;
+    align-items: center;
+    gap: 0.7em;
+    border-bottom: 0;
+}
+#duplicate-temp-error-modal .modal-title,
+#pipeline-error-modal .modal-title,
+#mapping-validator .modal-title,
+#artifact-identification-modal .modal-title,
+#dtype-validator .modal-title {
+    font-size: 14pt;
+}
+#pipeline-error-message {
+    padding-top: 5px;
+    color: #313c42;
+    font-style: italic;
+    font-size: 10pt;
 }
 #dtype-validator .modal-content {
     max-width: 460px;
@@ -622,39 +760,27 @@ label {
     border-bottom: 5px solid #cf0e22;
 }
 #artifact-identification-modal .modal-content {
-    max-width: 520px;
+    min-width: 550px;
     background-color: #fff;
     border-bottom: 5px solid #ee8a78;
 }
 .validation-error-modal .modal-body{
-    padding-right: 0;
-}
-.validation-content {
-    display: inline-flex;
-    align-items: center;
+    padding: 5px 10px 15px 15px;
 }
 .information-content {
     display: inline-flex;
     align-items: normal;
 }
-.validation-error h5 {
-    margin: 0;
-    letter-spacing: 2px;
-    display: inline;
-}
-.validation-error p {
+.popup-error span {
     margin-top: 5px;
     color: #333333;
-}
-.validation-error {
-    display: inline;
+    font-size: 10pt;
 }
 .artifact-method-info {
     display: block;
-    width: 400px;
+    width: auto;
 }
 .validation-error-modal button {
-    background: none;
     width: 20px;
     height: 30px;
     padding: 0;
@@ -665,21 +791,17 @@ label {
     margin-right: 10px;
 }
 .validation-error-modal button:hover {
-    background: none !important;
+    /*background: none !important;*/
     color: #ee8a78 !important;
 }
 #artifact-identification-modal button {
-    background: none;
     width: 20px;
     height: 30px;
-    padding: 0;
     position: relative;
     color: #372e27;
-    margin-left: 0px;
-    margin-top: -3px;
 }
 #artifact-identification-modal button:hover {
-    background: none !important;
+    /*background: none !important;*/
     color: #ee8a78 !important;
 }
 .artifact-method-info h5 {
@@ -872,12 +994,13 @@ th:first-child {  /* style only first table header */
 .processing-buttons {
     display: flex;
     align-items: center;
+    gap: 0.3em;
 }
-#beat-correction, 
-#accept-corrections, 
-#reject-corrections, 
-#revert-corrections, 
-#postprocess-data, 
+#beat-correction,
+#accept-corrections,
+#reject-corrections,
+#revert-corrections,
+#postprocess-data,
 #open-beat-editor {
     width: auto;
     height: 26px;
@@ -887,19 +1010,22 @@ th:first-child {  /* style only first table header */
     align-items: center;
     color: #ffffff;
     padding: 0px 4px 0px 5px;
-    margin-right: 5px;
 }
-#beat-correction:hover, 
-#accept-corrections:hover, 
-#reject-corrections:hover, 
-#revert-corrections:hover, 
-#postprocess-data:hover, 
+#beat-correction:hover,
+#accept-corrections:hover,
+#reject-corrections:hover,
+#revert-corrections:hover,
+#postprocess-data:hover,
 #open-beat-editor:hover {
     background: #ee8a78 !important;
     color: #ffffff !important;
 }
-#beat-correction > i,
-#reject-corrections > i {  /* magic wand icon */
+#reject-corrections > i {
+    font-size: 10.5pt;
+    color: #ffffff;
+    padding-right: 3px;
+}
+#beat-correction > i {  /* magic wand icon */
     transform: rotate(90deg);
     color: #ffffff;
     font-size: 10.5pt;
@@ -909,7 +1035,7 @@ th:first-child {  /* style only first table header */
 #open-beat-editor > span {
     margin-left: 5px;
 }
-#accept-corrections > i, 
+#accept-corrections > i,
 #revert-corrections > i,
 #postprocess-data > i,
 #open-beat-editor > i {  /* check icon */
@@ -939,7 +1065,7 @@ th:first-child {  /* style only first table header */
     margin-right: 5px;
 }
 .separator {
-    padding: 2px 7px 0px 7px;
+    padding: 2px 7px 0px 5px;
     font-size: 15pt;
 }
 .raw-plots .tab {
@@ -1057,6 +1183,10 @@ th:first-child {  /* style only first table header */
 #open-beat-editor i {
     color: #ffffff;
     font-size: 14px;
+}
+/* class to prevent spinner animation in the beat editor button */
+.no-spin .spinner-border {
+    animation: none !important;
 }
 
 /* ========================== POSTPROCESS MODAL =========================== */

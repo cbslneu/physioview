@@ -12,7 +12,7 @@ class Filters:
     fs : int
         The sampling rate of the PPG signal.
     """
-    def __init__(self, fs):
+    def __init__(self, fs: int):
         """
         Initialize the Filters object.
 
@@ -23,7 +23,12 @@ class Filters:
         """
         self.fs = fs
 
-    def baseline_wander(self, signal, cutoff = 0.5, order = 2):
+    def baseline_wander(
+        self,
+        signal: np.ndarray,
+        cutoff: float = 0.5,
+        order: int = 2
+    ) -> np.ndarray:
         """
         Apply a high-pass filter to remove baseline wander from PPG data.
 
@@ -44,7 +49,11 @@ class Filters:
         filtered = filtfilt(b, a, signal)
         return filtered
 
-    def moving_average(self, signal, window_len):
+    def moving_average(
+        self,
+        signal: np.ndarray,
+        window_len: int
+    ) -> np.ndarray:
         """
         Smooth a PPG signal using a moving average filter.
 
@@ -64,14 +73,18 @@ class Filters:
         filtered = np.convolve(signal, kernel, mode = 'same')
         return filtered
 
-    def filter_signal(self, signal, lowcut = 0.5, highcut = 10, order = 4, 
-                      window_len = 0.5):
+    def filter_signal(
+        self,
+        signal: np.ndarray,
+        lowcut: float = 0.5,
+        highcut: float = 10,
+        order: int = 4,
+        window_len: float = 0.5
+    ) -> np.ndarray:
         """
         Filter out baseline drift, motion artifact, and powerline
         interference from PPG data and smooth out the signal for further
-        processing. This function uses a 4th-order Chebyshev Type II filter
-        according to results of the study by Liang et al. (2018) and a moving
-        average filter using convolution.
+        processing.
 
         Parameters
         ----------
@@ -98,6 +111,13 @@ class Filters:
         ----------
         Liang, Y., Elgendi, M., Chen, Z., et al. (2018). An optimal filter for
         short photoplethysmogram signals. Scientific Data, 5, 180076.
+
+        Notes
+        -----
+        This function uses a 4th-order Chebyshev Type II filter according to
+        results of the study by Liang et al. (2018) and a moving average
+        filter using convolution. This is the default filter used in the
+        Heartview Dashboard.
         """
         nyquist = 0.5 * self.fs
         low = lowcut / nyquist
@@ -131,7 +151,7 @@ class BeatDetectors:
     procedures.
     """
 
-    def __init__(self, fs, preprocessed = True):
+    def __init__(self, fs: int, preprocessed: bool = True):
         """
         Initialize a BeatDetectors object.
 
@@ -151,7 +171,11 @@ class BeatDetectors:
         else:
             self.preprocessed = preprocessed
 
-    def adaptive_threshold(self, signal, ma_perc = 20):
+    def adaptive_threshold(
+        self,
+        signal: np.ndarray,
+        ma_perc: float = 20
+    ) -> np.ndarray:
         """
         Extract beat locations from PPG data with the adaptive thresholding
         algorithm by van Gent al. (2018).
@@ -208,8 +232,14 @@ class BeatDetectors:
         ppg_beats = np.asarray(ppg_beats).astype(int)
         return ppg_beats
 
-    def erma(self, signal, W1 = 0.111, W2 = 0.667, offset = 0.02,
-             refractory = 0.3):
+    def erma(
+        self,
+        signal: np.ndarray,
+        W1: float = 0.111,
+        W2: float = 0.667,
+        offset: float = 0.02,
+        refractory: float = 0.3
+    ) -> np.ndarray:
         """
         Extract beat locations from PPG data based on the Elgendi et al.
         (2013) algorithm using event-related moving averages and dynamic
@@ -291,7 +321,13 @@ class BeatDetectors:
         ppg_beats = np.array(ppg_beats, dtype = 'int')
         return ppg_beats
 
-    def _bandpass_filter(self, signal, lowcut = 0.5, highcut = 8, order = 2):
+    def _bandpass_filter(
+        self,
+        signal: np.ndarray,
+        lowcut: float = 0.5,
+        highcut: float = 8,
+        order: int = 2
+    ) -> np.ndarray:
         """A second-order bandpass filter to remove baseline wander from
         a PPG signal in the pre-processing procedure of the Elgendi et al.
         (2013) beat detection algorithm. All filter parameters are set as
@@ -303,10 +339,14 @@ class BeatDetectors:
         filtered = filtfilt(b, a, signal)
         return filtered
 
-    def _moving_average(self, signal, window_len = 0.75):
-        """Helper function to compute the moving average of a signal in
-        the van Gent et al. (2019) beat detection algorithm. The window
-        length is set by default to 0.75 according to the algorithm."""
+    def _moving_average(
+        self,
+        signal: np.ndarray,
+        window_len: float = 0.75
+    ) -> np.ndarray:
+        """Compute the moving average of a signal in the van Gent et al.
+        (2019) beat detection algorithm. The window length is set by default
+        to 0.75 according to the algorithm."""
         ma = uniform_filter1d(np.asarray(signal, dtype = 'float'),
                               size = int(window_len * self.fs))
         return ma
