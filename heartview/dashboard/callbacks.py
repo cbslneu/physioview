@@ -1581,7 +1581,7 @@ def get_callbacks(app):
 
                 # If beat correction status is suggested, render the corrected IBIs
                 if beat_correction_status[selected_subject] == 'suggested':
-                    ibi_corrected = pd.read_csv(render_subdir / 'ibi_corrected.csv')
+                    ibi_corrected = pd.read_csv(str(render_subdir / 'ibi_corrected.csv'))
 
                 # Get IBI data for rendering
                 ibi = pd.read_csv(str(render_subdir / 'ibi.csv'))
