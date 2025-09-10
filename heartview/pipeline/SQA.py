@@ -34,8 +34,8 @@ class Cardio:
     def compute_metrics(
         self,
         data: pd.DataFrame,
-        beats_ix: np.ndarray,
-        artifacts_ix: np.ndarray,
+        beats_ix: Optional[np.ndarray] = None,
+        artifacts_ix: Optional[np.ndarray] = None,
         ts_col: Optional[str] = None,
         seg_size: int = 60,
         min_hr: float = 40,
@@ -53,10 +53,13 @@ class Cardio:
         ----------
         data : pandas.DataFrame
             A DataFrame containing pre-processed ECG or PPG data.
-        beats_ix : array_like
-            An array containing the indices of detected beats.
-        artifacts_ix : array_like
-            An array containing the indices of artifactual beats.
+        beats_ix : array_like, optional
+            An array containing the indices of detected beats. Required if 
+            `data` does not contain a "Beat" column with beat occurrences.
+        artifacts_ix : array_like, optional
+            An array containing the indices of artifactual beats. Required 
+            if `data` does not contain an "Artifact" column with artifactual 
+            beat occurrences.
         ts_col : str, optional
             The name of the column containing timestamps; by default, None.
             If a string value is given, the output will contain a timestamps
@@ -64,8 +67,8 @@ class Cardio:
         seg_size : int, optional
             The segment size in seconds; by default, 60.
         min_hr : float, optional
-            The minimum acceptable heart rate against which the number of
-            beats in the last partial segment will be compared; by default, 40.
+            The minimum heart rate against which the number of detected beats
+            is considered valid; by default, 40.
         rolling_window : int, optional
             The size, in seconds, of the sliding window across which to
             compute the SQA metrics; by default, None.
@@ -90,132 +93,107 @@ class Cardio:
         --------
         >>> from heartview.pipeline import SQA
         >>> sqa = SQA.Cardio(fs = 1000)
-        >>> artifacts_ix = sqa.identify_artifacts(beats_ix, method = 'both')
+        >>> artifacts_ix = sqa.identify_artifacts(beats_ix, method = 'cbd')
         >>> cardio_qa = sqa.compute_metrics(ecg, beats_ix, artifacts_ix, \
         ...                                 ts_col = 'Timestamp', \
         ...                                 seg_size = 60, min_hr = 40)
         """
+        from heartview.heartview import compute_ibis
+
         df = data.copy()
         df.index = df.index.astype(int)
-        df.loc[beats_ix, 'Beat'] = 1
 
+        # Ensure a "Beat" column exists
+        if 'Beat' not in df.columns:
+            df.loc[beats_ix, 'Beat'] = 1
+
+        # Compute IBIs if no "IBI" column
+        if 'IBI' not in df.columns:
+            ibi = compute_ibis(df, self.fs, beats_ix, ts_col)
+            df['IBI'] = ibi['IBI']
+
+        # Compute SQA metrics across rolling windows
         if rolling_window is not None:
-            metrics = pd.DataFrame()
-            if ts_col is not None:
-                seconds = self.get_seconds(data, beats_ix, ts_col,
-                                           show_progress = show_progress)
-                s = 1
-                for n in tqdm(range(0, len(seconds), rolling_step),
-                              disable = not show_progress):
+            results = []
+            last_valid_hr = np.nan
 
-                    # Get missing beats
-                    window_missing = seconds.iloc[n:(n + rolling_window)]
-                    n_expected = round(window_missing['Mean HR'].median() * (seg_size / 60), 0)
-                    n_detected = window_missing['N Beats'].sum()
-                    n_missing = (n_expected - n_detected) \
-                        if n_expected > n_detected else 0
-                    perc_missing = round((n_missing / n_expected) * 100, 2)
-                    ts = window_missing['Timestamp'].iloc[0]
+            # Compute artifacts
+            artifacts = self.get_artifacts(
+                df, beats_ix, artifacts_ix, seg_size = 1, ts_col = ts_col)
+            
+            for s, start in enumerate(
+                    tqdm(range(0, len(df), rolling_step * self.fs),
+                         disable = not show_progress), start = 1):
+                window = df.iloc[start: start + rolling_window * self.fs]
 
-                    # Summarize artifactual beats
-                    artifacts = self.get_artifacts(
-                        df, beats_ix, artifacts_ix, seg_size = 1,
-                        ts_col = ts_col)
-                    window_artifact = artifacts.iloc[n:(n + rolling_window)]
-                    n_artifact = window_artifact['N Artifact'].sum()
-                    perc_artifact = round((n_artifact / n_detected) * 100, 2)
-
-                    # Output summary
-                    metrics = pd.concat([metrics, pd.DataFrame.from_records([{
-                        'Moving Window': s,
-                        'Timestamp': ts,
-                        'N Expected': n_expected,
-                        'N Detected': n_detected,
-                        'N Missing': n_missing,
-                        '% Missing': perc_missing,
-                        'N Artifact': n_artifact,
-                        '% Artifact': perc_artifact
-                    }])], ignore_index = True).reset_index(drop = True)
-                    s += 1
-            else:
-                seconds = self.get_seconds(data, beats_ix,
-                                           show_progress = show_progress)
-                s = 1
-                for n in tqdm(range(0, len(seconds), rolling_step),
-                              disable = not show_progress):
-
-                    # Get missing beats
-                    window_missing = seconds.iloc[n:(n + rolling_window)]
-                    n_expected = round(window_missing['Mean HR'].median() * (seg_size / 60), 0)
-                    n_detected = window_missing['N Beats'].sum()
-                    n_missing = (n_expected - n_detected) \
-                        if n_expected > n_detected else 0
-                    perc_missing = round((n_missing / n_expected) * 100, 2)
-
-                    # Get artifactual beats
-                    artifacts = self.get_artifacts(
-                        df, beats_ix, artifacts_ix, seg_size = 1)
-                    window_artifact = artifacts.iloc[n:(n + rolling_window)]
-                    n_artifact = window_artifact['N Artifact'].sum()
-                    perc_artifact = round((n_artifact / n_detected) * 100, 2)
-
-                    # Output summary
-                    metrics = pd.concat([metrics, pd.DataFrame.from_records([{
-                        'Moving Window': s,
-                        'N Expected': n_expected,
-                        'N Detected': n_detected,
-                        'N Missing': n_missing,
-                        '% Missing': perc_missing,
-                        'N Artifact': n_artifact,
-                        '% Artifact': perc_artifact
-                    }])], ignore_index = True).reset_index(drop = True)
-                    s += 1
-
-            # Handle last partial rolling window of data
-            last_seg_len = len(seconds) % rolling_window
-            if last_seg_len > 0:
-                last_detected = metrics['N Detected'].iloc[-1]
-                last_expected_ratio = min_hr / metrics['N Expected'].iloc[:-1].median()
-                last_expected = last_expected_ratio * last_seg_len
-                if last_expected > last_detected:
-                    last_n_missing = last_expected - last_detected
-                    last_perc_missing = round(
-                        (last_n_missing / last_expected) * 100, 2)
+                # Calculate expected HR
+                median_hrs = self._window_medians(window)
+                if median_hrs:
+                    exp_hr = float(np.nanmedian(median_hrs))
+                    last_valid_hr = exp_hr
+                elif not np.isnan(last_valid_hr):
+                    exp_hr = last_valid_hr
                 else:
-                    last_perc_missing = 0
-                    last_n_missing = 0
-                metrics['N Expected'].iloc[-1] = last_expected
-                metrics['N Missing'].iloc[-1] = last_n_missing
-                metrics['% Missing'].iloc[-1] = last_perc_missing
+                    exp_hr = np.nan
 
+                # Calculate the expected number of beats for this window
+                if np.isnan(exp_hr):
+                    n_expected = np.nan
+                else:
+                    n_expected = int(round(exp_hr * (rolling_window / 60.0)))
+
+                # Detected beats in this window
+                n_detected = window['Beat'].notna().sum()
+
+                # Missing beats
+                n_missing = np.nan if np.isnan(n_expected) \
+                    else max(0, n_expected - n_detected)
+                perc_missing = np.nan if np.isnan(n_expected) \
+                    else round((n_missing / n_expected) * 100, 2)
+
+                # Artifactual beats in this window
+                start_sec = start // self.fs
+                window_artifact = artifacts.iloc[
+                                  start_sec: start_sec + rolling_window]
+                n_artifact = window_artifact['N Artifact'].sum()
+                perc_artifact = np.nan if n_detected == 0 \
+                    else round((n_artifact / n_detected) * 100, 2)
+
+                row = {
+                    'Moving Window': s
+                }
+                if ts_col is not None and ts_col in window.columns:
+                    row['Timestamp'] = window[ts_col].iloc[0]
+                row.update({
+                    'N Expected': n_expected,
+                    'N Detected': n_detected,
+                    'N Missing': n_missing,
+                    '% Missing': perc_missing,
+                    'N Artifact': n_artifact,
+                    '% Artifact': perc_artifact,
+                })
+                results.append(row)
+            metrics = pd.DataFrame(results)
+
+        # Compute SQA metrics across non-overlapping segments
         else:
             if ts_col is not None:
                 missing = self.get_missing(
-                    df, beats_ix, seg_size, min_hr = min_hr, ts_col = ts_col,
-                    show_progress = show_progress)
+                    df, beats_ix, artifacts_ix, seg_size, ts_col = ts_col)
                 artifacts = self.get_artifacts(
                     df, beats_ix, artifacts_ix, seg_size, ts_col)
-                metrics = pd.merge(missing, artifacts,
-                                   on = ['Segment', 'Timestamp'])
-                metrics['Invalid'] = metrics['N Detected'].apply(
-                    lambda n: 1 if n < int(min_hr * (seg_size/60)) or n > 220 else np.nan)
+                metrics = pd.merge(
+                    missing, artifacts, on = ['Segment', 'Timestamp'])
             else:
                 missing = self.get_missing(
-                    df, beats_ix, seg_size, show_progress = show_progress)
+                    df, beats_ix, artifacts_ix, seg_size)
                 artifacts = self.get_artifacts(
                     df, beats_ix, artifacts_ix, seg_size)
                 metrics = pd.merge(missing, artifacts, on = ['Segment'])
 
         metrics['Invalid'] = metrics['N Detected'].apply(
-            lambda x: 1 if x < int(min_hr * (seg_size/60)) or x > 220 else np.nan)
-
-        metrics = metrics.astype({
-            'Segment': 'Int64',
-            'N Detected': 'Int64',
-            'N Expected': 'Int64',
-            'N Missing': 'Int64',
-            'N Artifact': 'Int64',
-        })
+            lambda x: 1 if x < int(min_hr * (seg_size/60)) or x > 220
+            else np.nan)
 
         return metrics
 
@@ -258,8 +236,10 @@ class Cardio:
             Identify artifactual beats using both or either of the methods.
         """
         df = data.copy()
-        df.loc[beats_ix, 'Beat'] = 1
-        df.loc[artifacts_ix, 'Artifact'] = 1
+        if 'Beat' not in df.columns:
+            df.loc[beats_ix, 'Beat'] = 1
+        if 'Artifact' not in df.columns:
+            df.loc[artifacts_ix, 'Artifact'] = 1
 
         n_seg = ceil(len(df) / (self.fs * seg_size))
         segments = pd.Series(np.arange(1, n_seg + 1))
@@ -514,13 +494,12 @@ class Cardio:
         return artifacts_ix
 
     def get_missing(
-        self,
+        self, 
         data: pd.DataFrame,
-        beats_ix: np.ndarray,
+        beats_ix: Optional[np.ndarray] = None,
+        artifacts_ix: Optional[np.ndarray] = None,
         seg_size: int = 60,
-        min_hr: float = 40,
         ts_col: Optional[str] = None,
-        show_progress: bool = True
     ) -> pd.DataFrame:
         """
         Summarize the number and proportion of missing beats per segment.
@@ -528,97 +507,115 @@ class Cardio:
         Parameters
         ----------
         data : pandas.DataFrame
-            The DataFrame containing the pre-processed ECG or PPG data.
-        beats_ix : array-like
-            An array containing the indices of detected beats.
+            The DataFrame containing the pre-processed ECG or PPG data. 
+        beats_ix : array_like, optional
+            An array containing the indices of detected beats. Required if 
+            `data` doesn't contain a "Beat" column.
+        artifacts_ix : array_like, optional
+            An array containing the indices of artifactual beats. Required 
+            if `data` doesn't contain an "Artifact" column .
         seg_size : int, optional
             The size of the segment in seconds; by default, 60.
-        min_hr : float, optional
-            The minimum acceptable heart rate against which the number of
-            beats in the last partial segment will be compared; by default, 40.
         ts_col : str, optional
             The name of the column containing timestamps; by default, None.
             If a string value is given, the output will contain a timestamps
             column.
-        show_progress : bool, optional
-            Whether to display a progress by while the function runs; by
-            default, True.
 
         Returns
         -------
         missing : pandas.DataFrame
-            A DataFrame with detected, expected, and missing numbers of
-            beats per segment.
+            A DataFrame with detected, expected, and missing numbers of beats 
+            per segment.
         """
-        seconds = self.get_seconds(data, beats_ix, ts_col, show_progress)
-        seconds.index = seconds.index.astype(int)
+        from heartview.heartview import compute_ibis
+        data = data.copy()
 
-        n_seg = ceil(len(seconds) / seg_size)
-        segments = pd.Series(np.arange(1, n_seg + 1))
-        n_expected = (
-                seconds.groupby(seconds.index // seg_size)['Mean HR'].median() * (seg_size / 60)
-        ).fillna(0).astype(int)
-        n_detected = seconds.groupby(
-            seconds.index // seg_size)['N Beats'].sum()
-        n_missing = (n_expected - n_detected).clip(lower = 0)
-        perc_missing = round((n_missing / n_expected) * 100, 2)
+        # Ensure "Beat" and "Artifact" columns exist
+        if 'Beat' not in data.columns:
+            data.loc[beats_ix, 'Beat'] = 1
+        if 'Artifact' not in data.columns:
+            data.loc[artifacts_ix, 'Artifact'] = 1
 
-        # Handle last partial segment of data
-        last_seg_len = len(seconds) % seg_size
-        if last_seg_len > 0:
-            last_detected = n_detected.iloc[-1]
-            med_expected = n_expected.iloc[:-1].median()
-            if med_expected == 0:
-                # Fallback to an estimate based on min_hr
-                last_expected = min_hr * (last_seg_len / seg_size)
+        # Compute IBIs if no "IBI" column
+        if 'IBI' not in data.columns:
+            ibi = compute_ibis(data, self.fs, beats_ix, ts_col)
+            data['IBI'] = ibi['IBI']
+
+        def _expected_hr(seg: int, seg_nums: np.ndarray) -> float:
+            """Estimate the expected HR for a segment with adjacent segment 
+            fallback."""
+            segment = data.loc[data.Segment == seg]
+            median_hrs = self._window_medians(segment)
+
+            # Check the last 50% of the previous segment
+            if not median_hrs and (seg - 1) in seg_nums:
+                prev = data.loc[data.Segment == seg - 1]
+                last_half = prev.iloc[-int(seg_size * 0.5):]
+                median_hrs = self._window_medians(last_half)
+
+            # Check the first 50% of the next segment
+            if not median_hrs and (seg + 1) in seg_nums:
+                nxt = data.loc[data.Segment == seg + 1]
+                first_half = nxt.iloc[:int(seg_size * 0.5)]
+                median_hrs = self._window_medians(first_half)
+
+            return float(np.nanmedian(median_hrs)) if median_hrs else np.nan
+
+        seg_nums = data.Segment.unique()
+        results = []
+        last_valid_hr = np.nan
+
+        for seg in seg_nums:
+            exp_hr = _expected_hr(seg, seg_nums)
+
+            # Detected beats
+            n_detected = data.loc[(data.Segment == seg) & data.Beat.notna()].shape[0]
+
+            # If exp_hr cannot be estimated and if there are detected beats,
+            # use the last valid exp_hr
+            if np.isnan(exp_hr) and not np.isnan(last_valid_hr) and n_detected > 0:
+                exp_hr = last_valid_hr
+            elif not np.isnan(exp_hr):
+                last_valid_hr = exp_hr
+
+            # Calculate expected number of beats in this segment
+            if np.isnan(exp_hr):
+                n_expected = np.nan
             else:
-                last_expected_ratio = min_hr / med_expected
-                last_expected = last_expected_ratio * last_seg_len
-            if last_expected > last_detected:
-                last_n_missing = last_expected - last_detected
-                last_perc_missing = round(
-                    (last_n_missing / last_expected) * 100, 2)
-            else:
-                last_perc_missing = 0
-                last_n_missing = 0
-            n_expected.iloc[-1] = int(last_expected)
-            n_missing.iloc[-1] = int(last_n_missing)
-            perc_missing.iloc[-1] = last_perc_missing
+                n_expected = int(round(exp_hr * (seg_size / 60)))
 
-        if ts_col is not None:
-            timestamps = seconds.groupby(
-                seconds.index // seg_size).first()['Timestamp']
-            missing = pd.concat([
-                segments,
-                timestamps,
-                n_detected,
-                n_expected,
-                n_missing,
-                perc_missing,
-            ], axis = 1)
-            missing.columns = [
-                'Segment',
-                'Timestamp',
-                'N Detected',
-                'N Expected',
-                'N Missing',
-                '% Missing',
-            ]
-        else:
-            missing = pd.concat([
-                segments,
-                n_detected,
-                n_expected,
-                n_missing,
-                perc_missing,
-            ], axis = 1)
-            missing.columns = [
-                'Segment',
-                'N Detected',
-                'N Expected',
-                'N Missing',
-                '% Missing',
-            ]
+            # Rescale n_expected for the last partial segment
+            if seg == seg_nums[-1]:
+                factor = (len(data[data.Segment == seg]) / self.fs) / seg_size
+                n_expected = int(round(n_expected * factor))
+
+            # Missing beats
+            n_missing = np.nan if np.isnan(n_expected) \
+                else max(0, n_expected - n_detected)
+            perc_missing = np.nan if np.isnan(n_expected) \
+                else round((n_missing / n_expected) * 100, 2)
+
+            row = {'Segment': seg}
+            if ts_col is not None and ts_col in data.columns:
+                row['Timestamp'] = data.loc[data.Segment == seg, ts_col].iloc[0]
+            row.update({
+                'N Detected': n_detected,
+                'N Expected': n_expected,
+                'N Missing': n_missing,
+                '% Missing': perc_missing,
+            })
+            results.append(row)
+        missing = pd.DataFrame(results)
+        
+        # Backfill for any un-estimable leading segments
+        first_valid = missing['N Expected'].first_valid_index()
+        if first_valid is not None:
+            missing.loc[:first_valid, 'N Expected'] = missing.loc[first_valid, 'N Expected']
+
+        # Recalculate missing numbers
+        missing['N Expected'] = missing['N Expected'].astype('Int64')
+        missing['N Missing'] = (missing['N Expected'] - missing['N Detected']).clip(lower = 0)
+        missing['% Missing'] = ((missing['N Missing'] / missing['N Expected']) * 100).round(2)
         return missing
 
     def get_seconds(
@@ -1740,6 +1737,21 @@ class Cardio:
         iqr = self._get_iqr(data)
         QD = iqr * 0.5
         return QD
+
+    def _window_medians(self, segment: pd.DataFrame, win_size: int = 5) -> list:
+        """Calculate median HRs from artifact-free windows in a segment 
+        slice for get_missing()."""
+        median_hrs = []
+        beats = segment.dropna(subset = ['Beat'])
+        n = len(beats)
+        for i in range(n - win_size + 1):
+            window = beats.iloc[i:i + win_size]
+            if window.Artifact.any():
+                continue
+            ibi_vals = window.IBI.values
+            med_hr = np.nanmedian(60000 / ibi_vals)
+            median_hrs.append(med_hr)
+        return median_hrs
 
     class _MaxNFifo:
         """
