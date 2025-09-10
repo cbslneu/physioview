@@ -43,7 +43,6 @@ def get_callbacks(app):
         """Save the data type to the local memory depending on the file
         type."""
         if not filenames:
-            # raise PreventUpdate
             return [], True, True, True, None
 
         session_path = Path(filenames[0]).parent
@@ -145,6 +144,13 @@ def get_callbacks(app):
 
         # Clear Beat Editor directories
         utils._clear_edits()
+
+        # Clear stale files in 'temp' directory
+        for f in Path(temp_path).iterdir():
+            if f.is_file() and str(f) != filename:
+                f.unlink()
+            elif f.is_dir() and str(f) != str(session_path):
+                shutil.rmtree(f, ignore_errors = True)
 
         return [file_check, disable_run, disable_configure,
                 hide_e4_dtypes, data]
@@ -1135,8 +1141,10 @@ def get_callbacks(app):
             artifacts_ix = utils._map_beat_edits(
                 edited_artifacts_ix, beat_editor_fs, fs)
 
-            # Remove any existing 'Artifact' column to prevent stale values
-            # from affecting recomputation in sqa.compute_metrics()
+            # Remove any existing 'Beat' or 'Artifact' columns to prevent
+            # stale values from affecting SQA recomputation
+            if 'Beat' in preprocessed_data.columns:
+                del preprocessed_data['Beat']
             if 'Artifact' in preprocessed_data.columns:
                 del preprocessed_data['Artifact']
 
