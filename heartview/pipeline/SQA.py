@@ -2,6 +2,7 @@ from typing import Literal, Optional, Union
 from tqdm import tqdm
 from math import ceil
 from scipy.interpolate import interp1d
+from heartview import heartview
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -98,8 +99,6 @@ class Cardio:
         ...                                 ts_col = 'Timestamp', \
         ...                                 seg_size = 60, min_hr = 40)
         """
-        from heartview.heartview import compute_ibis
-
         df = data.copy()
         df.index = df.index.astype(int)
 
@@ -109,7 +108,7 @@ class Cardio:
 
         # Compute IBIs if no "IBI" column
         if 'IBI' not in df.columns:
-            ibi = compute_ibis(df, self.fs, beats_ix, ts_col)
+            ibi = heartview.compute_ibis(df, self.fs, beats_ix, ts_col)
             df['IBI'] = ibi['IBI']
 
         # Compute SQA metrics across rolling windows
@@ -407,6 +406,14 @@ class Cardio:
             ibi_bad = np.zeros(shape = len(ibis))
             artifact_beats = []
 
+            # Flag IBIs that are implausible = below a 40 bpm threshold
+            min_ibi = 60000 / 40
+            invalid_ix = np.where(ibis > min_ibi)[0]
+            if len(invalid_ix) > 0:
+                artifact_beats.extend(
+                    beats_ix[invalid_ix + 1])
+                ibi_bad[invalid_ix] = 1
+
             if len(ibi_diffs) < neighbors:
                 neighbors = len(ibi_diffs)
 
@@ -457,10 +464,10 @@ class Cardio:
 
                     bad_neighbors = int(neighbors * 0.25)
                     if ii + (bad_neighbors - 1) < len(beats_ix):
-                        artifact_beats.append(
+                        artifact_beats.extend(
                             beats_ix[ii + 1:(ii + bad_neighbors + 1)])
                     else:
-                        artifact_beats.append(
+                        artifact_beats.extend(
                             beats_ix[ii + 1:(ii + (bad_neighbors - 1))])
                     ibi_bad[ii + 1] = 1
 
@@ -503,7 +510,7 @@ class Cardio:
     ) -> pd.DataFrame:
         """
         Summarize the number and proportion of missing beats per segment.
-
+    
         Parameters
         ----------
         data : pandas.DataFrame
@@ -520,81 +527,84 @@ class Cardio:
             The name of the column containing timestamps; by default, None.
             If a string value is given, the output will contain a timestamps
             column.
-
+    
         Returns
         -------
         missing : pandas.DataFrame
             A DataFrame with detected, expected, and missing numbers of beats 
             per segment.
         """
-        from heartview.heartview import compute_ibis
         data = data.copy()
-
+    
+        # Ensure a "Segment" column exists
+        if 'Segment' not in data.columns:
+            data.insert(0, 'Segment', data.index // (self.fs * seg_size) + 1)
+    
         # Ensure "Beat" and "Artifact" columns exist
         if 'Beat' not in data.columns:
             data.loc[beats_ix, 'Beat'] = 1
         if 'Artifact' not in data.columns:
             data.loc[artifacts_ix, 'Artifact'] = 1
-
+    
         # Compute IBIs if no "IBI" column
         if 'IBI' not in data.columns:
-            ibi = compute_ibis(data, self.fs, beats_ix, ts_col)
+            ibi = heartview.compute_ibis(data, self.fs, beats_ix, ts_col)
             data['IBI'] = ibi['IBI']
-
+    
         def _expected_hr(seg: int, seg_nums: np.ndarray) -> float:
             """Estimate the expected HR for a segment with adjacent segment 
             fallback."""
             segment = data.loc[data.Segment == seg]
             median_hrs = self._window_medians(segment)
-
+    
             # Check the last 50% of the previous segment
             if not median_hrs and (seg - 1) in seg_nums:
                 prev = data.loc[data.Segment == seg - 1]
                 last_half = prev.iloc[-int(seg_size * 0.5):]
                 median_hrs = self._window_medians(last_half)
-
+    
             # Check the first 50% of the next segment
             if not median_hrs and (seg + 1) in seg_nums:
                 nxt = data.loc[data.Segment == seg + 1]
                 first_half = nxt.iloc[:int(seg_size * 0.5)]
                 median_hrs = self._window_medians(first_half)
-
+    
             return float(np.nanmedian(median_hrs)) if median_hrs else np.nan
-
+    
         seg_nums = data.Segment.unique()
         results = []
         last_valid_hr = np.nan
-
+    
         for seg in seg_nums:
             exp_hr = _expected_hr(seg, seg_nums)
-
+    
             # Detected beats
             n_detected = data.loc[(data.Segment == seg) & data.Beat.notna()].shape[0]
-
+    
             # If exp_hr cannot be estimated and if there are detected beats,
             # use the last valid exp_hr
-            if np.isnan(exp_hr) and not np.isnan(last_valid_hr) and n_detected > 0:
+            if np.isnan(exp_hr) and not np.isnan(last_valid_hr):
                 exp_hr = last_valid_hr
             elif not np.isnan(exp_hr):
                 last_valid_hr = exp_hr
-
+    
             # Calculate expected number of beats in this segment
             if np.isnan(exp_hr):
                 n_expected = np.nan
             else:
                 n_expected = int(round(exp_hr * (seg_size / 60)))
-
+    
             # Rescale n_expected for the last partial segment
             if seg == seg_nums[-1]:
                 factor = (len(data[data.Segment == seg]) / self.fs) / seg_size
                 n_expected = int(round(n_expected * factor))
-
+    
             # Missing beats
             n_missing = np.nan if np.isnan(n_expected) \
                 else max(0, n_expected - n_detected)
             perc_missing = np.nan if np.isnan(n_expected) \
                 else round((n_missing / n_expected) * 100, 2)
-
+    
             row = {'Segment': seg}
             if ts_col is not None and ts_col in data.columns:
                 row['Timestamp'] = data.loc[data.Segment == seg, ts_col].iloc[0]
@@ -611,7 +621,7 @@ class Cardio:
         first_valid = missing['N Expected'].first_valid_index()
         if first_valid is not None:
             missing.loc[:first_valid, 'N Expected'] = missing.loc[first_valid, 'N Expected']
-
+    
         # Recalculate missing numbers
         missing['N Expected'] = missing['N Expected'].astype('Int64')
         missing['N Missing'] = (missing['N Expected'] - missing['N Detected']).clip(lower = 0)
