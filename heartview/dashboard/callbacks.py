@@ -2337,11 +2337,14 @@ def get_callbacks(app):
                             inplace = True)
 
             has_edits = False
+            has_corrections = False
             if data_type in ('ECG', 'BVP', 'PPG'):
 
                 # ---------------- Process Edited Cardiac Data ---------------
                 edited_file = temp_path / f'{s}_edited.csv'
                 has_edits = edited_file.exists()
+                corrected_file = temp_path / f'{s}_IBI_corrected.csv'
+                has_corrections = corrected_file.exists()
 
                 # Get sampling rate of Beat Editor data
                 beat_editor_fs = int(memory['downsampled fs'])  # ~250
@@ -2480,10 +2483,11 @@ def get_callbacks(app):
 
                     # Rewrite corrected IBI data to temp_path if available
                     else:
-                        corrected_ibi = pd.read_csv(
-                            temp_path / f'{s}_IBI_corrected.csv')
-                        corrected_ibi.to_csv(
-                            str(temp_path / f'{s}_IBI.csv'), index = False)
+                        if has_corrections:
+                            corrected_ibi = pd.read_csv(
+                                temp_path / f'{s}_IBI_corrected.csv')
+                            corrected_ibi.to_csv(
+                                str(temp_path / f'{s}_IBI.csv'), index = False)
 
                     if want_int:
                         p = temp_path / f'{s}_IBI.csv'
