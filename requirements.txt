@@ -11,8 +11,8 @@ multiprocess
 numpy==1.26.4
 openpyxl
 packaging==21.3
-pandas
-plotly
+pandas~=2.3.0
+plotly==6.2.0
 psutil
 pyEDFlib
 scipy
