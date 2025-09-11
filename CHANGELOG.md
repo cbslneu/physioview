@@ -3,6 +3,29 @@ All notable changes to this project will be documented in this file. The
 format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [PhysioView 1.0 / HeartView 2.1.2] - 2025-09-11
+This release marks the **rebranding of HeartView as PhysioView**.  
+PhysioView 1.0 builds directly on **HeartView 2.1.2**, and introduces 
+**electrodermal activity (EDA) signal processing and quality assessment 
+support**, expanding the scope of the software beyond cardiovascular data.
+
+### Added
+- `heartview.pipeline.EDA` module for EDA preprocessing, decomposition, and 
+  skin conductance response (SCR) detection (Nabian et al., 2018)
+- `SQA.EDA` class for the automated EDA quality assessment procedure 
+  (Kleckner et al., 2017)
+- Optional plotting of a horizontal reference line in `heartview.plot_signal()`
+
+#### Pipeline
+- Flagging of implausible IBI values in `SQA.Cardio.identify_artifacts()`
+- Support for automated beat correction with `SQA.Cardio.correct_interval()`
+
+#### Dashboard
+- Error handling when beats fail to be detected in a cardiac signal
+- Buttons to automatically correct detected beats in cardiac signals
+- Rendering of automated beat corrections and updates to the SQA charts and 
+  table
+
 ## [HeartView 2.1.2] - 2025-08-19
 ### Added
 * `_plotting.py` module to modularize helper functions and constants for 
