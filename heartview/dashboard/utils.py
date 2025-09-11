@@ -85,6 +85,11 @@ def _preprocess_cardiac(
     else:
         beats_ix = getattr(detect_beats, beat_detector)(
             preprocessed_data[dtype])
+
+    # Return early and display error if no beats were detected
+    if len(beats_ix) == 0:
+        return None, None, None
+
     preprocessed_data.loc[beats_ix, 'Beat'] = 1
     preprocessed_data.insert(
         0, 'Segment', preprocessed_data.index // (seg_size * fs) + 1)
@@ -104,13 +109,13 @@ def _preprocess_cardiac(
                 preprocessed_data.Timestamp, unit = unix_fmt)
     ibi = compute_ibis(preprocessed_data, fs, beats_ix, ts_col)
     metrics = sqa.compute_metrics(
-        preprocessed_data, beats_ix, artifacts_ix, seg_size = seg_size,
-        show_progress = False)
+        preprocessed_data, beats_ix, artifacts_ix, ts_col,
+        seg_size = seg_size, show_progress = False)
 
     # Downsample data to at least 250 Hz for quicker plot rendering
     if downsample:
         ds_data, ds_ibi, _, ds_acc, ds_fs = _downsample_data(
-            preprocessed_data, fs, 'ECG', beats_ix, artifacts_ix,
+            preprocessed_data, fs, dtype, beats_ix, artifacts_ix,
             acc = acc_data)
         return preprocessed_data, ibi, metrics, ds_data, ds_ibi, ds_acc, ds_fs
     else:
@@ -532,14 +537,12 @@ def _downsample_data(
         ds = pd.DataFrame({x_col: df[x_col].iloc[ds_idx].to_numpy(), y_col: y_dec})
 
         # Rescale detected, artifactual, and corrected beat indices
-        if beats_ix is not None:
-            down_beats = np.rint(
-                beats_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
-            ds.loc[down_beats, 'Beat'] = 1
-        if artifacts_ix is not None:
-            down_artifacts = np.rint(
-                artifacts_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
-            ds.loc[down_artifacts, 'Artifact'] = 1
+        down_beats = np.rint(
+            beats_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
+        ds.loc[down_beats, 'Beat'] = 1
+        down_artifacts = np.rint(
+            artifacts_ix / ds_factor).astype(int).clip(0, len(ds) - 1)
+        ds.loc[down_artifacts, 'Artifact'] = 1
         if corrected_beats_ix is not None:
             down_corrected_beats = np.rint(
                 corrected_beats_ix / ds_factor).astype(int).clip(0, len(ds) - 1)

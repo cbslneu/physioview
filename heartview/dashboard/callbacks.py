@@ -18,6 +18,7 @@ import zipfile
 import shutil
 import pandas as pd
 import numpy as np
+import traceback
 
 def get_callbacks(app):
     """Attach callback functions to the dashboard app."""
@@ -801,10 +802,22 @@ def get_callbacks(app):
                                 data, dtype, fs, seg_size, beat_detector,
                                 artifact_method, artifact_tol, filt_on,
                                 acc_data = acc, downsample = ds)
+
+                            # Throw beat detection error
+                            if isinstance(preprocessed, tuple) and \
+                                    all(x is None for x in preprocessed):
+                                pipeline_error = True
+                                error_msg = ('PipelineError: No beats detected. '
+                                             'Please try a different beat '
+                                             'detector.')
+                                return dtype_error, map_error, pipeline_error, \
+                                    error_msg, temp_input_error, None
+
                         except Exception as e:
                             pipeline_error = True
                             error_type = type(e).__name__
                             error_msg = f'{error_type}: {e}'
+                            print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
                                 error_msg, temp_input_error, None
                         metrics = preprocessed[2]
@@ -993,10 +1006,22 @@ def get_callbacks(app):
                             data, dtype, fs, seg_size, beat_detector,
                             artifact_method, artifact_tol, filt_on,
                             acc_data = acc, downsample = ds)
+
+                        # Throw beat detection error
+                        if isinstance(preprocessed, tuple) and \
+                                all(x is None for x in preprocessed):
+                            pipeline_error = True
+                            error_msg = ('PipelineError: No beats detected. '
+                                         'Please try a different beat '
+                                         'detector.')
+                            return dtype_error, map_error, pipeline_error, \
+                                error_msg, temp_input_error, None
+
                     except Exception as e:
                         pipeline_error = True
                         error_type = type(e).__name__
                         error_msg = f'{error_type}: {e}'
+                        print(traceback.format_exc())
                         return dtype_error, map_error, pipeline_error, \
                             error_msg, temp_input_error, None
                     metrics = preprocessed[2]
