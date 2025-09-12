@@ -2,7 +2,7 @@ from typing import Literal, Optional, Union
 from tqdm import tqdm
 from math import ceil
 from scipy.interpolate import interp1d
-from heartview import heartview
+from physioview import physioview
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -92,7 +92,7 @@ class Cardio:
 
         Examples
         --------
-        >>> from heartview.pipeline import SQA
+        >>> from physioview.pipeline import SQA
         >>> sqa = SQA.Cardio(fs = 1000)
         >>> artifacts_ix = sqa.identify_artifacts(beats_ix, method = 'cbd')
         >>> cardio_qa = sqa.compute_metrics(ecg, beats_ix, artifacts_ix, \
@@ -108,7 +108,7 @@ class Cardio:
 
         # Compute IBIs if no "IBI" column
         if 'IBI' not in df.columns:
-            ibi = heartview.compute_ibis(df, self.fs, beats_ix, ts_col)
+            ibi = physioview.compute_ibis(df, self.fs, beats_ix, ts_col)
             df['IBI'] = ibi['IBI']
 
         # Compute SQA metrics across rolling windows
@@ -548,7 +548,7 @@ class Cardio:
     
         # Compute IBIs if no "IBI" column
         if 'IBI' not in data.columns:
-            ibi = heartview.compute_ibis(data, self.fs, beats_ix, ts_col)
+            ibi = physioview.compute_ibis(data, self.fs, beats_ix, ts_col)
             data['IBI'] = ibi['IBI']
     
         def _expected_hr(seg: int, seg_nums: np.ndarray) -> float:
@@ -1889,13 +1889,13 @@ class EDA:
         Parameters
         ----------
         fs : int
-            The sampling rate of the ECG or PPG recording.
+            The sampling rate of the EDA recording.
         eda_min : float, optional
             The minimum acceptable value for EDA data in microsiemens; by
-            default, 0.05 uS.
+            default, 0.2 uS.
         eda_max : float, optional
             The maximum acceptable value for EDA data in microsiemens; by
-            default, 60 uS.
+            default, 40 uS.
         eda_max_slope : float, optional
             The maximum slope of EDA data in microsiemens per second; by
             default, 5 uS/sec.

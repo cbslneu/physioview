@@ -1,5 +1,5 @@
 from dash import html, dcc
-from heartview.dashboard import utils
+from physioview.dashboard import utils
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 import dash_uploader as du

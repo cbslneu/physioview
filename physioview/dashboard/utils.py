@@ -4,8 +4,8 @@ from pathlib import Path
 from shutil import rmtree
 from zipfile import ZipFile
 from scipy.signal import filtfilt, firwin
-from heartview.pipeline import ECG, EDA, PPG, SQA
-from heartview.heartview import compute_ibis
+from physioview.pipeline import ECG, EDA, PPG, SQA
+from physioview.physioview import compute_ibis
 from dash import html
 from requests import get as http_get
 from os import path
@@ -65,7 +65,7 @@ def _preprocess_cardiac(
     acc_data: Optional[pd.DataFrame] = None,
     downsample: bool = True
 ) -> tuple:
-    """Run the HeartView pipeline on ECG/PPG data."""
+    """Run the PhysioView pipeline on ECG/PPG data."""
     is_preprocessed = False if not filt_on else True
     if dtype == 'ECG':
         filt = ECG.Filters(fs)

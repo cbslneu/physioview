@@ -3,11 +3,11 @@ from zipfile import ZipFile, ZipExtFile
 from tqdm import tqdm
 from scipy.signal import resample as scipy_resample
 from plotly.subplots import make_subplots
-from heartview.pipeline.ACC import compute_magnitude
-from heartview.pipeline.SQA import Cardio, EDA
-from heartview.pipeline.PPG import BeatDetectors
-from heartview.pipeline.EDA import Filters as edaFilters
-from heartview._plotting import *
+from physioview.pipeline.ACC import compute_magnitude
+from physioview.pipeline.SQA import Cardio, EDA
+from physioview.pipeline.PPG import BeatDetectors
+from physioview.pipeline.EDA import Filters as eda_filters
+from physioview._plotting import *
 import warnings
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
@@ -251,9 +251,9 @@ class Empatica:
 
         Examples
         --------
-        >>> from heartview import heartview
+        >>> from physioview import physioview
         >>> e4_archive = 'Sample_E4_Data.zip'
-        >>> E4 = heartview.Empatica(e4_archive)
+        >>> E4 = physioview.Empatica(e4_archive)
         >>> ALL_E4_DATA = E4.preprocess()
         """
         with ZipFile(self.file, 'r') as archive:
@@ -600,24 +600,24 @@ class Empatica:
 
     def compute_sqa(
         self,
-        kind: str,
+        dtype: str,
         seg_size: int = 60,
         initial_hr: Union[int, float, Literal['auto']] = 'auto',
         min_hr: int = 40,
-        min_eda: float = 0.05,
+        min_eda: float = 0.2,
         max_eda: float = 40.0,
         rolling_window: int = None,
         rolling_step: int = 15,
         show_progress: bool = True
-    ) -> pd.DataFrame:
+    ) -> Union[pd.DataFrame, tuple[pd.DataFrame, pd.DataFrame]]:
         """
-        Compute signal quality assessment metrics (SQA) for PPG and/or EDA
-        data from Empatica E4 devices.
+        Compute signal quality assessment metrics (SQA) PPG and/or EDA data
+        from Empatica E4 devices.
 
         Parameters
         ----------
-        kind : str
-            The kind of data whose SQA to compute. This value must be a string
+        dtype : str
+            The type of data whose SQA to compute. This value must be a string
             variation of 'all', 'eda', or 'ppg'.
         seg_size : int
             The segment size in seconds; by default, 60.
@@ -631,7 +631,7 @@ class Empatica:
             beats in the last partial segment will be compared; by default, 40.
         min_eda : float, optional
             The minimum acceptable value for EDA data in microsiemens; by
-            default, 0.05 uS.
+            default, 0.2 uS.
         max_eda : float, optional
             The maximum acceptable value for EDA data in microsiemens; by
             default, 40 uS.
@@ -656,20 +656,18 @@ class Empatica:
         `seg_size` value.
         """
 
-        if kind.lower() not in ('all', 'eda', 'ppg'):
+        if dtype.lower() not in ('all', 'eda', 'ppg'):
             raise ValueError('The `kind` parameter must take a string value '
                              '\'all\', \'eda\', or \'ppg\'.')
         else:
-            if kind == 'all':
-                kind = ('eda', 'ppg')
+            if dtype == 'all':
+                dtype = ('eda', 'ppg')
 
             ppg_metrics, eda_metrics = None, None
 
-            if 'ppg' in kind:
+            if 'ppg' in dtype:
                 bvp = self.get_bvp().bvp
-                bvp_start = self.get_bvp().start
                 fs = self.get_bvp().fs
-                ibi = self.get_ibi().ibi
                 ppg_beats = BeatDetectors(fs, False).adaptive_threshold(
                     bvp['BVP'])
                 sqa = Cardio(fs)
@@ -678,19 +676,25 @@ class Empatica:
                 ppg_metrics = sqa.compute_metrics(
                     bvp, ppg_beats, artifact_beats, 'Timestamp', seg_size,
                     min_hr, rolling_window, rolling_step, show_progress)
-            if 'eda' in kind:
+
+            if 'eda' in dtype:
                 eda = self.get_eda().eda
-                eda_start = self.get_eda().start
                 fs = self.get_eda().fs
-                eda['EDA'] = edaFilters(fs).gaussian(
-                    eda['EDA'], window = int(0.5 * fs))
+                start_time = pd.to_datetime(self.get_eda().start, unit = 's')
+                eda['EDA'] = eda_filters(fs).filter_signal(eda['EDA'])
                 temp = self.get_temp().temp
                 sqa = EDA(fs, eda_min = min_eda, eda_max = max_eda)
                 eda_metrics = sqa.compute_metrics(
-                    eda['EDA'], temp['Temp'], eda['Timestamp'],
-                    preprocessed = True, seg_size = 60,
-                    rolling_window = rolling_window,
+                    eda['EDA'], temp['TEMP'], preprocessed = True,
+                    seg_size = 60, rolling_window = rolling_window,
                     rolling_step = rolling_step)
+                ts = pd.date_range(
+                    start = start_time,
+                    periods = len(eda_metrics),
+                    freq = pd.Timedelta(seconds = seg_size)
+                )
+                eda_metrics.insert(1, 'Timestamp', ts)
+
         if ppg_metrics is not None and eda_metrics is not None:
             return ppg_metrics, eda_metrics
         else:
@@ -703,7 +707,8 @@ class Empatica:
         self,
         segment: int = 1,
         seg_size: int = 60,
-        interactive: bool = True
+        interactive: bool = True,
+        **kwargs
     ) -> go.Figure:
         """
         Display a plot of a segment of signals recorded with the Empatica E4
@@ -717,6 +722,10 @@ class Empatica:
             The segment size in seconds; by default, 60.
         interactive : bool, optional
             Whether to plot an interactive visualization; by default, True.
+        **kwargs : dict, optional
+            Additional keyword arguments passed to the Plotly figure's
+            `update_layout()` method. This allows customizing attributes such
+            as `height`, `width`, `title`, `template`, etc.
 
         Returns
         -------
@@ -724,42 +733,58 @@ class Empatica:
             If `interactive` is True, displays and returns an interactive
             Plotly figure containing the plotted signals. If `interactive`
             is False, displays a static figure and returns None.
+
+        Examples
+        --------
+        >>> from physioview import physioview
+        >>> e4 = physioview.Empatica('empatica_file.zip')
+        >>> fig = e4.plot_signals(
+        >>>     interactive = True, template = 'simple_white')
         """
-        data = self.preprocess()
+        data = self.preprocess(time_aligned = True)
+
+        # Set the subplot order
         dtypes = ('acc', 'bvp', 'eda', 'temp')
+
         if interactive:
             fig = make_subplots(
                 rows = 4, cols = 1,
                 shared_xaxes = True,
                 vertical_spacing = 0.02,
                 row_heights = [0.2, 0.3, 0.3, 0.2])
+
             for n in range(len(dtypes)):
                 if dtypes[n] in ('acc', 'bvp'):
+                    df = data.hrv
                     fs = data.bvp_fs
                     seg_start = int((segment - 1) * fs * seg_size)
                     seg_end = seg_start + int(fs * seg_size)
                     signal_name = 'ACC' if dtypes[n] == 'acc' else 'BVP'
                     color = 'forestgreen' if dtypes[n] == 'acc' else '#3562bd'
-                    ylabel = 'm/s²' if dtypes[n] == 'acc' else ''
                     if dtypes[n] == 'acc':
-                        x = data.acc['Timestamp'].iloc[seg_start:seg_end]
-                        y = data.acc['Magnitude'].iloc[seg_start:seg_end]
+                        ylabel = 'm/s²'
+                        x = df['Timestamp'].iloc[seg_start:seg_end]
+                        y = df['Magnitude'].iloc[seg_start:seg_end]
                     else:
-                        x = data.bvp['Timestamp'].iloc[seg_start:seg_end]
-                        y = data.bvp['BVP'].iloc[seg_start:seg_end]
+                        ylabel = 'bvp'
+                        x = df['Timestamp'].iloc[seg_start:seg_end]
+                        y = df['BVP'].iloc[seg_start:seg_end]
                 else:
+                    df = data.eda
                     fs = data.eda_fs
                     seg_start = int((segment - 1) * fs * seg_size)
                     seg_end = seg_start + int(fs * seg_size)
-                    signal_name = 'EDA' if dtypes[n] == 'eda' else 'Temperature'
-                    color = '#43c9de' if dtypes[n] == 'eda' else '#8b3ac9'
-                    ylabel = 'uS' if dtypes[n] == 'eda' else '°C'
+                    signal_name = 'EDA' if dtypes[n] == 'eda' else 'TEMP'
+                    color = '#249ab5' if dtypes[n] == 'eda' else '#8659c2'
                     if dtypes[n] == 'eda':
-                        x = data.eda['Timestamp'].iloc[seg_start:seg_end]
-                        y = data.eda['EDA'].iloc[seg_start:seg_end]
+                        ylabel = 'uS'
+                        x = df['Timestamp'].iloc[seg_start:seg_end]
+                        y = df['EDA'].iloc[seg_start:seg_end]
                     else:
-                        x = data.temp['Timestamp'].iloc[seg_start:seg_end]
-                        y = data.temp['Temp'].iloc[seg_start:seg_end]
+                        ylabel = '°C'
+                        x = df['Timestamp'].iloc[seg_start:seg_end]
+                        y = df['TEMP'].iloc[seg_start:seg_end]
+
                 fig.add_trace(
                     go.Scatter(
                         x = x, y = y,
@@ -770,13 +795,24 @@ class Empatica:
                     row = n+1, col = 1)
                 fig.update_yaxes(
                     title_text = ylabel,
-                    row = 1, col = 1,
+                    row = n+1, col = 1,
                     showgrid = True,
                     gridwidth = 0.5,
                     gridcolor = 'lightgrey',
                     griddash = 'dot',
                     tickcolor = 'grey',
                     linecolor = 'grey')
+
+                # Apply user-supplied layout modifications
+                if kwargs:
+                    fig.update_layout(
+                        template = 'simple_white',
+                        legend = dict(
+                            font = dict(size = 15), orientation = 'h',
+                            yanchor = 'bottom', y = 1.05,
+                            xanchor = 'right', x = 1.0),
+                        **kwargs)
+
             fig.show()
             return fig
         else:
@@ -804,7 +840,7 @@ class Empatica:
                         y = data.eda['EDA'].iloc[seg_start:seg_end]
                     else:
                         x = data.temp['Timestamp'].iloc[seg_start:seg_end]
-                        y = data.temp['Temp'].iloc[seg_start:seg_end]
+                        y = data.temp['TEMP'].iloc[seg_start:seg_end]
                 for ax in axs:
                     ax.plot(x, y, label = signal_name, color = color, lw = 1.2)
                     ax.set_xlabel('Timestamp')
@@ -1084,9 +1120,9 @@ def plot_signal(
 
     Examples
     --------
-    >>> from heartview import heartview
+    >>> from physioview import physioview
     >>> # data has columns: 'Timestamp', 'II', 'GSR', 'Beat', 'SCR', 'Artifact'
-    >>> fig = heartview.plot_signal(
+    >>> fig = physioview.plot_signal(
     >>>     signal = data,
     >>>     signal_type = ['ECG', 'EDA'],
     >>>     axes = ('Timestamp', {'ECG': 'II', 'EDA': 'GSR'}),
@@ -1506,7 +1542,7 @@ def write_beat_editor_file(
         provided, timestamps are assumed to correspond to the DataFrame index.
     filename : str, optional
         The name of the JSON file to write. If no filename is provided,
-        the default filename 'heartview_edit.json' is used.
+        the default filename 'physioview_edit.json' is used.
     batch : bool, optional
         Whether input data is from a batch; by default, `False`. If `True`,
         the JSON file is written to a 'beat-editor/data/batch' subdirectory.
@@ -1523,7 +1559,7 @@ def write_beat_editor_file(
 
     # Set the output JSON filename
     if filename is None:
-        json_filename = 'heartview_edit.json'
+        json_filename = 'physioview_edit.json'
     else:
         json_filename = filename + '_edit.json'
 

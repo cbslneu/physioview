@@ -179,7 +179,7 @@ class Filters:
 
         Notes
         -----
-        This is the default filter used in the HeartView Dashboard.
+        This is the default filter used in the PhysioView Dashboard.
         """
         nyq = 0.5 * self.fs
         low = lowcut / nyq

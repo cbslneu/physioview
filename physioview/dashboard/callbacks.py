@@ -1,10 +1,10 @@
 from dash import html, Input, Output, State, ctx, callback
 from dash.exceptions import PreventUpdate
 from dash.dcc import send_bytes
-from heartview import heartview
-from heartview.pipeline import ACC, SQA
-from heartview.pipeline.EDA import compute_tonic_scl
-from heartview.dashboard import utils
+from physioview import physioview
+from physioview.pipeline import ACC, SQA
+from physioview.pipeline.EDA import compute_tonic_scl
+from physioview.dashboard import utils
 from flirt.hrv import get_hrv_features
 from flirt.eda import get_eda_features
 from os import makedirs, stat
@@ -623,11 +623,11 @@ def get_callbacks(app):
             headers = None
             device = data['source'] if data['source'] != 'csv' else 'Other'
             if device == 'Actiwave':
-                actiwave = heartview.Actiwave(data['filename'])
+                actiwave = physioview.Actiwave(data['filename'])
                 fs = actiwave.get_ecg_fs()
                 dtype = 'ECG'
             elif device == 'E4':
-                E4 = heartview.Empatica(data['filename'])
+                E4 = physioview.Empatica(data['filename'])
                 fs = E4.get_bvp().fs
                 dtype = 'BVP'
             else:
@@ -903,7 +903,7 @@ def get_callbacks(app):
                     dtype = 'ECG'
 
                     # Prepare Actiwave Cardio data
-                    actiwave = heartview.Actiwave(filepath)
+                    actiwave = physioview.Actiwave(filepath)
                     actiwave_data = actiwave.preprocess(time_aligned = True)
                     data = actiwave_data[['Timestamp', dtype]].copy()
                     acc = actiwave_data[['Timestamp', 'X', 'Y', 'Z']].copy()
@@ -913,7 +913,7 @@ def get_callbacks(app):
 
                 # -- Empatica E4 sources -------------------------------------
                 elif file_type == 'E4':
-                    E4 = heartview.Empatica(filepath)
+                    E4 = physioview.Empatica(filepath)
                     e4_data = E4.preprocess()
 
                     # Accelerometer data
@@ -1241,7 +1241,7 @@ def get_callbacks(app):
                         # Downsample Beat Editor data to match dashboard render
                         ds, _, _, _, ds_fs = utils._downsample_data(
                             data, fs, data_type, beats_ix, artifacts_ix)
-                        heartview.write_beat_editor_file(
+                        physioview.write_beat_editor_file(
                             ds, ds_fs, signal_col, 'Beat', ts_col, name,
                             batch = True, verbose = False)
 
@@ -1264,7 +1264,7 @@ def get_callbacks(app):
                     # Downsample Beat Editor data to match dashboard render
                     ds, _, _, _, ds_fs = utils._downsample_data(
                         data, fs, data_type, beats_ix, artifacts_ix)
-                    heartview.write_beat_editor_file(
+                    physioview.write_beat_editor_file(
                         ds, ds_fs, signal_col, 'Beat', ts_col, filename,
                         batch = batch, verbose = False)
             else:
@@ -1605,7 +1605,7 @@ def get_callbacks(app):
                     signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
                     signal, beats_ix, artifacts_ix = utils._revert_beat_corrections(
                         signal, fs_full, artifact_method, artifact_tol)
-                    ibi = heartview.compute_ibis(
+                    ibi = physioview.compute_ibis(
                         signal, fs_full, beats_ix, 'Timestamp')
                     ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
                     signal, ibi, _ = _save_temp_and_render(
@@ -1634,7 +1634,7 @@ def get_callbacks(app):
                     editor_data = pd.read_json(edit_file)
 
                     # Process beat edits
-                    data_edited = heartview.process_beat_edits(
+                    data_edited = physioview.process_beat_edits(
                         editor_data, edits)
                     data_edited_beats_ix = data_edited[
                         data_edited.Edited == 1].index.values
@@ -1654,7 +1654,7 @@ def get_callbacks(app):
                         index = False)
 
                     # Recompute IBIs with edited beats for rendering
-                    ibi_edited = heartview.compute_ibis(
+                    ibi_edited = physioview.compute_ibis(
                         data_edited, fs, data_edited_beats_ix, ts_col)
 
                     # Remove invalid IBIs + artifacts from any 'Unusable' portions
@@ -1688,7 +1688,7 @@ def get_callbacks(app):
                                 data_edited.loc[artif_post_ix, 'Artifact'] = np.nan
 
                     # Render updated signal plots
-                    signal_plots = heartview.plot_signal(
+                    signal_plots = physioview.plot_signal(
                         signal = data_edited, signal_type = data_type,
                         axes = (x_axis, 'Signal'), fs = fs,
                         peaks_map = {data_type: 'Edited'},
@@ -1706,7 +1706,7 @@ def get_callbacks(app):
                     correction_map = {data_type: 'Corrected'} if overlay_corrected else None
 
                     # Create cardiac signal subplots
-                    signal_plots = heartview.plot_signal(
+                    signal_plots = physioview.plot_signal(
                         signal = signal, signal_type = data_type,
                         axes = (x_axis, y_axis), fs = fs,
                         peaks_map = {data_type: 'Beat'},
@@ -1739,7 +1739,7 @@ def get_callbacks(app):
                 has_scr = 'SCR' in signal.columns
 
                 # Create EDA subplots
-                signal_plots = heartview.plot_signal(
+                signal_plots = physioview.plot_signal(
                     signal = signal, signal_type = signal_types,
                     axes = (x_axis, eda_subplots),
                     fs = fs,
@@ -2458,7 +2458,7 @@ def get_callbacks(app):
 
                     # Recompute IBIs with edited beats
                     if has_edits:
-                        edited_ibi = heartview.compute_ibis(
+                        edited_ibi = physioview.compute_ibis(
                             data, fs_full, mapped_edits_ix, ts_col)
 
                         # Remove first IBI after each 'unusable' portion

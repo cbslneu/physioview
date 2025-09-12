@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import cvxopt as cv
 from typing import Literal, Optional, Union
-from zipfile import ZipFile
 from scipy.signal import butter, convolve, ellip, filtfilt, find_peaks, \
     firwin, resample_poly
 from math import gcd
@@ -483,109 +482,6 @@ def resample(
     rs = resample_poly(signal, up, down)
     rs = np.asarray(rs).flatten()
     return rs
-
-def preprocess_e4(
-    file: str,
-    resample_data: bool = False,
-    resample_fs: int = 64
-) -> Union[pd.DataFrame, tuple]:
-    """
-    Pre-process electrodermal and temperature data from Empatica E4 files,
-    including comma-separated values (.csv) or archive (.zip) files.
-
-    Parameters
-    ----------
-    file : str
-        The path of the Empatica E4 CSV or archive file. The file extension
-        must be either '.csv' or '.zip.'
-    resample_data : bool, optional
-        Whether the EDA and temperature data should be resampled; by
-        default, False.
-    resample_fs : int, optional
-        The new sampling rate to which the data should be resampled; by
-        default, 64 Hz.
-
-    Returns
-    -------
-    pandas.DataFrame or tuple of pandas.DataFrame
-        If the input file is an Empatica E4 CSV file, returns a single data
-        frame containing the pre-preprocessed data with timestamps.
-        If the input file is an Empatica E4 archive file, returns a tuple
-        containing two DataFrames:
-        - eda_data : pandas.DataFrame
-            A DataFrame containing the pre-processed EDA data.
-        - temp_data : pandas.DataFrame
-            A DataFrame containing the pre-processed temperature data.
-    """
-    if not file.lower().endswith(('csv', 'zip')):
-        raise TypeError('The input filename must end in either \'.csv\' or '
-                        '\'.zip\'.')
-    else:
-        # Pre-process Empatica E4 CSV files
-        if file.lower().endswith('csv'):
-            meta = pd.read_csv(file, nrows = 2, header = None)
-            fs = meta.iloc[1, 0]
-            start_time = meta.iloc[0, 0]
-            data = pd.read_csv(file, header = 1, names = ['uS'])
-            timestamps = pd.date_range(
-                start = pd.to_datetime(start_time, unit = 's'),
-                periods = len(data), freq = f'{1 / fs}S')
-            if resample_data:
-                data = pd.Series(resample(data, fs, resample_fs), name = 'uS')
-                timestamps = pd.date_range(
-                    start = pd.to_datetime(start_time, unit = 's'),
-                    periods = len(data), freq = f'{1 / resample_fs}S')
-            timestamps = pd.Series(timestamps, name = 'Timestamp')
-            e4 = pd.concat([timestamps, data], axis = 1)
-            return e4
-
-        # Pre-process Empatica E4 archive files
-        else:
-            with ZipFile(file) as z:
-                if 'EDA.csv' not in z.namelist():
-                    raise FileNotFoundError('\'EDA.csv\' file not found.')
-                else:
-                    eda_file = z.open('EDA.csv')
-                    eda = pd.read_csv(eda_file, header = 1, names = ['uS'])
-                    eda_file.seek(0)
-                    meta = pd.read_csv(eda_file, nrows = 2, header = None)
-                    fs = meta.iloc[1, 0]
-                    start_time = meta.iloc[0, 0]
-                    timestamps = pd.date_range(
-                        start = pd.to_datetime(start_time, unit = 's'),
-                        periods = len(eda), freq = f'{1 / fs}S')
-                    if resample_data:
-                        eda = pd.Series(
-                            resample(eda, fs, resample_fs), name = 'uS')
-                        timestamps = pd.date_range(
-                            start = pd.to_datetime(start_time, unit = 's'),
-                            periods = len(eda), freq = f'{1 / resample_fs}S')
-                    timestamps = pd.Series(timestamps, name = 'Timestamp')
-                    eda_data = pd.concat([timestamps, eda], axis = 1)
-
-                if 'TEMP.csv' not in z.namelist():
-                    raise FileNotFoundError('\'TEMP.csv\' file not found.')
-                else:
-                    temp_file = z.open('TEMP.csv')
-                    temp = pd.read_csv(
-                        temp_file, header = 1, names = ['Celsius'])
-                    temp_file.seek(0)
-                    meta = pd.read_csv(
-                        temp_file, nrows = 2, header = None)
-                    fs = meta.iloc[1, 0]
-                    start_time = meta.iloc[0, 0]
-                    timestamps = pd.date_range(
-                        start = pd.to_datetime(start_time, unit = 's'),
-                        periods = len(temp), freq = f'{1 / fs}S')
-                    if resample_data:
-                        temp = pd.Series(
-                            resample(temp, fs, resample_fs), name = 'Celsius')
-                        timestamps = pd.date_range(
-                            start = pd.to_datetime(start_time, unit = 's'),
-                            periods = len(temp), freq = f'{1 / resample_fs}S')
-                    timestamps = pd.Series(timestamps, name = 'Timestamp')
-                    temp_data = pd.concat([timestamps, temp], axis = 1)
-            return eda_data, temp_data
         
 def _cvxEDA(
     signal: np.ndarray,
