@@ -398,12 +398,12 @@ layout = html.Div(id = 'main', children = [
                             className = 'logo')),
            dbc.Col(html.Div(html.A(
                'Documentation',
-               href = 'https://heartview.readthedocs.io/en/latest/',
+               href = 'https://physioview.readthedocs.io/en/latest/',
                target = '_blank')),
                    width = 3),
            dbc.Col(html.Div(html.A(
                'Contribute',
-               href = 'https://heartview.readthedocs.io/en/latest/contribute.html',
+               href = 'https://physioview.readthedocs.io/en/latest/contribute.html',
                target = '_blank')),
                    width = 3)
        ], justify = 'between')
