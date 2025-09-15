@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    networks:
+      - backend-api
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./data:/data
+      - ./saved:/saved
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      - backend
+    networks:
+      - backend-api
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://backend:3001
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+networks:
+  backend-api:
+    driver: bridge

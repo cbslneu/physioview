@@ -4,9 +4,9 @@ Code of Conduct
 
 |Intro|
 
-HeartView is an open-source project dedicated to fostering a welcoming and inclusive community for contributors and users alike.
+PhysioView is an open-source project dedicated to fostering a welcoming and inclusive community for contributors and users alike.
 We value diversity, collaboration, and respect for all individuals, regardless of their background or identity.
-This Code of Conduct outlines our expectations for behavior within the HeartView community.
+This Code of Conduct outlines our expectations for behavior within the PhysioView community.
 
 |Pledge|
 
@@ -17,7 +17,7 @@ disability, physical appearance, religion, or any other personal characteristic.
 
 |Expectations|
 
-As a member of the HeartView community, we expect you to:
+As a member of the PhysioView community, we expect you to:
 
 1. Be respectful and considerate of others' viewpoints, experiences, and opinions.
 2. Use welcoming and inclusive language when communicating within the project.
@@ -47,7 +47,7 @@ The project maintainers have the right and responsibility to remove, edit, or re
 
 |Scope|
 
-This Code of Conduct applies to all spaces associated with HeartView, including but not limited to GitHub repositories, mailing lists, issue trackers, discussion forums, and social media related to the project. Project maintainers are responsible for enforcing this Code of Conduct in these spaces.
+This Code of Conduct applies to all spaces associated with PhysioView, including but not limited to GitHub repositories, mailing lists, issue trackers, discussion forums, and social media related to the project. Project maintainers are responsible for enforcing this Code of Conduct in these spaces.
 
 |Attribution|
 
@@ -55,11 +55,11 @@ This Code of Conduct is adapted from the |Contributor Covenant|.
 
 |Conclusion|
 
-By contributing to the HeartView project, you are agreeing to abide by this Code of Conduct.
+By contributing to the PhysioView project, you are agreeing to abide by this Code of Conduct.
 We are committed to providing a safe, respectful, and inclusive environment for all contributors
 and users, and we appreciate your cooperation in achieving this goal.
 
-We appreciate your help and cooperation in making HeartView a welcoming and inclusive project for all.
+We appreciate your help and cooperation in making PhysioView a welcoming and inclusive project for all.
 
 
 .. |Intro| raw:: html

@@ -1,39 +1,64 @@
-<div align="center"> 
-  <img src="https://github.com/nmy2103/heartview/blob/main/assets/heartview-logo.png?raw=true" style="height: 100px;">
-  <br>
-  <img src="https://badgen.net/badge/python/3.9+/blue">
-  <img src="https://badgen.net/badge/license/GPL-3.0/orange">
-  <img src="https://badgen.net/badge/contributions/welcome/cyan">
-  <a href='https://heartview.readthedocs.io/en/latest/?badge=latest'>
+<div align="center">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" 
+              srcset="https://raw.githubusercontent.com/cbslneu/heartview/dev/assets/physioview-logo.png"
+              height="100">
+      <source media="(prefers-color-scheme: light)" 
+              srcset="https://raw.githubusercontent.com/cbslneu/heartview/dev/assets/physioview-logo-light.png"
+              height="100">
+      <img alt="PhysioView Logo"
+           src="https://raw.githubusercontent.com/cbslneu/heartview/dev/assets/physioview-logo.png">
+    </picture>
+    <br>
+    <img src="https://badgen.net/badge/python/3.9+/blue">
+    <img src="https://badgen.net/badge/license/GPL-3.0/orange">
+    <img src="https://badgen.net/badge/contributions/welcome/cyan">
+    <a href='https://heartview.readthedocs.io/en/latest/?badge=latest'>
     <img src='https://readthedocs.org/projects/heartview/badge/?version=latest'>
-  </a>
-  <br>
-  <i>An extensible, open-source, and web-based signal quality assessment pipeline for ambulatory cardiovascular data</i>
-  <br>
+    </a>
+    <br>
+    <i>An extensible, open-source, and web-based signal quality assessment pipeline for ambulatory physiological data</i>
+    <br>
 </div>  
 <hr>
 
-HeartView is a Python-based **signal quality assessment pipeline and dashboard** that visualizes and summarizes segment-by-segment quantification of missing and invalid beats in wearable electrocardiograph (ECG) and photoplethysmograph (PPG) data obtained in research contexts.  
+PhysioView **(formerly HeartView)** is a Python-based **signal processing and 
+quality assessment pipeline with an interactive dashboard** designed for wearable 
+electrocardiograph (ECG), photoplethysmograph (PPG), and electrodermal 
+activity (EDA) data collected in research settings.  
 
-In contrast to other existing tools, HeartView provides a graphical user interface intended to increase efficiency and accessibility for a wider range of researchers who may not otherwise be able to conduct rigorous quality assessment on their data. As such, HeartView is meant as a diagnostic tool for pre- and post-artifact correction of cardiovascular data. We aim to help researchers make more informed decisions about later data cleaning and processing procedures and the reliabiltiy of their data when wearable biosensor systems are used.  
+In contrast to other existing tools, PhysioView provides an 
+open-source graphical user interface intended to increase efficiency and 
+accessibility for a wider range of researchers who may not otherwise be 
+able to perform rigorous signal processing and quality checks programmatically.
 
-Currently, HeartView works with data collected from the Actiwave Cardio, Empatica E4, and other ECG devices outputting data in comma-separated value (CSV) format.
+PhysioView serves as both a diagnostic tool for evaluating data before and 
+after artifact correction, and as a platform for post-processing 
+physiological signals. We aim to help researchers make more informed 
+decisions about data cleaning and processing procedures and the reliabiltiy 
+of their data when wearable biosensor systems are used.  
+
+Currently, PhysioView works with data collected from the Actiwave Cardio, 
+Empatica E4, and other devices outputting data in comma-separated 
+value (CSV) format.
 
 ## Features
 * **File Reader**
-<br>Read and transform raw ECG, PPG, and accelerometer data from European Data Format (EDF), archive (ZIP), and CSV files.
+<br>Read and transform raw ECG, PPG, EDA, and accelerometer data from European Data Format (EDF), archive (ZIP), and CSV files.
 * **Configuration File Exporter**
 <br>Define and save pipeline parameters in a JSON configuration file that can be loaded for use on the same dataset later.
 * **Signal Filters**
-<br>Filter out noise from baseline wander, muscle (EMG) activity, and powerline interference from your ECG or PPG data.
-* **Beat Detection**
-<br>Extract heartbeats from your ECG [[1](https://doi.org/10.1016/j.bspc.2011.03.004)] and Empatica E4 data.
+<br>Filter out noise from baseline wander, muscle (EMG) activity, and powerline interference from your physiological signals.
+* **Peak Detection**
+<br>Extract heartbeats from ECG/PPG and skin conductance responses from EDA data.
 * **Visualization Dashboard**
-<br>View and interact with our signal quality assessment chart and ECG/PPG, interbeat interval (IBI), and acceleration signal plots by segment.
+<br>View and interact with our signal quality assessment charts and signal plots of physiological time series, including preprocessed signals and their derived features (e.g., IBI, phasic and tonic components).
 * **Signal Quality Metrics**
-<br>Generate segment-by-segment information about missing and invalid data.
+<br>Generate segment-by-segment signal quality metrics.
+* **Automated Beat Correction**
+<br>Apply a beat correction algorithm [[1](https://doi.org/10.3758/s13428-017-0950-2)] to automatically correct artifactual beats.
 * **Manual Beat Editor**
-<br>Ability to update an existing beat and manually inputting beat(s) 
+<br>Manually edit beat locations in cardiac signals.
 
 ## Citation
 If you use this software in your research, please cite [this paper](https://link.springer.com/chapter/10.1007/978-3-031-59717-6_8). :yellow_heart:
@@ -51,45 +76,51 @@ If you use this software in your research, please cite [this paper](https://link
 }
 ```
 
-## Latest Release [HeartView 2.0.2]
+## Latest Release [PhysioView 1.0]
+
+This is the first official release of **PhysioView** 🎉  
+
+PhysioView is the renamed and updated continuation of HeartView. Recent 
+enhancements made under HeartView are highlighted below, along with new 
+features introduced in PhysioView.  
 
 ### Pipeline Enhancements:
-- Added Beat Editor data I/O functions.
+- Introduced batch processing support.
+- Added postprocessing features, including heart rate variability (HRV) 
+  extraction.
+- Added automated beat correction functionality.
+- Introduced EDA processing and signal quality assessment support.
 
 ### Dashboard Improvements:
-- Added dropdown menus for selecting artifact identification methods.
-- Added dropdown menus for selecting beat detection algorithms.
+- Enabled uploading of ZIP archives for batch processing.
+- Added a dropdown menu to select a subject's data from a batch.
+- Enabled Beat Editor access within a modal.
+- Added rendering of automated and manual beat corrections directly in the 
+  dashboard's signal plot and SQA charts.
+- Introduced export functionality for postprocessed data.
 
 ### Beat Editor Improvements:
-- Added save functionality to preserve editing progress.
-- Added keyboard shortcuts for faster navigation and editing.
+- Simplified the interface by removing static text and file names.
 
-### Structural Refactoring:
-- Refactored modules for cleaner path handling and clarity.
+This release consolidates the improvements from **HeartView's final updates** and 
+marks the beginning of **PhysioView** as its own versioned project.  
 
 For a full list of changes, see the [full changelog](CHANGELOG.md).
 
-## Roadmap
-We're constantly working on improving HeartView. Here's a glimpse of what's 
-in store in the near future:
-
-- Automated beat correction functionality
-- Electrodermal activity (EDA) data pre-processing and quality assessment
-
 ## Installation
-1. Clone the HeartView GitHub repository into a directory of your choice.
+1. Clone the PhysioView GitHub repository into a directory of your choice.
 ```
 cd <directory>  # replace <directory> with your directory
 ```
 ```
-git clone https://github.com/cbslneu/heartview.git
+git clone https://github.com/cbslneu/physioview.git
 ```
-2. Set up and activate a virtual environment using Python 3.9 through 3.13 
-   inside the `heartview` project directory.  
+2. Set up and activate a virtual environment using Python 3.9 through 3.12 
+   inside the `physioview` project directory.  
   ❗️**Note:** If you do not have `virtualenv` installed, run `pip3 install 
 virtualenv` before proceeding below.
 ```
-cd heartview
+cd physioview
 ```
 ```
 virtualenv venv -p python3
@@ -132,16 +163,16 @@ cd server
 ```
 npm install
 ```
-## HeartView Dashboard
+## PhysioView Dashboard
 ### Executing
 1. Within the activated virtual environment 
-(i.e., `source <directory>/heartview/venv/bin/activate`), run the command:
+(i.e., `source <directory>/physioview/venv/bin/activate`), run the command:
 ```
 python3 app.py
 ```
 2. Open your web browser and go to: http://127.0.0.1:8050/
 
-## HeartView Beat Editor
+## PhysioView Beat Editor
 ### Executing
 1. Navigate to the `beat-editor/server` directory and start the backend:
 ```

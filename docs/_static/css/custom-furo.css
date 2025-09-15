@@ -1,3 +1,71 @@
 .toctree-l2 {
     padding-left: 5px;
 }
+
+.toc-drawer {
+    width: 18em;
+}
+
+.toc-drawer a.reference {
+    font-weight: bold;
+}
+
+.toc-tree {
+    line-height: 1.2em;
+}
+
+dl p {
+    font-size: 11.5pt;
+    margin-left: 1em;
+    margin-top: 0;
+}
+
+dl p:first-of-type {
+    font-size: var(--font-size--normal);
+    margin-left: 0;
+}
+
+dl p.rubric {
+    margin-left: 0;
+}
+
+dl > dt {
+    font-family: var(--font-stack--monospace);
+}
+
+dl > dt > span.classifier {
+    font-family: var(--font-stack);
+}
+
+dl dt.field-odd, dl dt.field-even, dl dd p.rubric {
+    font-weight: bold;
+    font-family: var(--font-stack);
+}
+
+dl .field-list strong {
+    font-family: var(--font-stack--monospace);
+    color: var(--color-api-name);
+    margin-left: 0;
+}
+
+dd.field-odd, dd.field-even {
+    font-size: 12pt;
+}
+
+.sig-param > .n:first-of-type {
+    color: var(--color-api-name);
+    font-weight: bold;
+}
+
+.sig-param > .n:not(:first-of-type) {
+    font-weight: normal;
+}
+
+.sig .sig-object .py {
+    font-size: 10.5pt;
+}
+
+.seealso > p.admonition-title {
+    font-weight: bold;
+    font-size: 13pt;
+}

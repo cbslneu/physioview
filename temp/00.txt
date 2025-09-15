@@ -1,7 +1,0 @@
-================================= IMPORTANT ==================================
-This file exists as a placeholder file in the 'heartview/temp' directory,
-because empty directories are not allowed in GitHub repositories.
-
-Do NOT delete this text file if you will be cloning and working with HeartView
-in your own GitHub repository. All changes to this file will be 
-ignored/untracked by Git in the 'heartview/hv.gitignore' file.
