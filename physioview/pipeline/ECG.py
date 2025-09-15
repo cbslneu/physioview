@@ -234,7 +234,7 @@ class BeatDetectors:
     ) -> np.ndarray:
         """
         Extract QRS complex locations from an ECG signal with the Engelse
-         and Zeelenberg (1979) algorithm, modified by Lourenço et al. (2011).
+        and Zeelenberg (1979) algorithm, modified by Lourenço et al. (2011).
 
         Parameters
         ----------
