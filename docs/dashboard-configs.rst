@@ -1,7 +1,7 @@
 ===================
 Configuration Files
 ===================
-The HeartView dashboard provides a flexible way to streamline your data
+The PhysioView dashboard provides a flexible way to streamline your data
 pre-processing workflow by using configuration files. These files allow you
 to save your selected parameters, such as data types, sampling rates, and
 filtering options, into a reusable format.

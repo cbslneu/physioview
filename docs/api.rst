@@ -2,55 +2,75 @@
 API Reference
 =============
 
-Data Pre-Processing
-===================
+Data Preprocessing
+==================
 
 ECG
 ...
 
-.. automodule:: heartview.pipeline.ECG
+.. automodule:: physioview.pipeline.ECG
    :members:
 
 PPG
 ...
 
-.. automodule:: heartview.pipeline.PPG
+.. automodule:: physioview.pipeline.PPG
+   :members:
+
+EDA
+...
+
+.. automodule:: physioview.pipeline.EDA
    :members:
 
 ACC
 ...
 
-.. automodule:: heartview.pipeline.ACC
+.. automodule:: physioview.pipeline.ACC
    :members:
 
 Signal Quality Assessment
 =========================
 
-.. automodule:: heartview.pipeline.SQA
+.. automodule:: physioview.pipeline.SQA
    :members:
 
-Devices
-=======
+Device-Specific Methods
+=======================
 Actiwave Cardio
 ...............
 
-.. autoclass:: heartview.heartview.Actiwave
+.. autoclass:: physioview.physioview.Actiwave
     :members:
     :undoc-members:
 
 Empatica E4
 ...........
 
-.. autoclass:: heartview.heartview.Empatica
+.. autoclass:: physioview.physioview.Empatica
     :members:
     :undoc-members:
 
-Beat Editor
-===========
+Other Signal Processing Functions
+=================================
+.. _compute_ibis:
+
+.. autofunction:: physioview.physioview.compute_ibis
+
+.. _compute_hrv:
+
+.. autofunction:: physioview.physioview.compute_hrv
+
+.. _plot_signal:
+
+.. autofunction:: physioview.physioview.plot_signal
+
+Beat Editor Functions
+=====================
 .. _write-beat-editor-file:
 
-.. autofunction:: heartview.heartview.write_beat_editor_file
+.. autofunction:: physioview.physioview.write_beat_editor_file
 
 .. _process_beat_edits:
 
-.. autofunction:: heartview.heartview.process_beat_edits
+.. autofunction:: physioview.physioview.process_beat_edits

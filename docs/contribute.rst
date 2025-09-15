@@ -2,7 +2,10 @@
 Contribute
 ==========
 
-Thank you for your interest in contributing to HeartView. We welcome and encourage contributions from the community, and your help is greatly appreciated. Before you start contributing, please read and follow these guidelines to ensure a smooth and collaborative process.
+Thank you for your interest in contributing to PhysioView. We welcome and
+encourage contributions from the community, and your help is greatly
+appreciated. Before you start contributing, please read and follow these
+guidelines to ensure a smooth and collaborative process.
 
 ---------------
 Getting Started
@@ -11,7 +14,7 @@ Getting Started
 Fork the Repository
 ...................
 
-1. Visit the |HeartView GitHub repo|.
+1. Visit the |PhysioView GitHub repo|.
 2. Click the "Fork" button in the top right corner to create your *own copy* of the repository.
 
 Clone Your Fork
@@ -21,7 +24,7 @@ In your Terminal, run the following command, replacing [your-username] with your
 
 ::
 
-    $ git clone https://github.com/your-username/heartview.git
+    $ git clone https://github.com/your-username/physioview.git
 
 Set Up a Development Environment
 ................................
@@ -30,7 +33,7 @@ Navigate to the project directory and install all project dependencies:
 
 ::
 
-    $ cd heartview
+    $ cd physioview
     $ virtualenv venv -p python3
     $ pip3 install -r requirements.txt
 
@@ -44,7 +47,8 @@ Branching
 
 Create a new branch for your feature or bug fix.
 Please ensure your branch name is descriptive and reflects the purpose of your changes.
-All code contributions should be written and documented following the current style and docstring format of HeartView code.
+All code contributions should be written and documented following the
+current style and docstring format of PhysioView code.
 
 ::
 
@@ -71,7 +75,7 @@ Submitting a Pull Request
 
     $ git push origin feature/your-feature-name
 
-2. Visit the |HeartView Github repo|.
+2. Visit the |PhysioView Github repo|.
 3. Click the "New Pull Request" button.
 4. Choose your branch and the ``dev`` branch.
 5. Provide a clear and detailed description of your changes in the pull request.
@@ -82,20 +86,23 @@ Submitting a Pull Request
 Review Process
 --------------
 
-We will review your pull request and respond with any feedback or additional necessary changes.
+We will review your pull request and respond with any feedback or additional
+necessary changes.
 Once your pull request is approved, it will be merged into the main branch.
 
 
 ------------------
 Terms of Agreement
 ------------------
-By contributing to this project, you agree to abide by the terms of the project's |license| and our :doc:`conduct`. Please be respectful and considerate of others.
+By contributing to this project, you agree to abide by the terms of the
+project's |license| and our :doc:`conduct`. Please be respectful and
+considerate of others.
 
 
 .. |HeartView GitHub repo| raw:: html
 
-    <a href="https://github.com/cbslneu/heartview" target="_blank">HeartView GitHub repository</a>
+    <a href="https://github.com/cbslneu/physioview" target="_blank">PhysioView GitHub repository</a>
 
 .. |license| raw:: html
 
-    <a href="https://github.com/cbslneu/heartview/blob/main/LICENSE" target="_blank">GPL-3.0 license</a>
+    <a href="https://github.com/cbslneu/physioview/blob/main/LICENSE" target="_blank">GPL-3.0 license</a>

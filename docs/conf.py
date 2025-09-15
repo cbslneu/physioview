@@ -10,17 +10,17 @@ sys.path.insert(0, os.path.abspath('../'))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'HeartView'
+project = 'PhysioView'
 copyright = '2025, Natasha Yamane, Varun Mishra, and Matthew S. Goodwin'
 author = 'Natasha Yamane, Varun Mishra, and Matthew S. Goodwin'
-release = '2.0.2'
+release = '1.0'
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'furo'
 html_static_path = ['_static']
-html_logo = '../assets/heartview-logo.png'
+html_logo = '../assets/physioview-logo.png'
 html_favicon = '../assets/favicon.ico'
 html_css_files = [
     'css/custom-furo.css',
@@ -33,7 +33,7 @@ html_theme_options = {
         "color-link--visited": "#ee8a78",
         "color-brand-visited": "#ee8a78",
         "color-admonition-background": "#f0f0f0",
-        "color-admonition-title-background--seealso": "#cbcacf",
+        "color-admonition-title-background--seealso": "#f0f0f0",
         "color-admonition-title--seealso": "#ee8a78",
         "color-sidebar-background": "#47555e",
         "color-sidebar-search-background": "#47555e",
@@ -56,8 +56,8 @@ html_theme_options = {
         "color-brand-content": "#ffbbae",
         "color-link--visited": "#ffbbae",
         "color-brand-visited": "#ffbbae",
-        "color-admonition-background": "#545d63",
-        "color-admonition-title-background--seealso": "#545d63",
+        "color-admonition-background": "#444d54",
+        "color-admonition-title-background--seealso": "#444d54",
         "color-admonition-title--seealso": "#ee8a78",
         "color-background-primary": "#313c42",
         "color-code-background": "#313c42",
@@ -79,13 +79,13 @@ html_theme_options = {
         "toc-item-spacing-horizontal": "0.4rem"
     },
     "sidebar_hide_name": True,
-    "source_repository": "https://github.com/cbslneu/heartview/",
+    "source_repository": "https://github.com/cbslneu/physioview/",
     "source_branch": "main",
     "source_directory": "docs/",
     "footer_icons": [
             {
                 "name": "GitHub",
-                "url": "https://github.com/cbslneu/heartview",
+                "url": "https://github.com/cbslneu/physioview",
                 "html": """
                     <i class="fa-brands fa-github fa-lg"></i>
                 """,
@@ -109,7 +109,7 @@ pygments_dark_style = 'lightbulb'
 authors = 'Natasha Yamane, Varun Mishra, and Matthew S. Goodwin'
 toctree_only = True
 latex_documents = [
-    ('index', 'heartview.tex', 'HeartView Documentation',
+    ('index', 'physioview.tex', 'PhysioView Documentation',
      authors.replace(', ', '\\and ').replace(' and ', '\\and and '),
      'manual', toctree_only)
 ]

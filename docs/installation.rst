@@ -4,13 +4,13 @@ Installation
 
 In your **Terminal**:
 
-1. Clone the HeartView GitHub repository into a directory of your choice\:
+1. Clone the PhysioView GitHub repository into a directory of your choice\:
 
 ::
 
-    $ git clone https://github.com/cbslneu/heartview.git
+    $ git clone https://github.com/cbslneu/physioview.git
 
-2. Set up and activate a virtual environment using **Python 3.9 through 3.13** inside the ``heartview`` project directory.
+2. Set up and activate a virtual environment using **Python 3.9 through 3.12** inside the ``physioview`` project directory.
 
 If you're unsure whether Python is installed, you can check by running:
 
@@ -24,7 +24,7 @@ Once Python is available, create a virtual environment in the project directory:
 
 ::
 
-    $ cd heartview
+    $ cd physioview
     $ virtualenv venv -p python3
 
 **Note:** ``virtualenv`` can be installed via ``pip3 install virtualenv``.

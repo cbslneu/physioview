@@ -1,7 +1,7 @@
 ===============
 Getting Started
 ===============
-The HeartView dashboard was developed in Python and with the Dash framework,
+The PhysioView dashboard was developed in Python and with the Dash framework,
 which consists of a Flask server that communicates with front-end React components.
 
 Launching the App

@@ -1,5 +1,4 @@
-.. HeartView documentation master file, created by
-   sphinx-quickstart on Wed Sep 27 13:52:14 2023.
+.. PhysioView documentation master file.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
@@ -13,7 +12,7 @@ Contents
 
 .. toctree::
    :maxdepth: 2
-   :caption: About HeartView
+   :caption: About PhysioView
 
    installation
    authors
@@ -21,22 +20,23 @@ Contents
 
 .. toctree::
    :maxdepth: 2
-   :caption: HeartView Pipeline
+   :caption: PhysioView Pipeline
 
    api
    examples
 
 .. toctree::
    :maxdepth: 1
-   :caption: HeartView Dashboard
+   :caption: PhysioView Dashboard
 
    dashboard-gettingstarted
    dashboard-runningqa
+   dashboard-autocorrection
    dashboard-configs
 
 .. toctree::
    :maxdepth: 1
-   :caption: HeartView Beat Editor
+   :caption: PhysioView Beat Editor
 
    beat-editor-getting-started
    beat-editor-quick-guide
