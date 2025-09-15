@@ -6,6 +6,7 @@ from scipy.signal import butter, convolve, ellip, filtfilt, find_peaks, \
     firwin, resample_poly
 from math import gcd
 from scipy.fft import fft, ifft, fftfreq
+from flirt.eda import get_eda_features
 
 # ============================== EDA Filters =================================
 class Filters:
@@ -214,7 +215,7 @@ class Filters:
         ma = np.concatenate((ma, np.full(len(signal) - len(ma), epsilon)))
         return ma
 
-# ======================== Other EDA Data Processing ========================
+# ======================== Other EDA Data Processing =========================
 def detect_scr_peaks(
     phasic: Union[np.ndarray, pd.Series],
     smooth_size: int = 20,
@@ -421,7 +422,7 @@ def decompose_eda(
     """
     Extract the phasic and tonic components of an electrodermal activity (EDA)
     signal using the convex optimization approach by Greco et al. (2015).
-    This is an alias function for `cvxEDA()` in this module.
+    This is an alias function for `_cvxEDA()` in this module.
 
     Parameters
     ----------
@@ -439,13 +440,46 @@ def decompose_eda(
 
     References
     ----------
-    A Greco, G. Valenza, A. Lanata, E. P. Scilingo, & L. Citi. (2015). cvxEDA:
-    A convex optimization approach to electrodermal activity processing. IEEE
-    Transactions on Biomedical Engineering, 63(4): 797-804.
+    Greco, A., Valenza, G., Lanata, A., Scilingo, E. P., & Citi, L. (2016).
+    cvxEDA: A convex optimization approach to electrodermal activity
+    processing. IEEE Transactions on Biomedical Engineering, 63(4), 797–804.
     """
     phasic, _, tonic, _, _, _, _ = _cvxEDA(
         signal, fs, options = {'show_progress': show_progress})
     return phasic, tonic
+
+def compute_features(
+    signal: np.ndarray,
+    fs: int,
+    window_size: int = 180,
+    step_size: int = 60,
+) -> pd.DataFrame:
+    """
+    Compute statistical EDA features from phasic and tonic components of
+    an EDA signal.
+
+    Parameters
+    ----------
+    signal : array_like
+        An array containing the raw EDA signal.
+    fs : int
+        The sampling rate of the EDA signal.
+    window_size : int, optional
+        The size of the window, in seconds, over which EDA features are
+        computed; by default, 180.
+    step_size : int, optional
+        The time interval, in seconds, at which EDA features are computed;
+        by default, 60.
+    """
+    eda = pd.Series(signal)
+    eda_features = get_eda_features(
+        data = eda,
+        window_length = window_size,
+        window_step_size = step_size,
+        data_frequency = fs
+    )
+    eda_features.reset_index(drop = True, inplace = True)
+    return eda_features
 
 def resample(
     signal: np.ndarray,
@@ -482,7 +516,7 @@ def resample(
     rs = resample_poly(signal, up, down)
     rs = np.asarray(rs).flatten()
     return rs
-        
+
 def _cvxEDA(
     signal: np.ndarray,
     fs: int = 4,

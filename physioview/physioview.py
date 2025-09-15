@@ -1,12 +1,9 @@
 from typing import Dict, List, Literal, Optional, Tuple, Union
 from zipfile import ZipFile, ZipExtFile
+from flirt.hrv import get_hrv_features
 from tqdm import tqdm
 from scipy.signal import resample as scipy_resample
 from plotly.subplots import make_subplots
-from physioview.pipeline.ACC import compute_magnitude
-from physioview.pipeline.SQA import Cardio, EDA
-from physioview.pipeline.PPG import BeatDetectors
-from physioview.pipeline.EDA import Filters as eda_filters
 from physioview._plotting import *
 import warnings
 import plotly.graph_objects as go
@@ -16,9 +13,14 @@ import numpy as np
 import datetime as dt
 import pyedflib
 
+__all__ = [
+    'Actiwave', 'Empatica', 'compute_ibis', 'compute_hrv', 'plot_signal',
+    'write_beat_editor_file', 'process_beat_edits'
+]
+
 class Actiwave:
     """
-    A class for convenient pre-processing of data from the Actiwave Cardio
+    A class for convenient preprocessing of data from the Actiwave Cardio
     device.
 
     Parameters/Attributes
@@ -50,7 +52,7 @@ class Actiwave:
         time_aligned: bool = False
     ) -> Union[tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
         """
-        Pre-process electrocardiograph (ECG) and acceleration data from
+        Preprocess electrocardiograph (ECG) and acceleration data from
         an Actiwave Cardio file.
 
         Parameters
@@ -63,8 +65,8 @@ class Actiwave:
         -------
         tuple or pandas.DataFrame
             If `time_aligned` is False, returns a tuple (`ecg`, `acc`),
-            where `ecg` is a DataFrame containing the pre-processed ECG data
-            and `acc` is a DataFrame containing the pre-processed X-, Y-, and
+            where `ecg` is a DataFrame containing the preprocessed ECG data
+            and `acc` is a DataFrame containing the preprocessed X-, Y-, and
             Z-axis acceleration data. If `time_aligned` is True, returns a
             single DataFrame containing time-synced ECG and acceleration
             data according to the ECG data's timestamps.
@@ -159,7 +161,7 @@ class Actiwave:
 # ==================== Empatica E4 Pre-Processing and SQA ====================
 class Empatica:
     """
-    A class to conveniently pre-process and assess quality of PPG and EDA data
+    A class to conveniently preprocess and assess quality of PPG and EDA data
     from Empatica E4 devices.
 
     Attributes
@@ -169,7 +171,7 @@ class Empatica:
     """
 
     class Data:
-        """A class to store pre-processed data variables."""
+        """A class to store preprocessed data variables."""
 
         def __init__(self, **kwargs):
             for key, value in kwargs.items():
@@ -193,7 +195,7 @@ class Empatica:
 
     def preprocess(self, time_aligned: bool = False) -> 'Empatica.Data':
         """
-        Pre-process all data from the Empatica E4.
+        Preprocess all data from the Empatica E4.
 
         Parameters
         ----------
@@ -206,27 +208,27 @@ class Empatica:
         -------
         data : Empatica.Data object
             An `Empatica.Data` object with the following attributes and
-            corresponding pre-processed data:
+            corresponding preprocessed data:
 
             If `time_aligned` is False:
                 acc : pandas.DataFrame
-                    A DataFrame containing the pre-processed ACC data with
+                    A DataFrame containing the preprocessed ACC data with
                     corresponding timestamps.
                 bvp : pandas.DataFrame
-                    A DataFrame containing the pre-processed BVP data with
+                    A DataFrame containing the preprocessed BVP data with
                     corresponding timestamps.
                 eda : pandas.DataFrame
-                    A DataFrame containing the pre-processed EDA data with
+                    A DataFrame containing the preprocessed EDA data with
                     corresponding timestamps.
                 hr : pandas.DataFrame
-                    A DataFrame containing the pre-processed HR data with
+                    A DataFrame containing the preprocessed HR data with
                     corresponding timestamps.
                 ibi : pandas.DataFrame
-                    A DataFrame containing the pre-processed IBI data with
+                    A DataFrame containing the preprocessed IBI data with
                     corresponding timestamps and seconds elapsed since the
                     start time of the IBI recording.
                 temp : pandas.DataFrame
-                    A DataFrame containing the pre-processed temperature
+                    A DataFrame containing the preprocessed temperature
                     data with corresponding timestamps.
                 start_time : float
                     The Unix-formatted start time of the E4 recording.
@@ -334,7 +336,7 @@ class Empatica:
 
     def get_acc(self) -> 'Empatica.Data':
         """
-        Get the pre-processed acceleration data and its start time and
+        Get the preprocessed acceleration data and its start time and
         sampling rate from the Empatica E4.
 
         Returns
@@ -344,13 +346,15 @@ class Empatica:
             corresponding accelerometer data variables:
 
             acc : pandas.DataFrame
-                A DataFrame containing the pre-processed BVP data with
+                A DataFrame containing the preprocessed BVP data with
                 corresponding timestamps.
             start : float
                 The Unix-formatted start time of the BVP recording.
             fs : int
                 The sampling rate of the BVP data.
         """
+        from physioview.pipeline.ACC import compute_magnitude
+
         with ZipFile(self.file, 'r') as archive:
             e4_files = archive.namelist()
             acc_file = None
@@ -384,7 +388,7 @@ class Empatica:
             corresponding BVP data variables:
 
             bvp : pandas.DataFrame
-                A DataFrame containing the pre-processed BVP data with
+                A DataFrame containing the preprocessed BVP data with
                 corresponding timestamps.
             start : float
                 The Unix-formatted start time of the BVP recording.
@@ -420,7 +424,7 @@ class Empatica:
             corresponding EDA data variables:
 
             eda : pandas.DataFrame
-                A DataFrame containing the pre-processed EDA data with
+                A DataFrame containing the preprocessed EDA data with
                 corresponding timestamps.
             start : float
                 The Unix-formatted start time of the EDA recording.
@@ -446,7 +450,7 @@ class Empatica:
 
     def get_hr(self) -> 'Empatica.Data':
         """
-        Get the pre-processed heart rate (HR) data, start time of the
+        Get the preprocessed heart rate (HR) data, start time of the
         first HR measurement, and sampling rate from the Empatica E4.
 
         Returns
@@ -456,7 +460,7 @@ class Empatica:
             corresponding HR data variables:
 
             hr : pandas.DataFrame
-                A DataFrame containing the pre-processed HR data with
+                A DataFrame containing the preprocessed HR data with
                 corresponding timestamps.
             start : float
                 The Unix-formatted start time of the HR measurements.
@@ -482,7 +486,7 @@ class Empatica:
 
     def get_ibi(self) -> 'Empatica.Data':
         """
-        Get the pre-processed interbeat interval (IBI) data and the start
+        Get the preprocessed interbeat interval (IBI) data and the start
         time of the first interval from the Empatica E4.
 
         Returns
@@ -492,7 +496,7 @@ class Empatica:
             corresponding IBI data variables:
 
             ibi : pandas.DataFrame
-                A DataFrame containing the pre-processed IBI data with
+                A DataFrame containing the preprocessed IBI data with
                 corresponding timestamps.
             start : int
                 The Unix-formatted start time of the IBI data.
@@ -530,7 +534,7 @@ class Empatica:
             corresponding temperature data variables:
 
             temp : pandas.DataFrame
-                A DataFrame containing the pre-processed temperature data with
+                A DataFrame containing the preprocessed temperature data with
                 corresponding timestamps.
             start : float
                 The Unix-formatted start time of the temperature recording.
@@ -655,6 +659,9 @@ class Empatica:
         window approach will override the segmented approach, ignoring any
         `seg_size` value.
         """
+        from physioview.pipeline.SQA import Cardio, EDA
+        from physioview.pipeline.PPG import BeatDetectors
+        from physioview.pipeline.EDA import Filters as eda_filters
 
         if dtype.lower() not in ('all', 'eda', 'ppg'):
             raise ValueError('The `kind` parameter must take a string value '
@@ -974,13 +981,12 @@ def compute_ibis(
     ts_col: Optional[str] = None
 ) -> pd.DataFrame:
     """
-    Compute interbeat intervals from beat locations in electrocardiograph
-     (ECG) or photoplethysmograph (PPG) data.
+    Compute interbeat intervals from beat locations in ECG or PPG data.
 
     Parameters
     ----------
     data : pandas.DataFrame
-        The DataFrame containing the pre-processed ECG/PPG data.
+        The DataFrame containing the preprocessed ECG/PPG data.
     fs : int
         The sampling rate of the ECG/PPG data.
     beats_ix : array_like
@@ -993,6 +999,14 @@ def compute_ibis(
     -------
     ibi : pandas.DataFrame
         A DataFrame containing timestamps and IBI values.
+
+    Examples
+    --------
+    >>> import physioview
+    >>> fs = 1024  # sampling rate
+    >>> # Here, `ecg` is a DataFrame with a "Timestamp" column
+    >>> beats_ix = physioview.ECGBeatDetectors(fs).manikandan(ecg['ECG'])
+    >>> ibi = physioview.compute_ibis(ecg, fs, beats_ix, 'Timestamp')
     """
 
     df = data.copy()
@@ -1004,6 +1018,75 @@ def compute_ibis(
     for n, ix in enumerate(beats_ix[1:]):
         ibi.loc[ix, 'IBI'] = ibis[n]
     return ibi
+
+def compute_hrv(
+    data: pd.DataFrame,
+    fs: int,
+    beats_ix: np.ndarray,
+    window_size: int = 60,
+    step_size: int = 1,
+    ts_col: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    Compute heart rate variability (HRV) metrics from beat locations in ECG or
+    PPG data.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        The DataFrame containing the preprocessed ECG/PPG data.
+    fs : int
+        The sampling rate of the ECG/PPG data.
+    beats_ix : array_like
+        An array of indices corresponding to beat occurrences.
+    window_size : int, optional
+        The size of the windows over which HRV metrics are calculated; by
+        default, 60.
+    step_size : int, optional
+        The step size of the windows over which HRV metrics are calculated;
+        by default, 1.
+    ts_col : str
+        The name of the column in `data` containing timestamp values; by
+        default, None.
+
+    Returns
+    -------
+    hrv : pandas.DataFrame
+        A DataFrame containing HRV metrics.
+
+    Examples
+    --------
+    >>> import physioview
+    >>> fs = 1024  # sampling rate
+    >>> # Here, `ecg` is a DataFrame with a "Timestamp" column
+    >>> beats_ix = physioview.ECGBeatDetectors(fs).manikandan(ecg['ECG'])
+    >>> # Compute HRV across 60-sec windows at 15-sec intervals
+    >>> hrv = physioview.compute_hrv(ecg, fs, beats_ix, window_size = 15,
+    >>>     step_size = 15, ts_col = 'Timestamp')
+    """
+    ibi = compute_ibis(data, fs, beats_ix, ts_col)
+    ibi = ibi.dropna().reset_index(drop = True)
+    if ts_col is not None:
+        ibi.set_index(ts_col, inplace = True)
+        ibi_series = ibi['IBI']
+    else:
+        start_time = pd.Timestamp.now()
+        ibi_vals = ibi['IBI'].values
+        times = start_time + pd.to_timedelta(pd.Series(ibi_vals).cumsum(),
+                                             unit = 'ms')
+        ibi_series = pd.Series(ibi_vals, index = times, name = 'IBI')
+    hrv = get_hrv_features(
+        ibi_series,
+        window_length = window_size,
+        window_step_size = step_size,
+        domains = ['td', 'fd', 'nl', 'stat'],
+        threshold = 0.5,
+        clean_data = False)
+    if ts_col is not None:
+        hrv.index.name = ts_col
+    else:
+        hrv.reset_index(drop = True, inplace = True)
+    return hrv
 
 SignalType = Literal['ECG', 'PPG', 'BVP', 'EDA', 'HR', 'RESP', 'TEMP']
 def plot_signal(
@@ -1045,21 +1128,22 @@ def plot_signal(
         The first element must be the name of the column in `signal` to use
         for the x-axis (e.g., `'Timestamp'`).
         The second element can take one of the following forms:
-        - str : a single y-axis column to plot for one signal type.
-          Example: `('Timestamp', 'EDA')`.
-        - list of str : multiple y-axis columns to plot for the same signal type.
-          Example: `('Timestamp', ['EDA', 'Phasic'])`.
+
+        - str : a single y-axis column to plot for one signal type. Example:
+          ``('Timestamp', 'EDA')``.
+        - list of str : multiple y-axis columns to plot for the same signal
+          type. Example: ``('Timestamp', ['EDA', 'Phasic'])``.
         - dict : mapping of signal types to one or more y-axis columns,
           allowing multiple signal types to be plotted in separate subplots.
           Example:
-          `('Timestamp', {'EDA': 'EDA', 'ECG': 'ECG'})`
-          `('Timestamp', {'EDA': ['EDA', 'Phasic'], 'ECG': ['ECG']})`.
+          ``('Timestamp', {'EDA': 'EDA', 'ECG': 'ECG'})`` or
+          ``('Timestamp', {'EDA': ['EDA', 'Phasic'], 'ECG': ['ECG']})``
     fs : int
         The sampling rate (Hz) of the signal data.
     peaks_map : dict of {str: str}, optional
         A dictionary mapping a signal type to the name of a column in `signal`
         containing binary (0/1) peak annotations; by default, None (i.e.,
-        no peaks are plotted). Example: `{'ECG': 'Beat'}` will plot beat
+        no peaks are plotted). Example: ``{'ECG': 'Beat'}`` will plot beat
         markers from the 'Beat' column on the ECG subplot.
     peaks_label : str, optional
         A label for the peak annotations on the signal subplot.
@@ -1073,21 +1157,23 @@ def plot_signal(
     correction_map : dict of {str: str}, optional
         A dictionary mapping a signal type to the name of a column in `signal`
         containing binary (0/1) corrected beat annotations; by default, None (i.e.,
-        no corrected peaks are plotted). Example: `{'ECG': 'Corrected'}` will plot
-        corrected beat markers from the 'Corrected' column on the ECG subplot.
+        no corrected peaks are plotted). Example: ``{`'ECG': 'Corrected'}``
+        will plot corrected beat markers from the 'Corrected' column on the
+        ECG subplot.
     edits_map : dict of {str: str}, optional
         A dictionary mapping a signal type to one or more edit types and
         their corresponding binary (0/1) annotation columns in `signal`; by
-        default, None (i.e., no edits are plotted). Format:
-        {signal_type: {edit_label: column_name, ...}}. For example:
-        {'ECG': {'Added': 'Added Beat',
-                 'Deleted': 'Deleted Beat',
-                 'Unusable': 'Unusable'}}.
+        default, `None` (i.e., no edits are plotted). Format:
+        ``{signal_type: {edit_label: column_name, ...}}``.
+
+        For example:
+        ``{'ECG': {'Added': 'Added Beat', 'Deleted': 'Deleted Beat',
+        'Unusable': 'Unusable'}}``
     hline : float, optional
         If provided, plots a horizontal dotted line for a given reference
-        amplitude value in the primary signal plot(s); by default, None.
+        amplitude value in the primary signal plot(s); by default, `None`.
     hline_name : str, optional
-        A label for the horizontal line; by default, None.
+        A label for the horizontal line; by default, `None`.
     acc : pandas.DataFrame, optional
         DataFrame containing accelerometer data. If present, plotted
         as a secondary signal in the first subplot. Must contain
@@ -1097,9 +1183,9 @@ def plot_signal(
         plotted as a secondary signal in the last subplot. Must contain
         'IBI' or another numeric column.
     ibi_corrected : pandas.DataFrame, optional
-        DataFrame containing auto-corrected inter-beat interval (IBI) data. If present,
-        plotted as a secondary signal in the last subplot. Must contain
-        'IBI' or another numeric column.
+        DataFrame containing auto-corrected interbeat interval (IBI) data.
+        If present, plotted as a secondary signal in the last subplot. Must
+        contain 'IBI' or another numeric column.
     seg_number : int, optional
         The positional number of the segment to plot; by default, 1 (first
         segment).
@@ -1522,15 +1608,12 @@ def write_beat_editor_file(
     ----------
     data : pandas.DataFrame
         A DataFrame containing the cardiac data. Must contain at least
-        the following columns:
-          - Cardiac signal
-          - Beat occurrences labeled as 1
-        Optionally, `data` can include:
-          - A timestamp column (specified by `ts_col`). If not provided,
-            sample indices are used.
-          - An "Artifact" column, where artifact occurrences are labeled as 1.
-            This allows the Beat Editor to visualize artifactual beat
-            locations.
+        two columns with the cardiac signal and beat occurrences labeled as
+        1. Optionally, `data` can include a timestamp column (specified by
+        `ts_col`) and an "Artifact" column, where artifact occurrences are
+        labeled as 1. This allows the Beat Editor to visualize artifactual
+        beat locations. If a timestamp columm is not provided, sample indices
+        are used.
     fs : int
         The sampling frequency of the signal.
     signal_col : str
@@ -1623,6 +1706,7 @@ def process_beat_edits(
     edits : pandas.DataFrame
         A DataFrame of edit instructions parsed from a Beat Editor
         `_edited.json` file.  Must contain:
+
         - 'editType': one of 'ADD', 'DELETE', or 'UNUSABLE'
         - either 'x' (edit location) or 'from' (start of unusable segment,
           with 'to' as the end), in the same time or sample units as
@@ -1632,10 +1716,11 @@ def process_beat_edits(
     -------
     processed : pandas.DataFrame
         A copy of `orig_data` with the following additional columns:
-        - 'Edited': 1 where all final beats are, otherwise NaN
-        - 'Deleted Beat': 1 where beats were deleted, otherwise NaN
-        - 'Added Beat': 1 where beats were added, otherwise NaN
-        - 'Unusable': 1 where segments are marked unusable, otherwise NaN
+
+        - 'Edited': 1 where all final beats are, otherwise `NaN`
+        - 'Deleted Beat': 1 where beats were deleted, otherwise `NaN`
+        - 'Added Beat': 1 where beats were added, otherwise `NaN`
+        - 'Unusable': 1 where segments are marked unusable, otherwise `NaN`
     """
 
     # Validate edits input

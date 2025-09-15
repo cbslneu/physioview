@@ -3,7 +3,7 @@ from dash.exceptions import PreventUpdate
 from dash.dcc import send_bytes
 from physioview import physioview
 from physioview.pipeline import ACC, SQA
-from physioview.pipeline.EDA import compute_tonic_scl
+from physioview.pipeline.EDA import compute_tonic_scl, compute_features
 from physioview.dashboard import utils
 from flirt.hrv import get_hrv_features
 from flirt.eda import get_eda_features
@@ -2510,17 +2510,12 @@ def get_callbacks(app):
 
                 # EDA feature extraction
                 elif data_type == 'EDA':
-                    data.set_index(ts_col, inplace = True)
-                    eda_features = get_eda_features(
-                        data = data['EDA'],
-                        window_length = window_size,
-                        window_step_size = step_size,
-                        data_frequency = fs_full
-                    )
+                    eda_features = compute_features(
+                        data['EDA'], fs_full, window_size, step_size)
 
                     # Write EDA features to temp_path
                     p = temp_path / f'{s}_Features.csv'
-                    eda_features.to_csv(str(p))
+                    eda_features.to_csv(str(p), index = False)
                     out.append(p)
 
             # ------------------ Signal Quality Metrics ------------------
