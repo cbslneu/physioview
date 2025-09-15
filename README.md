@@ -13,8 +13,8 @@
     <img src="https://badgen.net/badge/python/3.9+/blue">
     <img src="https://badgen.net/badge/license/GPL-3.0/orange">
     <img src="https://badgen.net/badge/contributions/welcome/cyan">
-    <a href='https://heartview.readthedocs.io/en/latest/?badge=latest'>
-    <img src='https://readthedocs.org/projects/heartview/badge/?version=latest'>
+    <a href='https://physioview.readthedocs.io/en/latest/?badge=latest'>
+    <img src='https://readthedocs.org/projects/physioview/badge/?version=latest'>
     </a>
     <br>
     <i>An extensible, open-source, and web-based signal quality assessment pipeline for ambulatory physiological data</i>
