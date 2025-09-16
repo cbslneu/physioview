@@ -2126,7 +2126,7 @@ def get_callbacks(app):
                                 html.A(
                                     'startup instructions',
                                     href = (
-                                        'https://heartview.readthedocs.io/en/latest/'
+                                        'https://physioview.readthedocs.io/en/latest/'
                                         'beat-editor-getting-started.html#'
                                         'launching-the-beat-editor'
                                     ),
