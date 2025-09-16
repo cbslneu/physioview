@@ -99,7 +99,7 @@ project's |license| and our :doc:`conduct`. Please be respectful and
 considerate of others.
 
 
-.. |HeartView GitHub repo| raw:: html
+.. |PhysioView GitHub repo| raw:: html
 
     <a href="https://github.com/cbslneu/physioview" target="_blank">PhysioView GitHub repository</a>
 
