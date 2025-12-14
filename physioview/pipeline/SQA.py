@@ -602,7 +602,7 @@ class Cardio:
             # Missing beats
             n_missing = np.nan if np.isnan(n_expected) \
                 else max(0, n_expected - n_detected)
-            perc_missing = np.nan if np.isnan(n_expected) \
+            perc_missing = np.nan if (np.isnan(n_expected) or n_expected == 0) \
                 else round((n_missing / n_expected) * 100, 2)
     
             row = {'Segment': seg}
