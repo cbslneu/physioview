@@ -27,4 +27,4 @@ if __name__ == '__main__':
     _clear_temp()
     _clear_edits()
     cache.clear()
-    app.run_server(debug = True)
+    app.run_server()
