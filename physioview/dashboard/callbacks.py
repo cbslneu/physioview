@@ -2495,13 +2495,25 @@ def get_callbacks(app):
 
                     if want_feats:
                         ibi = pd.read_csv(str(temp_path / f'{s}_IBI.csv'))
-                        ibi.set_index(ts_col, inplace = True)
-                        hrv = get_hrv_features(
-                            data = ibi.dropna()['IBI'],
-                            window_length = window_size,
-                            window_step_size = step_size,
-                            domains = ['td', 'fd', 'nl', 'stat'],
-                            threshold = 0.5, clean_data = False)
+                        ibi[ts_col] = pd.to_datetime(
+                            ibi[ts_col], errors = 'coerce')
+                        ibi = ibi.dropna(subset = [ts_col]).set_index(ts_col)
+                        ibi_series = ibi['IBI'].dropna().sort_index()
+
+                        if ibi_series.empty or len(ibi_series.index) < 2:
+                            hrv = pd.DataFrame()
+                        else:
+                            # Set window length based on available IBI data
+                            dur_sec = (ibi_series.index.max() - ibi_series.index.min()).total_seconds()
+                            dur_sec = max(dur_sec, 0)
+                            window_len = min(int(window_size), int(np.floor(dur_sec)))
+                            step_len = min(int(step_size), window_len)
+                            hrv = get_hrv_features(
+                                data = ibi_series,
+                                window_length = window_len,
+                                window_step_size = step_len,
+                                domains = ['td', 'fd', 'nl', 'stat'],
+                                threshold = 0.5, clean_data = False)
 
                         # Write HRV data to temp_path
                         p = temp_path / f'{s}_HRV.csv'
