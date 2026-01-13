@@ -597,7 +597,8 @@ class Cardio:
             # Rescale n_expected for the last partial segment
             if seg == seg_nums[-1]:
                 factor = (len(data[data.Segment == seg]) / self.fs) / seg_size
-                n_expected = int(round(n_expected * factor))
+                if not np.isnan(n_expected):
+                    n_expected = int(round(n_expected * factor))
     
             # Missing beats
             n_missing = np.nan if np.isnan(n_expected) \
