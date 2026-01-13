@@ -428,10 +428,16 @@ def get_callbacks(app):
                         batch_headers = []
 
                         # Filter out macOS metadata in zip file
-                        zfiles = [f for f in zf.namelist() if '/' in f and
-                                  not f.startswith('__MACOSX/') and
-                                  not f.endswith('.DS_Store') and
-                                  '/._' not in f and not f.endswith('/')]
+                        # zfiles = [f for f in zf.namelist() if '/' in f and
+                        #           not f.startswith('__MACOSX/') and
+                        #           not f.endswith('.DS_Store') and
+                        #           '/._' not in f and not f.endswith('/')]
+                        zfiles = [f for f in zf.namelist()
+                                  if f.lower().endswith('.csv')
+                                  and not f.endswith('/')
+                                  and not f.startswith('__MACOSX/')
+                                  and '/._' not in f
+                                  and not f.endswith('.DS_Store')]
 
                         for f in zfiles:
                             fname = Path(f).name
