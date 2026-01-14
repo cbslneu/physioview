@@ -6,8 +6,6 @@ from physioview.pipeline import ACC, SQA
 from physioview.pipeline.EDA import compute_tonic_scl, compute_features
 from physioview.dashboard import utils
 from flirt.hrv import get_hrv_features
-from flirt.eda import get_eda_features
-from os import makedirs, stat
 from pathlib import Path
 from time import sleep
 from io import BytesIO
@@ -47,9 +45,7 @@ def get_callbacks(app):
             return [], True, True, True, None
 
         session_path = Path(filenames[0]).parent
-        latest_file = sorted(
-            session_path.iterdir(), key = lambda f: -stat(f).st_mtime)[0]
-        filename = str(latest_file)
+        filename = filenames[0]
 
         # Default visibility
         disable_run = True
@@ -115,8 +111,13 @@ def get_callbacks(app):
                                         'marginRight': '5px'}),
                         html.Span('Data loaded.')
                     ]
-                    extract_dir = str(temp_path / session_path / 'batch')
-                    makedirs(extract_dir, exist_ok = True)
+
+                    # Clear stale batch CSVs from previous uploads in the same
+                    # session folder
+                    batch_dir = session_path / 'batch'
+                    if batch_dir.exists():
+                        shutil.rmtree(batch_dir)
+                    batch_dir.mkdir(parents = True, exist_ok = True)
                     data = {'source': 'batch',
                             'filename': filename}
                     disable_run = False
@@ -147,11 +148,13 @@ def get_callbacks(app):
         utils._clear_edits()
 
         # Clear stale files in 'temp' directory
-        for f in Path(temp_path).iterdir():
-            if f.is_file() and str(f) != filename:
-                f.unlink()
-            elif f.is_dir() and str(f) != str(session_path):
-                shutil.rmtree(f, ignore_errors = True)
+        for p in temp_path.iterdir():
+            if p == session_path or p == render_dir:
+                continue
+            if p.is_file() or p.is_symlink():
+                p.unlink()
+            else:
+                shutil.rmtree(p, ignore_errors = True)
 
         return [file_check, disable_run, disable_configure,
                 hide_e4_dtypes, data]
@@ -717,6 +720,8 @@ def get_callbacks(app):
             set_progress((0, '0%'))
 
             # Create '_render' folder
+            if render_dir.exists():
+                shutil.rmtree(render_dir)
             render_dir.mkdir(parents = True, exist_ok = True)
 
             file_type = load_data['source']
@@ -2331,7 +2336,17 @@ def get_callbacks(app):
             :param s: The selected subject.
             """
             out = []
-            data = pd.read_csv(temp_path / f'{s}_{data_type}.csv')
+
+            raw_path = temp_path / f'{s}_{data_type}.csv'
+            cleaned_path = temp_path / f'{s}_{data_type}_cleaned.csv'
+
+            # Prefer cleaned data if it exists
+            in_path = cleaned_path if cleaned_path.exists() else raw_path
+            if not in_path.exists():
+                raise FileNotFoundError(
+                    f'Missing input ECG file for {s}: {raw_path} or '
+                    f'{cleaned_path}')
+            data = pd.read_csv(in_path)
 
             # Get timestamp/sample column
             ts_col = 'Timestamp' if 'Timestamp' in data.columns else \
@@ -2427,10 +2442,7 @@ def get_callbacks(app):
                     data = data[order]
 
                     # Rewrite to temp_path
-                    data.to_csv(
-                        str(temp_path / f'{s}_{data_type}_cleaned.csv'),
-                        index = False)
-                    (temp_path / f'{s}_{data_type}.csv').unlink()
+                    data.to_csv(cleaned_path, index = False)
 
             # ------------------- Raw and Cleaned Data -------------------
             if want_signal:

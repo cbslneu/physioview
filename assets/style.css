@@ -1262,7 +1262,7 @@ th:first-child {  /* style only first table header */
     width: 50px;
 }
 #postprocess-params-right input[type="number"] {
-    width: 40px;
+    width: 50px;
 }
 #postprocess-modal .export-options {
     display: grid;
