@@ -2437,7 +2437,8 @@ def get_callbacks(app):
                         beats_col = 'Beat'
                     col_order = ['Segment', ts_col, data_type, 'Filtered',
                                  beats_col, 'Artifact', 'Auto Corrected',
-                                 'Deleted Beat',  'Added Beat', 'Edited']
+                                 'Deleted Beat',  'Added Beat',
+                                 'Unusable', 'Edited']
                     order = [c for c in col_order if c in data.columns]
                     data = data[order]
 
