@@ -2,6 +2,7 @@ from typing import Literal
 from scipy.signal import butter, cheby1, ellip, filtfilt, find_peaks, \
     hilbert, iirnotch, lfilter, sosfiltfilt
 from scipy.ndimage import uniform_filter1d
+import warnings
 import pandas as pd
 import numpy as np
 
@@ -185,6 +186,17 @@ class Filters:
         low = lowcut / nyq
         high = highcut / nyq
         b, a = ellip(order, rp, rs, [low, high], btype = 'band')
+
+        # Check if the signal fulfills the filtfilt padding requirement
+        padlen = 3 * (max(len(a), len(b)) - 1)
+        if len(signal) <= padlen:
+            warnings.warn(
+                f'Signal length ({len(signal)}) is too short for filtfilt '
+                f'padding (requires > {padlen}). Returning unfiltered signal.',
+                RuntimeWarning
+            )
+            return signal.copy()
+
         filtered = filtfilt(b, a, signal)
         return filtered
 
