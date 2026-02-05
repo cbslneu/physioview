@@ -2171,9 +2171,9 @@ class EDA:
 
         # Filter EDA signal with a FIR low pass filter
         if not preprocessed:
-            from EDA import Filters as eda_filters
+            from .EDA import Filters as eda_filters
             try:
-                signal = eda_filters.lowpass_fir(signal)
+                signal = eda_filters(self.fs).filter_signal(signal)
             except ValueError:
                 pass
 
