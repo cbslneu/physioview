@@ -218,95 +218,111 @@ class Filters:
 # ======================== Other EDA Data Processing =========================
 def detect_scr_peaks(
     phasic: Union[np.ndarray, pd.Series],
+    method: str = 'threshold',
+    fs: Optional[float] = None,
+    min_peak_amp: Optional[float] = None,
+    min_rise_time: float = 0.5,
+    max_rise_time: float = 5.0,
     smooth_size: int = 20,
     min_amp_thresh: float = 0.1,
-    min_peak_amp: Optional[float] = None,
-) -> np.ndarray:
+) -> Union[tuple, np.ndarray]:
     """
-    Detect skin conductance response (SCR) peaks in a phasic EDA signal using
-    the Nabian et al. (2018) approach.
+    Detect skin conductance response (SCR) peaks in a phasic EDA signal.
 
     Parameters
     ----------
     phasic : array-like
-        Phasic component of EDA signal.
-    smooth_size : int, optional
-        The size of Bartlett window for smoothing derivative; by default, 20.
-    min_amp_thresh : float, optional
-        The minimum SCR amplitude threshold, relative to the max detected
-        amplitude; by default, 0.1 (i.e., 10%).
+        The phasic component of EDA signal (in microsiemens, µS).
+    method : str, optional
+        The detection method to use; by default, 'threshold'. Must be either
+        'threshold' or 'nabian':
+        - 'threshold': Amplitude threshold-based detection
+        - 'nabian': Nabian et al. (2018) derivative-based detection
+    fs : float, optional
+        The sampling rate of the EDA signal in Hz. Required for 'threshold' method.
     min_peak_amp : float, optional
-        The minimum amplitude for a SCR peak to be considered valid; by
-        default, None.
+        The minimum amplitude, in microsiemens (µS), for an SCR peak to be
+        considered valid. For 'threshold' method, defaults to 0.05 µS if not
+        provided. For 'nabian' method, defaults to None (no absolute threshold).
+    min_rise_time : float, optional
+        The minimum rise time in seconds for 'threshold' method; by default, 0.5.
+    max_rise_time : float, optional
+        The maximum rise time in seconds for 'threshold' method; by default, 5.0.
+        Typical SCRs have rise times of 1-3 seconds.
+    smooth_size : int, optional
+        The size of Bartlett window for smoothing derivative in 'nabian' method;
+        by default, 20.
+    min_amp_thresh : float, optional
+        The minimum SCR amplitude relative to the maximum detected amplitude
+        for 'nabian' method; by default, 0.1 (i.e., 10%).
 
     Returns
     -------
-    peaks : np.ndarray
-        An array containing indices of detected SCR peaks.
+    If method is 'threshold':
+        tuple of (onsets, peaks, amps)
+            onsets : np.ndarray
+                An array containing the indices of SCR onsets (troughs).
+            peaks : np.ndarray
+                An array contaiing the indices of SCR peaks.
+            amps : np.ndarray
+                An array containing the amplitudes of the detected SCR peaks.
+
+    If method is 'nabian':
+        peaks : np.ndarray
+            An array containing the indices of SCR peaks.
+
+    Notes
+    -----
+    The 'threshold' method identifies trough-peak pairs based on absolute
+    amplitude and physiological rise time criteria.
+
+    The 'nabian' method uses derivative zero-crossings with Bartlett smoothing
+    and sequential amplitude thresholds as described in Nabian et al. (2018).
 
     References
     ----------
     Nabian, M., et al. (2018). An open-source feature extraction tool for
     the analysis of peripheral physiological data. IEEE Journal of
     Translational Engineering in Health and Medicine, 6, 1-11.
+
+    Dawson, M. E., Schell, A. M., & Filion, D. L. (2007). The electrodermal
+    system. In J. T. Cacioppo, L. G. Tassinary, & G. G. Berntson (Eds.),
+    Handbook of psychophysiology (3rd ed., pp. 159-181). Cambridge University
+    Press.
+
+    Boucsein, W. (2012). Electrodermal activity (2nd ed.). Springer.
     """
 
-    # Differentiate phasic signal
-    diff = np.diff(phasic, prepend = phasic[0])
+    method = method.lower()
 
-    # Smooth derivative with Bartlett kernel
-    kernel = np.bartlett(smooth_size)
-    kernel /= kernel.sum()
-    diff_smoothed = convolve(diff, kernel, mode="same")
+    if method == 'threshold':
+        if fs is None:
+            raise ValueError(
+                "`fs` is required for 'threshold' method")
+        if min_peak_amp is None:
+            min_peak_amp = 0.05
+        peaks = _detect_scr_threshold(
+            phasic,
+            fs = fs,
+            min_peak_amp = min_peak_amp,
+            min_rise_time = min_rise_time,
+            max_rise_time = max_rise_time,
+        )
+        return peaks
 
-    # Find zero crossings
-    def _get_zero_crossings(sig, direction = 'positive'):
-        zc = np.where(np.diff(np.sign(sig)) != 0)[0]
-        if direction == 'positive':
-            return [i for i in zc if sig[i] < 0 and sig[i+1] >= 0]
-        elif direction == 'negative':
-            return [i for i in zc if sig[i] > 0 and sig[i+1] <= 0]
-        else:
-            return zc
+    elif method == 'nabian':
+        peaks = _detect_scr_nabian(
+            phasic,
+            smooth_size = smooth_size,
+            min_amp_thresh = min_amp_thresh,
+            min_peak_amp = min_peak_amp,
+        )
+        return peaks
 
-    pos_crossings = _get_zero_crossings(diff_smoothed, 'positive')
-    neg_crossings = _get_zero_crossings(diff_smoothed, 'negative')
-
-    # Ensure onset before offset
-    if len(neg_crossings) > 0 and len(pos_crossings) > 0:
-        if neg_crossings[0] < pos_crossings[0]:
-            neg_crossings = neg_crossings[1:]
-    n_pairs = min(len(pos_crossings), len(neg_crossings))
-    pos_crossings = pos_crossings[:n_pairs]
-    neg_crossings = neg_crossings[:n_pairs]
-
-    # Get peaks
-    candidates = []
-    for onset, offset in zip(pos_crossings, neg_crossings):
-        window = phasic[onset:offset]
-        if len(window) == 0:
-            continue
-        peak_idx = onset + np.argmax(window)
-        amp = phasic[peak_idx] - phasic[onset]
-        candidates.append((peak_idx, amp))
-
-    # Apply sequential amplitude threshold
-    if len(candidates) == 0:
-        return np.array([])
-    peaks, amps = [], []
-    for idx, amp in candidates:
-        if not amps:
-            if (min_peak_amp is None) or (amp >= min_peak_amp):
-                peaks.append(idx)
-                amps.append(amp)
-        else:
-            use_rel = amp >= (min_amp_thresh * max(amps))
-            use_abs = (min_peak_amp is None) or (amp >= min_peak_amp)
-            if use_abs and use_rel:
-                peaks.append(idx)
-                amps.append(amp)
-
-    return np.array(peaks)
+    else:
+        raise ValueError(
+            f"Unknown method '{method}'. Must be 'threshold' or 'nabian'."
+        )
 
 def compute_tonic_scl(
     signal: np.ndarray,
@@ -516,6 +532,203 @@ def resample(
     rs = resample_poly(signal, up, down)
     rs = np.asarray(rs).flatten()
     return rs
+
+def _detect_scr_nabian(
+    phasic: Union[np.ndarray, pd.Series],
+    smooth_size: int = 20,
+    min_amp_thresh: float = 0.1,
+    min_peak_amp: Optional[float] = None,
+) -> np.ndarray:
+    """
+    Detect skin conductance response (SCR) peaks in a phasic EDA signal using
+    the Nabian et al. (2018) approach.
+
+    Parameters
+    ----------
+    phasic : array-like
+        Phasic component of EDA signal.
+    smooth_size : int, optional
+        The size of Bartlett window for smoothing derivative; by default, 20.
+    min_amp_thresh : float, optional
+        The minimum SCR amplitude threshold, relative to the max detected
+        amplitude; by default, 0.1 (i.e., 10%).
+    min_peak_amp : float, optional
+        The minimum amplitude for a SCR peak to be considered valid; by
+        default, None.
+
+    Returns
+    -------
+    peaks : np.ndarray
+        An array containing indices of detected SCR peaks.
+
+    Notes
+    -----
+    The original Nabian et al. (2018) method uses only the sequential relative
+    amplitude threshold (min_amp_thresh). The `min_peak_amp` parameter is an
+    optional extension for additional filtering of small peaks.
+
+    References
+    ----------
+    Nabian, M., et al. (2018). An open-source feature extraction tool for
+    the analysis of peripheral physiological data. IEEE Journal of
+    Translational Engineering in Health and Medicine, 6, 1-11.
+    """
+
+    # Differentiate phasic signal
+    diff = np.diff(phasic, prepend = phasic[0])
+
+    # Smooth derivative with Bartlett kernel
+    kernel = np.bartlett(smooth_size)
+    kernel /= kernel.sum()
+    diff_smoothed = convolve(diff, kernel, mode="same")
+
+    # Find zero crossings
+    def _get_zero_crossings(sig, direction = 'positive'):
+        zc = np.where(np.diff(np.sign(sig)) != 0)[0]
+        if direction == 'positive':
+            return [i + 1 for i in zc if sig[i] < 0 and sig[i+1] >= 0]
+        elif direction == 'negative':
+            return [i + 1 for i in zc if sig[i] > 0 and sig[i+1] <= 0]
+        else:
+            [i + 1 for i in zc]
+
+    pos_crossings = _get_zero_crossings(diff_smoothed, 'positive')
+    neg_crossings = _get_zero_crossings(diff_smoothed, 'negative')
+
+    # Ensure onset before offset
+    if len(neg_crossings) > 0 and len(pos_crossings) > 0:
+        if neg_crossings[0] < pos_crossings[0]:
+            neg_crossings = neg_crossings[1:]
+    n_pairs = min(len(pos_crossings), len(neg_crossings))
+    pos_crossings = pos_crossings[:n_pairs]
+    neg_crossings = neg_crossings[:n_pairs]
+
+    # Get peaks
+    candidates = []
+    for onset, offset in zip(pos_crossings, neg_crossings):
+        window = phasic[onset:offset]
+        if len(window) == 0:
+            continue
+        peak_idx = onset + np.argmax(window)
+        amp = phasic[peak_idx] - phasic[onset]
+        candidates.append((peak_idx, amp))
+
+    # Apply sequential amplitude threshold
+    if len(candidates) == 0:
+        return np.array([])
+    peaks, amps = [], []
+    for idx, amp in candidates:
+
+        # Check absolute threshold
+        if min_peak_amp is not None and amp < min_peak_amp:
+            # Reset sequence - peak too small
+            amps = []
+            continue
+
+        if not amps:
+            peaks.append(idx)  # accept first peak
+            amps.append(amp)
+        else:
+            # Check relative threshold against max so far
+            if amp >= (min_amp_thresh * max(amps)):
+                peaks.append(idx)
+                amps.append(amp)
+            else:
+                # Below threshold - reset sequence
+                amps = []
+
+    peaks = np.array(peaks)
+    return peaks
+
+def _detect_scr_threshold(
+    eda: Union[np.ndarray, pd.Series],
+    fs: float,
+    min_peak_amp: float = 0.05,
+    min_rise_time: float = 0.5,
+    max_rise_time: float = 5.0,
+) -> np.ndarray:
+    """
+    Detect skin conductance response (SCR) peaks using a threshold method
+    based on trough-peak amplitude.
+
+    Parameters
+    ----------
+    phasic : array-like
+        Phasic component of an EDA signal.
+    fs : float
+        The sampling rate (in Hz) of the EDA signal.
+    min_peak_amp : float, optional
+        The minimum amplitude threshold in microsiemens (µS); by
+        default, 0.05.
+    min_rise_time : float, optional
+        The minimum rise time in seconds; by default, 0.5.
+    max_rise_time : float, optional
+        The maximum rise time in seconds; by default, 5.0.
+        Typical SCRs have rise times of 1–3 seconds.
+
+    Returns
+    -------
+    peaks : np.ndarray
+        An array containing the indices of SCR peaks.
+
+    References
+    ----------
+    Dawson, M. E., Schell, A. M., & Filion, D. L. (2007). The electrodermal
+    system. In J. T. Cacioppo, L. G. Tassinary, & G. G. Berntson (Eds.),
+    Handbook of psychophysiology (3rd ed., pp. 159-181). Cambridge University
+    Press.
+
+    Boucsein, W. (2012). Electrodermal activity (2nd ed.). Springer.
+
+    Boucsein, W., et al. (2012). Publication recommendations for electrodermal
+    measurements. Psychophysiology, 49(8), 1017-1034.
+    """
+    if isinstance(eda, pd.Series):
+        eda = eda.values
+
+    # Find all local minima (potential onsets/troughs)
+    min_dist_samples = int(min_rise_time * fs)
+    troughs, _ = find_peaks(-eda, distance = min_dist_samples)
+    peaks_all, _ = find_peaks(eda, distance = min_dist_samples)
+
+    if len(troughs) == 0 or len(peaks_all) == 0:
+        return (np.array([]), np.array([]), np.array([]), np.array([]))
+
+    # Match troughs to peaks
+    valid_onsets = []
+    valid_peaks = []
+    valid_amplitudes = []
+
+    trough_idx = 0
+    for trough in troughs:
+
+        # Find the next peak after this trough
+        subsequent_peaks = peaks_all[peaks_all > trough]
+        if len(subsequent_peaks) == 0:
+            continue
+
+        peak = subsequent_peaks[0]
+
+        # Calculate amplitude
+        amplitude = eda[peak] - eda[trough]
+
+        # Calculate rise time
+        rise_time = (peak - trough) / fs
+
+        # Check criteria for SCRs
+        if amplitude < min_peak_amp:
+            continue
+        if rise_time < min_rise_time or rise_time > max_rise_time:
+            continue
+        if len(valid_peaks) > 0 and peak <= valid_peaks[-1]:
+            continue
+
+        valid_onsets.append(trough)
+        valid_peaks.append(peak)
+        valid_amplitudes.append(amplitude)
+
+    peaks = np.array(valid_peaks)
+    return peaks
 
 def _cvxEDA(
     signal: np.ndarray,
