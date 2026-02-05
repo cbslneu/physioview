@@ -185,7 +185,8 @@ def get_callbacks(app):
 
     # ======================== ENABLE DATA PARAMETERS =========================
     @app.callback(
-        [Output('resample', 'hidden'),
+        [Output('sampling-rate', 'value', allow_duplicate = True),
+         Output('resample', 'hidden'),
          Output('resampling-rate', 'disabled'),
          Output('load-temperature', 'hidden'),
          Output('temp-upload-section', 'hidden'),
@@ -194,18 +195,19 @@ def get_callbacks(app):
          Output('scr-amplitude-threshold', 'hidden'),
          Output('beat-detectors', 'options'),
          Output('beat-detectors', 'value'),
+         Output('scr-detectors', 'options'),
+         Output('scr-detectors', 'value', allow_duplicate = True),
          Output('seg-size', 'value', allow_duplicate = True)],
         [Input('e4-data-types', 'value'),
          Input('data-types', 'value'),
          Input('toggle-resample', 'on'),
-         Input('toggle-scr-detection', 'on'),
+         # Input('toggle-scr-detection', 'on'),
          Input('toggle-temp-data', 'on'),
          State('memory-load', 'data')],
         prevent_initial_call = True
     )
     def db_enable_dtype_specific_parameters(e4_dtype, dtype, toggle_rs_on,
-                                            toggle_scr_on, toggle_temp_on,
-                                            loaded_data):
+                                            toggle_temp_on, loaded_data):
         """Enable parameters specific to data types of CSV sources."""
         load_temp_hidden = True
         temp_upload_hidden = True
@@ -216,24 +218,35 @@ def get_callbacks(app):
         resample_disabled = True
         beat_detectors = []
         default_beat_detector = None
+        scr_detectors = []
+        default_scr_detector = None
         data_source = loaded_data['source']
         seg_size = 60
+        fs = 500
 
         # Handle EDA components
         if dtype == 'EDA' or e4_dtype == 'EDA':
             resample_hidden = False
             load_temp_hidden = False
+            cardio_preprocess_hidden = True
             eda_preprocess_hidden = False
             seg_size = 180
             if toggle_rs_on is True:
                 resample_disabled = False
-            if toggle_scr_on is True:
-                scr_amp_thresh_hidden = False
             if toggle_temp_on is True:
                 temp_upload_hidden = False
+            scr_detectors = [
+                {'label': 'Nabian et al. (2018)', 'value': 'nabian'},
+                {'label': 'Threshold-Based', 'value': 'threshold'}
+            ]
+            default_scr_detector = 'threshold'
+            scr_amp_thresh_hidden = False
+            fs = 4
 
         # Handle cardiac components
         if dtype in ('PPG', 'ECG')  or e4_dtype == 'PPG' or data_source == 'Actiwave':
+            fs = 500
+            eda_preprocess_hidden = True
             cardio_preprocess_hidden = False
             if dtype == 'PPG' or e4_dtype == 'PPG':
                 beat_detectors = [
@@ -249,11 +262,11 @@ def get_callbacks(app):
                 ]
                 default_beat_detector = 'manikandan'
 
-        return [resample_hidden, resample_disabled,
+        return [fs, resample_hidden, resample_disabled,
                 load_temp_hidden, temp_upload_hidden,
                 cardio_preprocess_hidden, eda_preprocess_hidden,
                 scr_amp_thresh_hidden, beat_detectors, default_beat_detector,
-                seg_size]
+                scr_detectors, default_scr_detector, seg_size]
 
     # === Read temperature data file if provided ==============================
     @app.callback(
@@ -338,12 +351,12 @@ def get_callbacks(app):
          Output('temp-variable', 'value'),
          Output('temp-uploader', 'disabled'),
          Output('temp-uploader', 'children', allow_duplicate = True),
-         Output('sampling-rate', 'value'),
+         Output('sampling-rate', 'value', allow_duplicate = True),
          Output('seg-size', 'value', allow_duplicate = True),
          Output('artifact-method', 'value'),
          Output('artifact-tol', 'value'),
          Output('toggle-filter', 'on'),
-         Output('toggle-scr-detection', 'on'),
+         Output('scr-detectors', 'value', allow_duplicate = True),
          Output('eda-valid-min', 'value'),
          Output('eda-valid-max', 'value')],
         [Input('memory-load', 'data'),
@@ -369,7 +382,6 @@ def get_callbacks(app):
         # Default toggler states
         temp_on = False
         filter_on = False
-        scr_on = False
 
         # Default parameter values
         base_headers = ['<Var>', '<Var>']
@@ -380,6 +392,7 @@ def get_callbacks(app):
         temp_value = None
         artifact_method = 'cbd'
         artifact_tol = 1
+        scr_detector = 'threshold'
         seg_size = 60
         fs = 500
         dtype = None
@@ -409,7 +422,7 @@ def get_callbacks(app):
                     seg_size = configs['segment size']
                     fs = configs['sampling rate']
                     dtype = configs['data type']
-                    scr_on = configs['scr detection']
+                    scr_detector = configs['scr detector']
 
             # -- csv sources -------------------------------------------------
             elif memory['source'] == 'csv':
@@ -431,10 +444,6 @@ def get_callbacks(app):
                         batch_headers = []
 
                         # Filter out macOS metadata in zip file
-                        # zfiles = [f for f in zf.namelist() if '/' in f and
-                        #           not f.startswith('__MACOSX/') and
-                        #           not f.endswith('.DS_Store') and
-                        #           '/._' not in f and not f.endswith('/')]
                         zfiles = [f for f in zf.namelist()
                                   if f.lower().endswith('.csv')
                                   and not f.endswith('/')
@@ -482,7 +491,7 @@ def get_callbacks(app):
             artifact_method = configs['artifact identification method']
             artifact_tol = configs['artifact tolerance']
             filter_on = configs['filters']
-            scr_on = configs['scr detection']
+            scr_detector = configs['scr detector']
             temp_on = configs['use temperature']
             eda_min = configs['minimum eda']
             eda_max = configs['maximum eda']
@@ -494,10 +503,8 @@ def get_callbacks(app):
             else:
                 headers = list(configs['headers'].values())
                 base_headers = headers
-                drop_values = [h for h in configs['headers'].values()
-                               if h is not None]
-                # drop_values = [[h for h in headers if h is not None] for _
-                #                in range(6)]
+                drop_values = [[h for h in configs['headers']
+                                if h is not None] for _ in range(6)]
 
             # Populate temperature dropdown
             if temp_on:
@@ -533,8 +540,8 @@ def get_callbacks(app):
             # temperature data upload
             temp_uploader_disabled, temp_uploader_text,
 
-            fs, seg_size, artifact_method, artifact_tol, filter_on, scr_on,
-            eda_min, eda_max
+            fs, seg_size, artifact_method, artifact_tol, filter_on,
+            scr_detector, eda_min, eda_max
         )
 
     # =================== TOGGLE EXPORT CONFIGURATION MODAL ===================
@@ -616,7 +623,7 @@ def get_callbacks(app):
          State('toggle-filter', 'on'),
          State('toggle-temp-data', 'on'),
          State('temp-variable', 'value'),
-         State('toggle-scr-detection', 'on'),
+         State('scr-detectors', 'value'),
          State('scr-amp-thresh', 'value'),
          State('eda-valid-min', 'value'),
          State('eda-valid-max', 'value'),
@@ -625,7 +632,7 @@ def get_callbacks(app):
     )
     def write_confirm_config(n, data, dtype, fs, d1, d2, d3, d4, d5,
                              seg_size, artifact_method, artifact_tol,
-                             filter_on, temp_on, temp_var, scr_on,
+                             filter_on, temp_on, temp_var, scr_detector,
                              scr_amp, eda_min, eda_max, filename):
         """Export the configuration file."""
         if n:
@@ -648,7 +655,7 @@ def get_callbacks(app):
                     'Z': d5}
             json_object = utils._create_configs(
                 device, dtype, fs, seg_size, artifact_method, artifact_tol,
-                filter_on, scr_on, scr_amp, headers, temp_on, temp_var,
+                filter_on, scr_detector, scr_amp, headers, temp_on, temp_var,
                 eda_min, eda_max)
             download = {'content': json_object, 'filename': f'{filename}.json'}
             return [download, 1]
@@ -682,7 +689,7 @@ def get_callbacks(app):
             State('artifact-method', 'value'),
             State('artifact-tol', 'value'),
             State('toggle-filter', 'on'),
-            State('toggle-scr-detection', 'on'),
+            State('scr-detectors', 'value'),
             State('scr-amp-thresh', 'value'),
             State('eda-valid-min', 'value'),
             State('eda-valid-max', 'value'),
@@ -704,8 +711,8 @@ def get_callbacks(app):
     )
     def run_pipeline(set_progress, n, load_data, e4_dtype, dtype, fs, rs, d1,
                      d2, d3, d4, d5, temp_data, temp_var, beat_detector,
-                     seg_size, artifact_method, artifact_tol, filt_on, scr_on,
-                     scr_amp, eda_min, eda_max):
+                     seg_size, artifact_method, artifact_tol, filt_on,
+                     scr_detector, scr_amp, eda_min, eda_max):
         """Read Actiwave Cardio, Empatica E4, or CSV-formatted data, save
         the data to the local memory, and load the progress spinner."""
 
@@ -851,8 +858,8 @@ def get_callbacks(app):
                             else None
                         try:
                             preprocessed = utils._preprocess_eda(
-                                data, fs, rs, temp, seg_size, filt_on, scr_on,
-                                scr_amp, eda_min, eda_max)
+                                data, fs, rs, temp, seg_size, filt_on,
+                                scr_detector, scr_amp, eda_min, eda_max)
                         except Exception as e:
                             pipeline_error = True
                             error_type = type(e).__name__
@@ -1067,11 +1074,12 @@ def get_callbacks(app):
                     try:
                         preprocessed = utils._preprocess_eda(
                             data, fs, rs, temp, seg_size, filt_on,
-                            scr_on, scr_amp, eda_min, eda_max)
+                            scr_detector, scr_amp, eda_min, eda_max)
                     except Exception as e:
                         pipeline_error = True
                         error_type = type(e).__name__
                         error_msg = f'{error_type}: {e}'
+                        print(traceback.format_exc())
                         return dtype_error, map_error, pipeline_error, \
                             error_msg, temp_input_error, None
                     metrics = preprocessed[1]
@@ -1520,8 +1528,9 @@ def get_callbacks(app):
             # Get render data for primary signal
             render_subdir = render_dir / selected_subject
             signal = pd.read_csv(str(render_subdir / 'signal.csv'))
-            y_axis = 'Filtered' if filt_on else data_type
-            x_axis = 'Timestamp' if 'Timestamp' in signal.columns else 'Sample'
+            y_axis_label = 'Filtered' if filt_on else data_type
+            x_axis_label = 'Timestamp' if 'Timestamp' in signal.columns else \
+                'Sample'
             ts_col = 'Timestamp' if 'Timestamp' in signal.columns else None
 
             # Get ACC data if available
@@ -1701,7 +1710,7 @@ def get_callbacks(app):
                     # Render updated signal plots
                     signal_plots = physioview.plot_signal(
                         signal = data_edited, signal_type = data_type,
-                        axes = (x_axis, 'Signal'), fs = fs,
+                        axes = (x_axis_label, 'Signal'), fs = fs,
                         peaks_map = {data_type: 'Edited'},
                         peaks_label = 'Edited Beat',
                         peaks_color = '#71b4eb',
@@ -1719,7 +1728,7 @@ def get_callbacks(app):
                     # Create cardiac signal subplots
                     signal_plots = physioview.plot_signal(
                         signal = signal, signal_type = data_type,
-                        axes = (x_axis, y_axis), fs = fs,
+                        axes = (x_axis_label, y_axis_label), fs = fs,
                         peaks_map = {data_type: 'Beat'},
                         artifacts_map = {data_type: 'Artifact'},
                         correction_map = correction_map,
@@ -1727,6 +1736,10 @@ def get_callbacks(app):
                         ibi_corrected = ibi_corrected,
                         seg_number = selected_segment,
                         seg_size = segment_size)
+
+                for trace in signal_plots.data:
+                    if trace.name == y_axis_label and y_axis_label == 'Filtered':
+                        trace.name = f'Filtered {data_type}'
 
                 beat_correction_hidden = beat_correction_status[selected_subject] == 'suggested' \
                     or beat_correction_status[selected_subject] == 'accepted'
@@ -1736,7 +1749,7 @@ def get_callbacks(app):
 
             # Otherwise create the EDA signal subplots
             else:
-                eda_subplots = {'EDA': ['Phasic', y_axis, 'Tonic']}
+                eda_subplots = {'EDA': ['Decomposed', y_axis_label, 'Tonic']}
                 signal_types = [data_type]
 
                 # Add temperature to subplots if data was provided
@@ -1752,17 +1765,33 @@ def get_callbacks(app):
                 # Create EDA subplots
                 signal_plots = physioview.plot_signal(
                     signal = signal, signal_type = signal_types,
-                    axes = (x_axis, eda_subplots),
+                    axes = (x_axis_label, eda_subplots),
                     fs = fs,
                     peaks_map = {data_type: 'SCR'} if has_scr else None,
-                    hline = eda_min, hline_name = 'Min. Valid EDA',
+                    # hline = eda_min, hline_name = 'Min. Valid EDA',
                     acc = acc, seg_number = selected_segment,
                     seg_size = segment_size)
+
+                # Reorder traces in plot so SCRs are plotted on the phasic
+                # component
+                first_trace = None
+                other_traces = []
                 for trace in signal_plots.data:
-                    if trace.name == y_axis:
+                    if trace.name == 'Decomposed':
+                        trace.name = 'Phasic'
+                        other_traces.append(trace)
+                    elif trace.name == y_axis_label:
+                        if y_axis_label == 'Filtered':
+                            trace.name = 'Filtered EDA'
                         trace.line.color = 'lightgrey'
-                    if trace.name == 'Tonic':
+                        first_trace = trace
+                    elif trace.name == 'Tonic':
                         trace.line.dash = 'dash'
+                        other_traces.append(trace)
+                    else:
+                        other_traces.append(trace)
+                signal_plots.data = [first_trace] + other_traces if \
+                    first_trace else other_traces
 
                 beat_correction_hidden = False
                 accept_corrections_hidden = True

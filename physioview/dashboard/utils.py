@@ -5,6 +5,7 @@ from shutil import rmtree
 from zipfile import ZipFile
 from scipy.signal import filtfilt, firwin
 from physioview.pipeline import ECG, EDA, PPG, SQA
+from physioview.pipeline.SQA import EDA as EDAQA
 from physioview.physioview import compute_ibis
 from dash import html
 from requests import get as http_get
@@ -191,7 +192,7 @@ def _preprocess_eda(
     temp: Optional[np.ndarray] = None,
     seg_size: int = 60,
     filt_on: bool = True,
-    scr_on: bool = True,
+    scr_detector: str = 'threshold',
     scr_amp: float = 0.25,
     eda_min: float = 0.2,
     eda_max: float = 40,
@@ -209,9 +210,11 @@ def _preprocess_eda(
     if target_fs != fs:
         signal_rs = EDA.resample(signal, fs, target_fs)
         fs_eff = target_fs
+        temp_rs = EDA.resample(temp, fs, target_fs)
     else:
         signal_rs = signal
         fs_eff = fs
+        temp_rs = temp
 
     # Build timestamps/sample indices
     n_samples = len(signal_rs)
@@ -228,6 +231,8 @@ def _preprocess_eda(
 
     # Create resampled data
     data_rs = pd.DataFrame({ts_col: ts_rs, 'EDA': signal_rs})
+    if temp_rs is not None:
+        data_rs['TEMP'] = temp_rs
     preprocessed_data = data_rs
     fs = fs_eff  # update sampling rate to resampled rate
 
@@ -243,21 +248,27 @@ def _preprocess_eda(
             temp = preprocessed_data['TEMP'].values
     else:
         is_preprocessed = False
+        if 'TEMP' in preprocessed_data.columns:
+            temp = preprocessed_data['TEMP'].values
+        else:
+            temp = None
 
     # Decompose to phasic and tonic components with convex optimization
     phasic, tonic = EDA.decompose_eda(
         preprocessed_data['EDA'], fs, show_progress = False)
     preprocessed_data['Phasic'] = phasic
     preprocessed_data['Tonic'] = tonic
+    preprocessed_data['Decomposed'] = phasic + tonic
 
     # Detect SCR peaks if requested
-    if scr_on:
-        scr_ix = EDA.detect_scr_peaks(preprocessed_data['Phasic'],
-                                      min_peak_amp = scr_amp)
-        preprocessed_data.loc[scr_ix, 'SCR'] = 1
+    scr_ix = EDA.detect_scr_peaks(preprocessed_data['Phasic'],
+                                  fs = fs,
+                                  method = scr_detector,
+                                  min_peak_amp = scr_amp)
+    preprocessed_data.loc[scr_ix, 'SCR'] = 1
 
     # Compute quality metrics
-    edaqa = SQA.EDA(fs, eda_min, eda_max)
+    edaqa = EDAQA(fs, eda_min, eda_max)
     ycol = 'Filtered' if 'Filtered' in preprocessed_data.columns else 'EDA'
     eda_validity = edaqa.get_validity_metrics(preprocessed_data[ycol])
     preprocessed_data = pd.concat([
@@ -332,7 +343,7 @@ def _create_configs(
     artifact_method: str,
     artifact_tol: float,
     filter_on: bool,
-    scr_on: bool,
+    scr_detector: str,
     scr_amp: float,
     headers: Optional[dict] = None,
     temp_on: bool = False,
@@ -348,7 +359,7 @@ def _create_configs(
                'sampling rate': fs,
                'segment size': seg_size,
                'filters': filter_on,
-               'scr detection': scr_on,
+               'scr detector': scr_detector,
                'scr amplitude': scr_amp,
                'artifact identification method': artifact_method,
                'artifact tolerance': artifact_tol,

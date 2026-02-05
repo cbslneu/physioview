@@ -246,7 +246,7 @@ h6 {
 #data-types {
     margin-left: 10px;
 }
-#segment-data span, #artifact-params > span {
+#segment-data span, #artifact-params > span, #scr-amplitude-threshold span {
     font-weight: 600;
     padding-right: 5px;
 }
@@ -276,14 +276,14 @@ h6 {
     margin-top: 5px;
     font-size: 10pt;
 }
-#select-beat-detector {
+#select-beat-detector, #select-scr-detector {
     margin-top: 5px;
     padding-bottom: 10px;
 }
-#select-beat-detector > span {
+#select-beat-detector > span, #select-scr-detector > span {
     font-weight: 600;
 }
-#beat-detectors {
+#beat-detectors, #scr-detectors {
     font-size: 10pt;
 }
 #data-variables {
@@ -387,7 +387,7 @@ h6 {
 }
 #scr-amplitude-threshold {
     display: inline-flex;
-    gap: 0.25em;
+    /*gap: 0.25em;*/
     font-weight: 600;
     align-items: center;
     padding-bottom: 10px;
@@ -423,7 +423,7 @@ h6 {
     font-size: 13pt;
     margin-top: 3px;
 }
-#seg-data-help, #artifact-tol-help {
+#seg-data-help, #artifact-tol-help, #min-peak-amp-help {
     margin-left: 5px;
     padding-right: 10px;
     font-size: 13pt;

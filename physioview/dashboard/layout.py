@@ -236,16 +236,22 @@ layout = html.Div(id = 'main', children = [
                 ]),
             ]),
             html.Div(id = 'eda-preprocessing', hidden = True, children = [
-                daq.BooleanSwitch(
-                    id = 'toggle-scr-detection',
-                    color = '#ee8a78',
-                    label = 'Detect SCR Peaks',
-                    labelPosition = 'left',
-                    on = False,
-                    style = {'paddingBottom:': '10px'}),
+                html.Div(id = 'select-scr-detector', children = [
+                    html.Span('SCR Detector:'),
+                    dcc.Dropdown(id = 'scr-detectors',
+                                 options = [], clearable = False)
+                ]),
                 html.Div(id = 'scr-amplitude-threshold', children = [
                     html.Span('Minimum Peak Amplitude (µS):'),
-                    dcc.Input(id = 'scr-amp-thresh', value = 0.25, type = 'number')
+                    dcc.Input(id = 'scr-amp-thresh', value = None, type =
+                    'number'),
+                    html.I(className = 'fa-regular fa-circle-question',
+                       id = 'min-peak-amp-help'),
+                    dbc.Tooltip(
+                        'Exclude SCR peaks with ampitudes below this '
+                        'threshold. If this field is empty, no amplitude '
+                        'threshold is used.',
+                        target = 'min-peak-amp-help')
                 ], hidden = True),
                 html.Div(id = 'valid-amplitude-range', children = [
                     html.Span('Valid EDA Range (µS):'),
@@ -262,7 +268,7 @@ layout = html.Div(id = 'main', children = [
                        id = 'seg-data-help'),
                 dbc.Tooltip(
                     'This sets the size of the windows into which your data '
-                    'will be segmented; by default, 60 seconds.',
+                    'will be segmented.',
                     target = 'seg-data-help')
             ]),
         ]),
