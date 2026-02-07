@@ -201,7 +201,6 @@ def get_callbacks(app):
         [Input('e4-data-types', 'value'),
          Input('data-types', 'value'),
          Input('toggle-resample', 'on'),
-         # Input('toggle-scr-detection', 'on'),
          Input('toggle-temp-data', 'on'),
          State('memory-load', 'data')],
         prevent_initial_call = True
@@ -267,6 +266,64 @@ def get_callbacks(app):
                 cardio_preprocess_hidden, eda_preprocess_hidden,
                 scr_amp_thresh_hidden, beat_detectors, default_beat_detector,
                 scr_detectors, default_scr_detector, seg_size]
+
+    # === Open advanced filter cutoff settings ================================
+    @app.callback(
+        [Output('filter-config-link', 'hidden'),
+         Output('filter-config-collapse', 'className')],
+        [Input('toggle-filter', 'on'),
+         Input('filter-config-link', 'n_clicks')],
+        State('filter-config-collapse', 'className'),
+        prevent_initial_call = True
+    )
+    def handle_filter_config_link(filter_on, n_clicks, current_class):
+        """Enable/disable the filter settings link based on the filter
+        toggle state and display/hide the settings when the link is clicked."""
+        trig = ctx.triggered_id
+        if current_class is None:
+            current_class = 'filter-config-hidden'
+
+        # Handle filter toggle
+        if trig == 'toggle-filter':
+            if filter_on:
+                # Filter enabled; keep settings hidden
+                return False, 'filter-config-hidden'
+            else:
+                # Filter disabled; hide link and settings
+                return True, 'filter-config-hidden'
+
+        # Handle link click only if the filter oggle is already on
+        if trig == 'filter-config-link':
+            if filter_on:
+                if current_class == 'filter-config-hidden':
+                    return False, 'filter-config-visible'
+                else:
+                    return False, 'filter-config-hidden'
+
+        # Otherwise, keep the link and settings hidden
+        return True, 'filter-config-hidden'
+
+    # === Set filter cutoff values ============================================
+    @app.callback(
+        [Output('filter-lowcut', 'disabled'),
+         Output('filter-lowcut', 'value', allow_duplicate = True),
+         Output('filter-highcut', 'value', allow_duplicate = True)],
+        [Input('data-types', 'value'),
+         Input('e4-data-types', 'value')],
+        prevent_initial_call = True
+    )
+    def disable_lowcut_input(dtype, e4_dtype):
+        """Disable the filter lowcut input and customize the highcut input
+        and value depending on the inputted data type."""
+        ecg_filter_params = [False, 5, 15]
+        ppg_filter_params = [False, 0.5, 10]
+        eda_filter_params = [True, None, 0.35]
+        if dtype == 'EDA' or e4_dtype == 'EDA':
+            return eda_filter_params
+        elif dtype == 'PPG' or e4_dtype == 'PPG':
+            return ppg_filter_params
+        else:
+            return ecg_filter_params
 
     # === Read temperature data file if provided ==============================
     @app.callback(
@@ -689,6 +746,8 @@ def get_callbacks(app):
             State('artifact-method', 'value'),
             State('artifact-tol', 'value'),
             State('toggle-filter', 'on'),
+            State('filter-lowcut', 'value'),
+            State('filter-highcut', 'value'),
             State('scr-detectors', 'value'),
             State('scr-amp-thresh', 'value'),
             State('eda-valid-min', 'value'),
@@ -712,7 +771,8 @@ def get_callbacks(app):
     def run_pipeline(set_progress, n, load_data, e4_dtype, dtype, fs, rs, d1,
                      d2, d3, d4, d5, temp_data, temp_var, beat_detector,
                      seg_size, artifact_method, artifact_tol, filt_on,
-                     scr_detector, scr_amp, eda_min, eda_max):
+                     filter_lowcut, filter_highcut, scr_detector, scr_amp,
+                     eda_min, eda_max):
         """Read Actiwave Cardio, Empatica E4, or CSV-formatted data, save
         the data to the local memory, and load the progress spinner."""
 
@@ -819,6 +879,7 @@ def get_callbacks(app):
                             preprocessed = utils._preprocess_cardiac(
                                 data, dtype, fs, seg_size, beat_detector,
                                 artifact_method, artifact_tol, filt_on,
+                                filter_lowcut, filter_highcut,
                                 acc_data = acc, downsample = ds)
 
                             # Throw beat detection error
@@ -859,7 +920,8 @@ def get_callbacks(app):
                         try:
                             preprocessed = utils._preprocess_eda(
                                 data, fs, rs, temp, seg_size, filt_on,
-                                scr_detector, scr_amp, eda_min, eda_max)
+                                filter_highcut, scr_detector, scr_amp,
+                                eda_min, eda_max)
                         except Exception as e:
                             pipeline_error = True
                             error_type = type(e).__name__
@@ -1023,6 +1085,7 @@ def get_callbacks(app):
                         preprocessed = utils._preprocess_cardiac(
                             data, dtype, fs, seg_size, beat_detector,
                             artifact_method, artifact_tol, filt_on,
+                            filter_lowcut, filter_highcut,
                             acc_data = acc, downsample = ds)
 
                         # Throw beat detection error
@@ -1074,7 +1137,8 @@ def get_callbacks(app):
                     try:
                         preprocessed = utils._preprocess_eda(
                             data, fs, rs, temp, seg_size, filt_on,
-                            scr_detector, scr_amp, eda_min, eda_max)
+                            filter_highcut, scr_detector, scr_amp,
+                            eda_min, eda_max)
                     except Exception as e:
                         pipeline_error = True
                         error_type = type(e).__name__

@@ -276,8 +276,11 @@ h6 {
     margin-top: 5px;
     font-size: 10pt;
 }
-#select-beat-detector, #select-scr-detector {
+#select-beat-detector {
     margin-top: 5px;
+    padding-bottom: 10px;
+}
+#select-scr-detector {
     padding-bottom: 10px;
 }
 #select-beat-detector > span, #select-scr-detector > span {
@@ -377,10 +380,6 @@ h6 {
     padding-right: 0px;
 }
 /* -- containers -----------------------------------------------------------*/
-#filter-data {
-    display: flex;
-    padding-bottom: 5px;
-}
 #segment-data {
     display: flex;
     align-items: center;
@@ -421,13 +420,72 @@ h6 {
 #filter-help {
     margin-left: 5px;
     font-size: 13pt;
-    margin-top: 3px;
 }
 #seg-data-help, #artifact-tol-help, #min-peak-amp-help {
     margin-left: 5px;
     padding-right: 10px;
     font-size: 13pt;
     margin-top: 1px;
+}
+
+/* --- advanced filter configuration ---------------------------------------*/
+#filter-settings {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+#filter-data {
+    display: block;
+    padding-bottom: 5px;
+}
+#filter-config-link {
+    color: #ee8a78 !important;
+    font-weight: 400 !important;
+    font-size: 9pt !important;
+    margin-left: 10px;
+    letter-spacing: 0.7pt;
+}
+#filter-config-link:hover {
+    text-decoration: underline;
+}
+#filter-config-collapse {
+    width: 100%;
+}
+.filter-config-hidden {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform-origin: top;
+    transition: max-height 0.35s ease-out, opacity 0.25s ease-out;
+}
+.filter-config-visible {
+    max-height: 150px;
+    opacity: 1;
+    overflow: hidden;
+    transform-origin: top;
+    transition: max-height 0.35s ease-in, opacity 0.25s ease-in 0.1s;
+    padding-top: 8px;
+}
+#filter-lowcut, #filter-highcut {
+    width: 50px;
+}
+#filter-config-collapse .card {
+    border-radius: 5px;
+    border: 1px dashed #ee8a78;
+    background-color: #fae0da;
+}
+#filter-config-collapse .card-body {
+    padding: 10px;
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 9.5pt;
+}
+#lower-cutoff-div, #upper-cutoff-div {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
 }
 /* --- file uploaders ------------------------------------------------------*/
 #config-uploader { /* configuration file uploader */

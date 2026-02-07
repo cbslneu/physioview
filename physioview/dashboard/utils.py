@@ -62,12 +62,14 @@ def _preprocess_cardiac(
     beat_detector: str,
     artifact_method: str,
     artifact_tol: float,
-    filt_on: bool,
+    filter_on: bool,
+    filter_lowcut: float = 1,
+    filter_highcut: float = 15,
     acc_data: Optional[pd.DataFrame] = None,
     downsample: bool = True
 ) -> tuple:
     """Run the PhysioView pipeline on ECG/PPG data."""
-    is_preprocessed = False if not filt_on else True
+    is_preprocessed = False if not filter_on else True
     if dtype == 'ECG':
         filt = ECG.Filters(fs)
         detect_beats = ECG.BeatDetectors(fs, is_preprocessed)
@@ -77,23 +79,30 @@ def _preprocess_cardiac(
 
     preprocessed_data = data.copy()
 
-    # Filter ECG and detect beats
-    if filt_on:
+    # Filter ECG
+    if filter_on:
         preprocessed_data['Filtered'] = filt.filter_signal(
-            preprocessed_data[dtype])
-        beats_ix = getattr(detect_beats, beat_detector)(
-            preprocessed_data['Filtered'])
-    else:
-        beats_ix = getattr(detect_beats, beat_detector)(
-            preprocessed_data[dtype])
+            preprocessed_data[dtype],
+            lowcut = filter_lowcut,
+            highcut = filter_highcut)
 
-    # Return early and display error if no beats were detected
-    if len(beats_ix) == 0:
-        return None, None, None
-
-    preprocessed_data.loc[beats_ix, 'Beat'] = 1
+    # Segment data and detect beats by segment
     preprocessed_data.insert(
         0, 'Segment', preprocessed_data.index // (seg_size * fs) + 1)
+    min_seg_size = int(3 * fs)  # 3 sec
+    for seg_num, segment in preprocessed_data.groupby('Segment'):
+        if len(segment) < min_seg_size:
+            continue  # skip segments that are too short
+        if filter_on:
+            beats_seg = getattr(detect_beats, beat_detector)(segment['Filtered'])
+        else:
+            beats_seg = getattr(detect_beats, beat_detector)(segment[dtype])
+        preprocessed_data.loc[segment.index[beats_seg], 'Beat'] = 1
+
+    # Return early and display error if no beats were detected
+    beats_ix = preprocessed_data.loc[preprocessed_data['Beat'] == 1].index.values
+    if len(beats_ix) == 0:
+        return None, None, None
 
     # Identify artifactual beats
     sqa = SQA.Cardio(fs)
@@ -191,7 +200,8 @@ def _preprocess_eda(
     rs: Optional[int] = None,
     temp: Optional[np.ndarray] = None,
     seg_size: int = 60,
-    filt_on: bool = True,
+    filter_on: bool = True,
+    filter_highcut: float = 0.35,
     scr_detector: str = 'threshold',
     scr_amp: float = 0.25,
     eda_min: float = 0.2,
@@ -237,10 +247,10 @@ def _preprocess_eda(
     fs = fs_eff  # update sampling rate to resampled rate
 
     # Apply filter if requested
-    if filt_on:
+    if filter_on:
         filter_eda = EDA.Filters(fs)
         preprocessed_data['Filtered'] = filter_eda.filter_signal(
-            preprocessed_data['EDA'], fs)
+            preprocessed_data['EDA'], fs = fs, cutoff = filter_highcut)
         is_preprocessed = True
         if temp is not None:
             preprocessed_data['TEMP'] = filter_eda.moving_average(

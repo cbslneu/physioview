@@ -186,20 +186,43 @@ layout = html.Div(id = 'main', children = [
         html.Div(id = 'preprocess-data', hidden = True, children = [
             html.H4('Preprocess Data'),
             html.Div(id = 'filter-data', children = [
-                daq.BooleanSwitch(
-                    id = 'toggle-filter',
-                    color = '#ee8a78',
-                    label = 'Filter Signal',
-                    labelPosition = 'left',
-                    on = False),
-                html.I(className = 'fa-regular fa-circle-question',
-                       id = 'filter-help'),
-                dbc.Tooltip('Apply a filter to remove low- and high-frequency '
-                            'noise, including baseline drift, powerline '
-                            'interference, and muscle activity.',
-                            target = 'filter-help',
-                            style = {'--bs-tooltip-max-width': '225px'})
+                html.Div(id = 'filter-settings', children = [
+                    html.Div([
+                        daq.BooleanSwitch(
+                            id = 'toggle-filter',
+                            color = '#ee8a78',
+                            label = 'Filter Signal',
+                            labelPosition = 'left',
+                            on = False),
+                        html.I(className = 'fa-regular fa-circle-question',
+                               id = 'filter-help'),
+                        dbc.Tooltip('Apply a filter to remove low- and '
+                                    'high-frequency noise, including baseline '
+                                    'drift, powerline interference, '
+                                    'and muscle activity.',
+                                    target = 'filter-help',
+                                    style = {'--bs-tooltip-max-width': '225px'})
+                    ], style = {'display': 'flex', 'alignItems': 'center'}),
+                    html.A('Filter Settings', id = 'filter-config-link',
+                           n_clicks = 0, href = '#', hidden = True)
+                ]),
+                html.Div(
+                    dbc.Card(dbc.CardBody([
+                        html.Div(id = 'lower-cutoff-div', children = [
+                            html.Span('Lower Cutoff (Hz):'),
+                            dcc.Input(id = 'filter-lowcut', type = 'number',
+                                      value = 1, min = 0.1),
+                        ]),
+                        html.Div(id = 'upper-cutoff-div', children = [
+                            html.Span('Upper Cutoff (Hz):'),
+                            dcc.Input(id = 'filter-highcut', type = 'number',
+                                      value = 15, min = 0.1),
+                        ]),
+                    ])),
+                    id = 'filter-config-collapse',
+                    className = 'filter-config-hidden'),
             ]),
+
             html.Div(id = 'cardio-preprocessing', hidden = True, children = [
                 html.Div(id = 'artifact-params', children = [
                     html.Div(children = [
