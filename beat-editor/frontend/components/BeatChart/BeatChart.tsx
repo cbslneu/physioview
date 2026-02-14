@@ -10,17 +10,25 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 
 import createChartOptions from "../../utils/CreateChartOptions";
 import { EDIT_TYPE_ADD, EDIT_TYPE_DELETE } from "../../constants/constants";
-import KeyboardShortcuts from '../KeyboardShortcuts/KeyboardShortcuts';
+import KeyboardShortcuts from "../KeyboardShortcuts/KeyboardShortcuts";
 import useMarkingUnusableMode from "../../hooks/useMarkingUnusableMode";
 import useKeyboardShortcuts from "../../utils/key-input-utils";
-import { Beat, SavedBeat, ChartCoordinates, ChartClickEvent, SegmentObj } from "../../types/types";
+import {
+  Beat,
+  SavedBeat,
+  ChartCoordinates,
+  ChartClickEvent,
+  SegmentObj,
+} from "../../types/types";
 import SaveButton from "../SaveButton/SaveButton";
+import ExportButton from "../ExportButton/ExportButton";
+import ImportEditsButton from "../ImportEditsButton/ImportEditsButton";
 
 Highcharts.SVGRenderer.prototype.symbols.cross = function (
   x: number,
   y: number,
   w: number,
-  h: number
+  h: number,
 ) {
   return ["M", x, y, "L", x + w, y + h, "M", x + w, y, "L", x, y + h, "z"];
 };
@@ -35,6 +43,7 @@ interface BeatChartProps {
   addBeats: SavedBeat[];
   deleteBeats: SavedBeat[];
   unusableBeats: SegmentObj[];
+  onRefresh: () => void;
 }
 
 interface HasDataTypeParams {
@@ -58,17 +67,24 @@ const BeatChart = ({
   addBeats,
   deleteBeats,
   unusableBeats,
+  onRefresh,
 }: BeatChartProps) => {
-  const [chartOptions, setChartOptions] = useState<Highcharts.Options | null>(null);
+  const [chartOptions, setChartOptions] = useState<Highcharts.Options | null>(
+    null,
+  );
   const [cardiacData, setCardiacData] = useState<ChartCoordinates[]>([]);
   const [beatData, setBeatData] = useState<ChartCoordinates[]>([]);
-  const [beatArtifactData, setBeatArtifactData] = useState<ChartCoordinates[]>([]);
+  const [beatArtifactData, setBeatArtifactData] = useState<ChartCoordinates[]>(
+    [],
+  );
   const [isAddMode, setIsAddMode] = useState(false);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [isMarkingUnusableMode, setIsMarkingUnusableMode] = useState(false);
   const [addModeCoordinates, setAddModeCoordinates] = useState<SavedBeat[]>([]);
-  const [deleteModeCoordinates, setDeleteModeCoordinates] = useState<SavedBeat[]>([]);
+  const [deleteModeCoordinates, setDeleteModeCoordinates] = useState<
+    SavedBeat[]
+  >([]);
   const [unusableSegments, setUnusableSegments] = useState<SegmentObj[]>([]);
   const [selectedSegment, setSelectedSegment] = useState("1");
 
@@ -86,10 +102,10 @@ const BeatChart = ({
 
   useEffect(() => {
     const dataTypeX = X_AXIS_KEYS.find((data) =>
-      hasDataType({ fileData, data })
+      hasDataType({ fileData, data }),
     );
     const dataTypeY = Y_AXIS_KEYS.find((data) =>
-      hasDataType({ fileData, data })
+      hasDataType({ fileData, data }),
     );
 
     // Filter the data by the selected segment from the dropdown
@@ -97,13 +113,13 @@ const BeatChart = ({
       ? fileData.filter((data) => data.Segment == selectedSegment)
       : fileData;
     const beatAnnotatedData = segmentFilteredData.filter(
-      (data) => data.Beat === 1
+      (data) => data.Beat === 1,
     );
     const correctedAnnotatedData = segmentFilteredData.filter(
-      (data) => data.Corrected === 1
+      (data) => data.Corrected === 1,
     );
     const artifactData = segmentFilteredData.filter(
-      (data) => data.Artifact === 1
+      (data) => data.Artifact === 1,
     );
 
     const initCardiacData = transformCoordinates({
@@ -148,7 +164,6 @@ const BeatChart = ({
     setCardiacData(initCardiacData);
     setBeatData(initBeats);
     setBeatArtifactData(initArtifacts);
-
   }, [
     fileData,
     isAddMode,
@@ -180,13 +195,13 @@ const BeatChart = ({
 
     // Check if the point already exists in cardiacData (for Add Mode) or beatData (for Delete Mode)
     const isSignal = cardiacData.some(
-      (point) => point.x === newX && point.y === newY
+      (point) => point.x === newX && point.y === newY,
     );
     const isBeatCoordinate = beatData.some(
-      (point) => point.x === newX && point.y === newY
+      (point) => point.x === newX && point.y === newY,
     );
     const isArtifactCoordinate = beatArtifactData.some(
-      (point) => point.x === newX && point.y === newY
+      (point) => point.x === newX && point.y === newY,
     );
 
     // In Add Mode, prevent adding points that already exist in cardiacData
@@ -390,7 +405,14 @@ const BeatChart = ({
             deleteModeCoordinates={deleteModeCoordinates}
             unusableSegments={unusableSegments}
           />
-        <KeyboardShortcuts />
+          <ImportEditsButton onImportSuccess={onRefresh} />
+          <ExportButton
+            fileName={fileName}
+            addModeCoordinates={addModeCoordinates}
+            deleteModeCoordinates={deleteModeCoordinates}
+            unusableSegments={unusableSegments}
+          />
+          <KeyboardShortcuts />
         </div>
       </div>
 

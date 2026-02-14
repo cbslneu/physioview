@@ -3,6 +3,8 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 const bodyParser = require("body-parser");
+const multer = require("multer");
+const upload = multer({ dest: "temp/" });
 const app = express();
 
 // Middleware to parse JSON bodies
@@ -18,13 +20,13 @@ app.get("/fetch-file", async (req, res) => {
   try {
     const dataFiles = await fs.promises.readdir(dataDir);
     const fileDirJsonFiles = dataFiles.filter((file) =>
-      file.endsWith("_edit.json")
+      file.endsWith("_edit.json"),
     );
 
     // Extract the name of the _edit.json file
     const jsonFileName = fileDirJsonFiles[0].substring(
       0,
-      fileDirJsonFiles[0].length - 10
+      fileDirJsonFiles[0].length - 10,
     );
 
     // Skip the /saved folder if it doesn't exist
@@ -33,9 +35,7 @@ app.get("/fetch-file", async (req, res) => {
       : [];
     // Grab the _edited.json file that matches the _edit.json file
     const savedDirJsonFiles = fs.existsSync(savedDir)
-      ? savedFiles.filter((file) =>
-          file.endsWith(`${jsonFileName}_edited.json`)
-        )
+      ? savedFiles.filter((file) => file.endsWith(`_edited.json`))
       : [];
 
     if (dataFiles.length === 0) {
@@ -50,7 +50,7 @@ app.get("/fetch-file", async (req, res) => {
           fileName: file.replace("_edit.json", ""),
           data: JSON.parse(fileContent),
         };
-      })
+      }),
     );
 
     // If there's a '_edited.json' file, take the data in there too to replot
@@ -64,7 +64,7 @@ app.get("/fetch-file", async (req, res) => {
                 fileName: file,
                 data: JSON.parse(fileContent),
               };
-            })
+            }),
           )
         : null;
 
@@ -72,8 +72,8 @@ app.get("/fetch-file", async (req, res) => {
     const segmentOptions = [
       ...new Set(
         allFileData.flatMap((file) =>
-          file.data.map((o) => o.Segment.toString())
-        )
+          file.data.map((o) => o.Segment.toString()),
+        ),
       ),
     ];
 
@@ -97,7 +97,7 @@ app.post("/saved", async (req, res) => {
     __dirname,
     "..",
     "saved",
-    `${fileName}_edited.json`
+    `${fileName}_edited.json`,
   );
 
   try {
@@ -138,6 +138,27 @@ app.post("/saved", async (req, res) => {
   } catch (err) {
     console.error("Error saving file:", err);
     res.status(500).send("Error saving file.");
+  }
+});
+
+app.post("/import-edits", upload.single("file"), async (req, res) => {
+  try {
+    const savedDir = path.join(__dirname, "..", "saved");
+
+    if (!fs.existsSync(savedDir)) {
+      fs.mkdirSync(savedDir);
+    }
+
+    const tempPath = req.file.path;
+    const targetPath = path.join(savedDir, req.file.originalname);
+
+    await fs.promises.rename(tempPath, targetPath);
+
+    res.status(200).json({ message: "File imported successfully." });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error importing file.", error: err.message });
   }
 });
 
