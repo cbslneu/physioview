@@ -280,8 +280,9 @@ class BeatDetectors:
 
         # Differentiate the input signal
         diff = np.zeros(len(signal))
+        signal_array = np.array(signal)
         for i in range(4, len(diff)):
-            diff[i] = signal[i] - signal[i - 4]
+            diff[i] = signal_array[i] - signal_array[i - 4]
 
         # Apply low-pass filter to the differentiated signal
         ci = [1, 4, 6, 4, 1]               # coefficients
