@@ -273,7 +273,8 @@ class BeatDetectors:
 
         if not self.preprocessed:
             # Pre-process data using built-in filters
-            signal = Filters.filter_signal(signal, self.fs)
+            filter = Filters(self.fs)
+            signal = filter.filter_signal(signal)
         else:
             pass
 
