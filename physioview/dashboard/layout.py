@@ -1,5 +1,5 @@
+from . import _core
 from dash import html, dcc
-from physioview.dashboard import utils
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 import dash_uploader as du
@@ -13,6 +13,7 @@ layout = html.Div(id = 'main', children = [
         dcc.Store(id = 'config-memory', storage_type = 'memory'),
         dcc.Store(id = 'config-download-memory', storage_type = 'memory'),
         dcc.Store(id = 'temperature-load', storage_type = 'memory'),
+        dcc.Store(id = 'event-load', storage_type = 'memory'),
         dcc.Store(id = 'memory-db', storage_type = 'memory'),
         html.Span(className = 'h5',
                   children = ['Welcome to PhysioView']),
@@ -144,6 +145,56 @@ layout = html.Div(id = 'main', children = [
                                      options = ['<Var>', '<Var>']))
                 ])
             ]),
+            html.Div(id = 'segment-data', children = [
+                html.Div(id = 'segment-data-overview', children = [
+                    html.Span('Segment Data:'),
+                    dbc.RadioItems(
+                        id = 'segment-by',
+                        options = [
+                            {'label': 'by time', 'value': 'time'},
+                            {'label': 'by event', 'value': 'event'},
+                        ],
+                        value = 'time', inline = True),
+                    html.I(className = 'fa-regular fa-circle-question',
+                           id = 'by-event-help'),
+                    dbc.Tooltip(id = 'by-event-tooltip', children = [
+                        'Event files (.csv, .txt) must contain the following ',
+                        html.Strong('required columns:'), html.Br(),
+                        '(1) ', html.Strong('event: '), 'text labels; (2) ',
+                        html.Strong('start: '), 'timestamps; (3) ',
+                        html.Strong('end: '),
+                        'timestamps. Start and end times should be datetime '
+                        'strings (e.g., "2024-01-15 14:30:00") or Unix '
+                        'timestamps in seconds  (e.g., 1705329000).'],
+                        target = 'by-event-help',
+                        style = {'--bs-tooltip-max-width': '250px'})
+                ]),
+                html.Div(id = 'segment-data-by-time', children = [
+                    html.Span('Window Size (sec):'),
+                    dcc.Input(id = 'seg-size', type = 'number'),
+                    html.I(className = 'fa-regular fa-circle-question',
+                           id = 'seg-data-help'),
+                    dbc.Tooltip(
+                        'This sets the window size for data segmentation. If '
+                        'event-based segmentation is selected, each event '
+                        'will be further divided into windows of this size. '
+                        'Leave empty to process each event as a whole.',
+                        target = 'seg-data-help'),
+                ], className = 'segment-data-detailed', hidden = False),
+                html.Div(id = 'segment-data-by-event', children = [
+                    html.Span('Upload:'),
+                    dcc.Upload(
+                        id = 'event-uploader',
+                        children = html.Span('Select File...'),
+                        multiple = False,
+                        disabled = False,
+                        accept = '.csv,.txt'),
+                    html.I(id = 'clear-event-upload',
+                           title = 'Clear upload',
+                           className = 'fa-solid fa-eraser')],
+                className = 'segment-data-detailed', hidden = True),
+                html.Div(id = 'event-file-check', children = [])
+            ]),
             html.Div(id = 'load-temperature', hidden = True, children = [
                 html.Div(children = [
                     daq.BooleanSwitch(
@@ -169,7 +220,6 @@ layout = html.Div(id = 'main', children = [
                             children = html.Span('Select File...'),
                             multiple = False,
                             disabled = True,
-                            # text_disabled = 'Enabled for single-file uploads only.',
                             accept = '.csv'),
                         html.I(id = 'clear-temp-upload', title = 'Clear upload',
                                className = 'fa-solid fa-eraser'),
@@ -284,16 +334,6 @@ layout = html.Div(id = 'main', children = [
                     dcc.Input(id = 'eda-valid-max', value = 40, type = 'number'),
                 ])
             ], style = {'padding': '5px 0px 7px 0px'}),
-            html.Div(id = 'segment-data', children = [
-                html.Span('Segment Size (sec):'),
-                dcc.Input(id = 'seg-size', type = 'number'),
-                html.I(className = 'fa-regular fa-circle-question',
-                       id = 'seg-data-help'),
-                dbc.Tooltip(
-                    'This sets the size of the windows into which your data '
-                    'will be segmented.',
-                    target = 'seg-data-help')
-            ]),
         ]),
         html.Div(id = 'run-save-buttons', children = [
             html.Button('Run', n_clicks = 0, id = 'run-data', disabled = True),
@@ -445,9 +485,12 @@ layout = html.Div(id = 'main', children = [
 
             # Subject Selection Dropdown
             html.Div(id = 'select-subject', children = [
-                html.I(className = 'fa-solid fa-user'),
+                html.Span(
+                    id = 'data-dropdown-icon',
+                    children = [html.I(className = 'fa-solid fa-user')]
+                ),
                 dcc.Dropdown(
-                    id = 'subject-dropdown',
+                    id = 'data-dropdown',
                     placeholder = 'Select Data',
                     options = [],
                     value = None,
@@ -466,7 +509,7 @@ layout = html.Div(id = 'main', children = [
                     style = {'display': 'flex',
                              'justifyContent': 'spaceBetween'}),
                 html.Div(className = 'data-summary-divs', id = 'summary-table',
-                         children = [utils._blank_table()]),
+                         children = [_core.visualization._blank_table()]),
 
                 # Data Summary Exporter
                 html.Div(children = [
@@ -573,7 +616,7 @@ layout = html.Div(id = 'main', children = [
                         type = 'circle', color = '#3a4952', children = [
                             dcc.Graph(
                                 id = 'sqa-plot',
-                                figure = utils._blank_fig('pending'))])
+                                figure = _core.visualization._blank_fig('pending'))])
                 ])
             ])
         ]),
@@ -646,7 +689,7 @@ layout = html.Div(id = 'main', children = [
             html.Div(className = 'figs', children = [
                 dcc.Loading(type = 'circle', color = '#3a4952', children = [
                     dcc.Graph(id = 'raw-data',
-                              figure = utils._blank_fig('pending'),
+                              figure = _core.visualization._blank_fig('pending'),
                               style = {'height': 'auto'})
                 ])
             ])

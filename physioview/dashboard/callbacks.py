@@ -1,10 +1,10 @@
+from . import _core
 from dash import html, Input, Output, State, ctx, callback
 from dash.exceptions import PreventUpdate
 from dash.dcc import send_bytes
 from physioview import physioview
 from physioview.pipeline import ACC, SQA
 from physioview.pipeline.EDA import compute_tonic_scl, compute_features
-from physioview.dashboard import utils
 from flirt.hrv import get_hrv_features
 from pathlib import Path
 from time import sleep
@@ -54,7 +54,7 @@ def get_callbacks(app):
 
         ext = filenames[0].lower().rsplit('.', 1)[-1]
         if ext == 'edf':
-            if utils._check_edf(filenames[0]) == 'ECG':
+            if _core.io._check_edf(filenames[0]) == 'ECG':
                 file_check = [
                     html.I(className = 'fa-solid fa-circle-check',
                            style = {'color': '#63e6be', 'marginRight': '5px'}),
@@ -145,7 +145,7 @@ def get_callbacks(app):
             raise PreventUpdate
 
         # Clear Beat Editor directories
-        utils._clear_edits()
+        _core.startup._clear_edits()
 
         # Clear stale files in 'temp' directory
         for p in temp_path.iterdir():
@@ -180,7 +180,7 @@ def get_callbacks(app):
         id = 'config-uploader'
     )
     def db_get_config_file(cfg_file):
-        configs = utils._load_config(cfg_file[0])
+        configs = _core.io._load_config(cfg_file[0])
         return configs
 
     # ======================== ENABLE DATA PARAMETERS =========================
@@ -267,6 +267,20 @@ def get_callbacks(app):
                 scr_amp_thresh_hidden, beat_detectors, default_beat_detector,
                 scr_detectors, default_scr_detector, seg_size]
 
+    # === Toggle segmentation settings ========================================
+    @app.callback(
+        [Output('segment-data-by-event', 'hidden'),
+         Output('segment-data-by-time', 'hidden')],
+        Input('segment-by', 'value'),
+        prevent_initial_call = True
+    )
+    def toggle_data_segmentation(segment_by):
+        """Toggle the data segmentation settings by time or event."""
+        if segment_by == 'time':
+            return True, False
+        elif segment_by == 'event':
+            return False, False
+
     # === Open advanced filter cutoff settings ================================
     @app.callback(
         [Output('filter-config-link', 'hidden'),
@@ -325,6 +339,58 @@ def get_callbacks(app):
         else:
             return ecg_filter_params
 
+    # === Read event timestamps file if provided ==============================
+    @app.callback(
+        [Output('event-load', 'data'),
+         Output('event-file-check', 'children'),
+         Output('event-uploader', 'children')],
+        Input('event-uploader', 'contents'),
+        State('event-uploader', 'filename'),
+        prevent_initial_call = True
+    )
+    def db_get_event_timestamps(contents, filename):
+        """Read and store event timestamps to memory."""
+        if not contents:
+            raise PreventUpdate
+
+        file_check = []
+        event_data = _core.io._parse_event_data(contents)
+        event_data.columns = event_data.columns.str.lower().str.strip()
+
+        # Check required headers in event file
+        required_event_cols = ['event', 'start', 'end']
+        if not all(col in event_data.columns for col in required_event_cols) \
+                or event_data.empty:
+            file_check = [html.I(className = 'fa-solid fa-circle-xmark'),
+                          html.Span('Invalid event file contents!')]
+            uploaded = html.Span('Select File...')
+            return None, file_check, uploaded
+
+        # Convert start and end to datetime
+        try:  # from strings first
+            event_data['start'] = pd.to_datetime(event_data['start'])
+            event_data['end'] = pd.to_datetime(event_data['end'])
+        except Exception as e:
+            try:  # from Unix values
+                event_data['start'] = pd.to_datetime(
+                    event_data['start'], unit = 's')
+                event_data['end'] = pd.to_datetime(
+                    event_data['end'], unit = 's')
+            except Exception:
+                file_check = [
+                    html.I(className = 'fa-solid fa-circle-xmark'),
+                    html.Span('Invalid timestamp format.')
+                ]
+                uploaded = html.Span('Select File...')
+                return None, file_check, uploaded
+
+        if filename:
+            uploaded = html.Span(f'{filename}')
+        else:
+            uploaded = html.Span('Select File...')
+
+        return event_data.to_dict('records'), file_check, uploaded
+
     # === Read temperature data file if provided ==============================
     @app.callback(
         [Output('temperature-load', 'data'),
@@ -342,7 +408,7 @@ def get_callbacks(app):
         file_check = []
         data = {}
 
-        temperature_data = utils._parse_temp_csv(contents)
+        temperature_data = _core.io._parse_temp_csv(contents)
         if temperature_data.shape[1] != 1:
             file_check = [html.I(className = 'fa-solid fa-circle-xmark'),
                           html.Span('Invalid data type!')]
@@ -352,7 +418,7 @@ def get_callbacks(app):
                 '.', '').str.isnumeric().all():
             col = col.iloc[1:]
         temp_vals = pd.to_numeric(col, errors = 'coerce').dropna().tolist()
-        data['TEMP'] = temp_vals
+        data['Temp'] = temp_vals
 
         # Update uploader text to show the filename
         if filename:
@@ -362,12 +428,29 @@ def get_callbacks(app):
 
         return data, file_check, uploaded
 
+    # === Clear uploaded event file ===========================================
+    @app.callback(
+        [Output('event-uploader', 'contents'),
+         Output('event-uploader', 'filename'),
+         Output('event-uploader', 'last_modified'),
+         Output('event-uploader', 'children', allow_duplicate = True),
+         Output('event-file-check', 'children', allow_duplicate = True)],
+        Input('clear-event-upload', 'n_clicks'),
+        prevent_initial_call = True
+    )
+    def clear_uploaded_events(n):
+        """Reset the event upload component's contents if the 'erase' icon is
+        clicked."""
+        if n:
+            return None, None, None, 'Select File...', []
+
     # === Clear uploaded temperature file =====================================
     @app.callback(
         [Output('temp-uploader', 'contents'),
          Output('temp-uploader', 'filename'),
          Output('temp-uploader', 'last_modified'),
-         Output('temp-uploader', 'children', allow_duplicate = True)],
+         Output('temp-uploader', 'children', allow_duplicate = True),
+         Output('temp-file-check', 'children', allow_duplicate = True)],
         [Input('clear-temp-upload', 'n_clicks'),
          Input('duplicate-temp-error-modal', 'is_open')],
         prevent_initial_call = True
@@ -378,9 +461,9 @@ def get_callbacks(app):
         closed."""
         trig = ctx.triggered_id
         if trig == 'clear-temp-upload':
-            return None, None, None, 'Select File...'
+            return None, None, None, 'Select File...', []
         if trig == 'duplicate-temp-error-modal' and not error_is_open:
-            return None, None, None, 'Select File...'
+            return None, None, None, 'Select File...', []
         raise PreventUpdate
 
     # =================== POPULATE PARAMETERIZATION FIELDS ====================
@@ -409,6 +492,9 @@ def get_callbacks(app):
          Output('temp-uploader', 'disabled'),
          Output('temp-uploader', 'children', allow_duplicate = True),
          Output('sampling-rate', 'value', allow_duplicate = True),
+         Output('segment-by', 'options'),
+         Output('by-event-help', 'style'),
+         Output('by-event-tooltip', 'className'),
          Output('seg-size', 'value', allow_duplicate = True),
          Output('artifact-method', 'value'),
          Output('artifact-tol', 'value'),
@@ -456,6 +542,14 @@ def get_callbacks(app):
         eda_min = 0.2
         eda_max = 40
 
+        # Default data segmentation options
+        segment_by = [
+            {'label': 'by time', 'value': 'time'},
+            {'label': 'by event', 'value': 'event', 'disabled': False}
+        ]
+        by_event_help = {}
+        hide_seg_by_tooltip = ''
+
         if loaded == 'memory-load':
 
             # -- device sources ----------------------------------------------
@@ -486,7 +580,7 @@ def get_callbacks(app):
                 if toggle_config_on:
                     pass
                 else:
-                    headers = utils._get_csv_headers(memory['filename'])
+                    headers = _core.io._get_csv_headers(memory['filename'])
                     base_headers = headers
                     drop_values = [headers[:] for _ in range(6)]
 
@@ -495,6 +589,11 @@ def get_callbacks(app):
                 if toggle_config_on:
                     pass
                 else:
+                    # Disable event-based segmentation
+                    segment_by[1]['disabled'] = True
+                    by_event_help = {'display': 'none'}
+                    hide_seg_by_tooltip = 'd-none'
+
                     session_path = Path(memory['filename']).parent
                     extract_dir = session_path / 'batch'
                     with zipfile.ZipFile(memory['filename'], 'r') as zf:
@@ -510,7 +609,7 @@ def get_callbacks(app):
 
                         for f in zfiles:
                             fname = Path(f).name
-                            if utils._check_csv(f):
+                            if _core.io._check_csv(f):
                                 extracted_path = zf.extract(
                                     f, path = str(extract_dir))
 
@@ -519,7 +618,7 @@ def get_callbacks(app):
                                 shutil.move(extracted_path, root_temp)
 
                                 # Get CSV headers
-                                hdrs = utils._get_csv_headers(str(root_temp))
+                                hdrs = _core.io._get_csv_headers(str(root_temp))
                                 batch_headers.append(tuple(hdrs))
 
                         # Clean up unnecessary directories
@@ -597,7 +696,8 @@ def get_callbacks(app):
             # temperature data upload
             temp_uploader_disabled, temp_uploader_text,
 
-            fs, seg_size, artifact_method, artifact_tol, filter_on,
+            fs, segment_by, by_event_help, hide_seg_by_tooltip, seg_size,
+            artifact_method, artifact_tol, filter_on,
             scr_detector, eda_min, eda_max
         )
 
@@ -690,7 +790,7 @@ def get_callbacks(app):
     def write_confirm_config(n, data, dtype, fs, d1, d2, d3, d4, d5,
                              seg_size, artifact_method, artifact_tol,
                              filter_on, temp_on, temp_var, scr_detector,
-                             scr_amp, eda_min, eda_max, filename):
+                             min_peak_amp, eda_min, eda_max, filename):
         """Export the configuration file."""
         if n:
             headers = None
@@ -710,10 +810,10 @@ def get_callbacks(app):
                     'X': d3,
                     'Y': d4,
                     'Z': d5}
-            json_object = utils._create_configs(
+            json_object = _core.io._create_configs(
                 device, dtype, fs, seg_size, artifact_method, artifact_tol,
-                filter_on, scr_detector, scr_amp, headers, temp_on, temp_var,
-                eda_min, eda_max)
+                filter_on, scr_detector, min_peak_amp, headers, temp_on,
+                temp_var, eda_min, eda_max)
             download = {'content': json_object, 'filename': f'{filename}.json'}
             return [download, 1]
 
@@ -739,6 +839,8 @@ def get_callbacks(app):
             State('data-type-dropdown-3', 'value'),
             State('data-type-dropdown-4', 'value'),
             State('data-type-dropdown-5', 'value'),
+            State('segment-by', 'value'),
+            State('event-load', 'data'),
             State('temperature-load', 'data'),
             State('temp-variable', 'value'),
             State('beat-detectors', 'value'),
@@ -769,10 +871,10 @@ def get_callbacks(app):
         prevent_initial_call = True
     )
     def run_pipeline(set_progress, n, load_data, e4_dtype, dtype, fs, rs, d1,
-                     d2, d3, d4, d5, temp_data, temp_var, beat_detector,
-                     seg_size, artifact_method, artifact_tol, filt_on,
-                     filter_lowcut, filter_highcut, scr_detector, scr_amp,
-                     eda_min, eda_max):
+                     d2, d3, d4, d5, segment_by, event_times, temp_data,
+                     temp_var, beat_detector, seg_size, artifact_method,
+                     artifact_tol, filter_on, filter_lowcut, filter_highcut,
+                     scr_detector, min_peak_amp, eda_min, eda_max):
         """Read Actiwave Cardio, Empatica E4, or CSV-formatted data, save
         the data to the local memory, and load the progress spinner."""
 
@@ -780,6 +882,9 @@ def get_callbacks(app):
         map_error = False
         pipeline_error = False
         temp_input_error = False
+
+        # Set up storage
+        memory = {}
 
         if ctx.triggered_id == 'run-data':
 
@@ -806,8 +911,21 @@ def get_callbacks(app):
             filename = Path(filepath).name  # e.g., "example.csv"
             file = Path(filepath).stem
 
-            # Set up storage
-            memory = {}
+            # Get event data if it exists
+            segment_by_event = False if segment_by == 'time' else True
+            if event_times is not None and len(event_times) > 0:
+                event_df = pd.DataFrame(event_times)
+                event_df['start'] = pd.to_datetime(event_df['start'])
+                event_df['end'] = pd.to_datetime(event_df['end'])
+            else:
+                event_df = None
+                if segment_by == 'event':
+                    pipeline_error = True
+                    error_msg = f'Missing event file. Please upload an event ' \
+                                'file or segment your data by time.'
+                    return dtype_error, map_error, pipeline_error, \
+                        error_msg, temp_input_error, None
+            memory['segment by event'] = segment_by_event
 
             # Enable downsampling if fs or rs is greater than the sampling
             # rate (~250 Hz) of the render data
@@ -816,6 +934,16 @@ def get_callbacks(app):
 
             # Initialize for uploads without IBI or ACC
             ibi, acc = None, None
+
+            # Get peak detector according to signal type
+            if dtype in ('ECG', 'PPG'):
+                peak_detector = beat_detector
+            else:
+                peak_detector = scr_detector
+
+            # Initialize data preprocessing class
+            preprocessor = _core.Preprocessor(
+                dtype, fs, filter_on, peak_detector, event_df, seg_size)
 
             # -- batch sources -----------------------------------------------
             if file_type == 'batch':
@@ -842,30 +970,32 @@ def get_callbacks(app):
                         has_ts = True
                         # No acceleration data
                         if (d3 is None) & (d4 is None) & (d5 is None):
-                            data, acc = utils._setup_data(
-                                f, dtype, [d1, d2], temp_var, has_ts)
+                            data, acc = _core.io._setup_data(
+                                f, dtype, [d1, d2], temp_var, event_df,
+                                has_ts)
                         # With acceleration data
                         else:
-                            data, acc = utils._setup_data(
+                            data, acc = _core.io._setup_data(
                                 f, dtype, [d1, d2, d3, d4, d5], temp_var,
-                                has_ts)
+                                event_df, has_ts)
                     else:
                         has_ts = False
                         # No acceleration data
                         if (d3 is None) & (d4 is None) & (d5 is None):
-                            data, acc = utils._setup_data(
-                                f, dtype, [d2], temp_var, has_ts)
+                            data, acc = _core.io._setup_data(
+                                f, dtype, [d2], temp_var, event_df, has_ts)
                         # With acceleration data
                         else:
-                            data, acc = utils._setup_data(
-                                f, dtype, [d2, d3, d4, d5], temp_var, has_ts)
+                            data, acc = _core.io._setup_data(
+                                f, dtype, [d2, d3, d4, d5], temp_var,
+                                event_df, has_ts)
 
                     # Preprocess any acceleration data
                     if acc is not None:
                         acc['Magnitude'] = ACC.compute_magnitude(
                             acc['X'], acc['Y'], acc['Z'])
                         if has_ts:
-                            unix_fmt = utils._check_unix(acc.Timestamp)
+                            unix_fmt = _core.io._check_unix(acc.Timestamp)
                             if unix_fmt is not None:
                                 acc.Timestamp = pd.to_datetime(
                                     acc.Timestamp, unit = unix_fmt)
@@ -876,21 +1006,26 @@ def get_callbacks(app):
                     # ---- cardiac data --------------------------------------
                     if dtype in ('ECG', 'PPG'):
                         try:
-                            preprocessed = utils._preprocess_cardiac(
-                                data, dtype, fs, seg_size, beat_detector,
-                                artifact_method, artifact_tol, filt_on,
-                                filter_lowcut, filter_highcut,
-                                acc_data = acc, downsample = ds)
+                            preprocessed, metrics = preprocessor.preprocess_full(
+                                data, artifact_method = artifact_method,
+                                artifact_tol = artifact_tol)
 
-                            # Throw beat detection error
-                            if isinstance(preprocessed, tuple) and \
-                                    all(x is None for x in preprocessed):
+                            # Check for detected beats
+                            beats_ix = preprocessor.peaks_ix
+                            if len(beats_ix) == 0:
                                 pipeline_error = True
                                 error_msg = ('PipelineError: No beats detected. '
                                              'Please try a different beat '
                                              'detector.')
                                 return dtype_error, map_error, pipeline_error, \
-                                    error_msg, temp_input_error, None
+                                        error_msg, temp_input_error, None
+
+                            # Downsample preprocessed data for rendering
+                            artifacts_ix = preprocessor.artifacts_ix
+                            ds_data, ds_ibi, _, ds_acc, ds_fs = \
+                                _core.io._downsample_data(
+                                    preprocessed, fs, dtype, beats_ix,
+                                    artifacts_ix, acc = acc)
 
                         except Exception as e:
                             pipeline_error = True
@@ -899,29 +1034,22 @@ def get_callbacks(app):
                             print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
                                 error_msg, temp_input_error, None
-                        metrics = preprocessed[2]
 
                         # Write IBI data to 'temp' folder
-                        ibi = preprocessed[1]
+                        ibi = physioview.compute_ibis(
+                            data, fs, beats_ix,
+                            ts_col = 'Timestamp' if has_ts else None)
                         ibi.to_csv(
                             str(temp_path / f'{fname}_IBI.csv'), index = False)
 
-                        # Get downsampled data for rendering
-                        if len(preprocessed) > 3:
-                            ds_data = preprocessed[3]
-                            ds_ibi = preprocessed[4]
-                            ds_acc = preprocessed[5]
-                            ds_fs = preprocessed[6]
-
                     # ---- EDA data ------------------------------------------
                     else:
-                        temp = data['TEMP'].values if 'TEMP' in data.columns \
+                        temp = data['Temp'].values if 'Temp' in data.columns \
                             else None
                         try:
-                            preprocessed = utils._preprocess_eda(
-                                data, fs, rs, temp, seg_size, filt_on,
-                                filter_highcut, scr_detector, scr_amp,
-                                eda_min, eda_max)
+                            preprocessed, metrics = preprocessor.preprocess_full(
+                                data, rs, min_peak_amp, temp_data = temp,
+                                eda_min = eda_min, eda_max = eda_max)
                         except Exception as e:
                             pipeline_error = True
                             error_type = type(e).__name__
@@ -930,53 +1058,35 @@ def get_callbacks(app):
                                 error_msg, temp_input_error, None
                         metrics = preprocessed[1]
 
-                        # Get downsampled data for rendering
-                        if len(preprocessed) > 2:
-                            ds_data = preprocessed[2]
-                            ds_acc = preprocessed[3]
-                            ds_fs = preprocessed[4]
+                        # Downsample data for rendering
+                        ds_data, ds_ibi, _, ds_acc, ds_fs = \
+                            _core.io._downsample_data(
+                                preprocessed, fs, dtype, beats_ix,
+                                artifacts_ix, acc = acc)
 
                     # Write preprocessed data and metrics to 'temp' folder
-                    preprocessed_data = preprocessed[0]
-                    preprocessed_data.to_csv(
+                    preprocessed.to_csv(
                         str(temp_path / f'{fname}_{dtype}.csv'), index = False)
                     metrics.to_csv(
                         str(temp_path / f'{fname}_SQA.csv'), index = False)
 
                     # Write any downsampled data to '_render' folder
-                    render_subdir = render_dir / fname
-                    render_subdir.mkdir(parents = True, exist_ok = True)
-                    if ds_data is not None:
-                        ds_data.to_csv(
-                            str(render_subdir / 'signal.csv'), index = False)
-                    else:
-                        preprocessed_data.to_csv(
-                            str(render_subdir / 'signal.csv'), index = False)
-                    if ibi is not None:
-                        if ds_ibi is not None:
-                            ds_ibi.to_csv(
-                                str(render_subdir / 'ibi.csv'), index = False)
-                        else:
-                            ibi.to_csv(
-                                str(render_subdir / 'ibi.csv'), index = False)
-                    if ds_acc is not None:
-                        ds_acc.to_csv(
-                            str(render_subdir / 'acc.csv'), index = False)
-                    else:
-                        if acc is not None:
-                            acc.to_csv(
-                                str(render_subdir / 'acc.csv'), index = False)
+                    _core.io._create_render(fname, ds_data, ds_ibi, ds_acc)
 
+                    # Update progress bar
                     perc = ((idx + 2) / total_progress) * 100
                     set_progress((perc, f'{perc:.0f}%'))
                     sleep(0.5)
 
+            # Otherwise, preprocess a single file
             else:
                 # Update progress bar for all single-file sources: 33%
                 total_progress = 6
                 perc = (2 / total_progress) * 100
                 set_progress((perc, f'{perc:.0f}%'))
                 sleep(0.5)
+
+                ts_col = None
 
                 # -- Actiwave Cardio sources ---------------------------------
                 if file_type == 'Actiwave':
@@ -990,6 +1100,7 @@ def get_callbacks(app):
                     acc.to_csv(
                         str(temp_path / f'{file}_ACC.csv'), index = False)
                     fs = actiwave.get_ecg_fs()
+                    ts_col = 'Timestamp'
 
                 # -- Empatica E4 sources -------------------------------------
                 elif file_type == 'E4':
@@ -1024,6 +1135,8 @@ def get_callbacks(app):
                         fs = e4_data.bvp_fs
                         data = bvp.copy()
 
+                    ts_col = 'Timestamp'
+
                 # -- csv sources ---------------------------------------------
                 else:
 
@@ -1036,26 +1149,29 @@ def get_callbacks(app):
                     # If timestamps are given
                     if d1 is not None:
                         has_ts = True
+                        ts_col = 'Timestamp'
                         # No acceleration data
                         if (d3 is None) & (d4 is None) & (d5 is None):
-                            data, acc = utils._setup_data(
-                                filepath, dtype, [d1, d2], temp_var, has_ts)
+                            data, acc = _core.io._setup_data(
+                                filepath, dtype, [d1, d2], temp_var,
+                                event_df, has_ts)
                         # With acceleration data
                         else:
-                            data, acc = utils._setup_data(
+                            data, acc = _core.io._setup_data(
                                 filepath, dtype, [d1, d2, d3, d4, d5],
-                                temp_var, has_ts)
+                                temp_var, event_df, has_ts)
                     else:
                         has_ts = False
                         # No acceleration data
                         if (d3 is None) & (d4 is None) & (d5 is None):
-                            data, acc = utils._setup_data(
-                                filepath, dtype, [d2], temp_var, has_ts)
+                            data, acc = _core.io._setup_data(
+                                filepath, dtype, [d2], temp_var,
+                                event_df, has_ts)
                         # With acceleration data
                         else:
-                            data, acc = utils._setup_data(
+                            data, acc = _core.io._setup_data(
                                 filepath, dtype, [d2, d3, d4, d5], temp_var,
-                                has_ts)
+                                event_df, has_ts)
 
                 # Update progress bar: 50%
                 perc = (3 / total_progress) * 100
@@ -1067,7 +1183,7 @@ def get_callbacks(app):
                     acc['Magnitude'] = ACC.compute_magnitude(
                         acc['X'], acc['Y'], acc['Z'])
                     if 'Timestamp' in acc.columns:
-                        unix_fmt = utils._check_unix(acc.Timestamp)
+                        unix_fmt = _core.io._check_unix(acc.Timestamp)
                         if unix_fmt is not None:
                             acc.Timestamp = pd.to_datetime(
                                 acc.Timestamp, unit = unix_fmt)
@@ -1081,107 +1197,156 @@ def get_callbacks(app):
 
                 # Preprocess any cardiac data
                 if dtype in ('ECG', 'PPG', 'BVP') or e4_dtype == 'PPG':
-                    try:
-                        preprocessed = utils._preprocess_cardiac(
-                            data, dtype, fs, seg_size, beat_detector,
-                            artifact_method, artifact_tol, filt_on,
-                            filter_lowcut, filter_highcut,
-                            acc_data = acc, downsample = ds)
 
-                        # Throw beat detection error
-                        if isinstance(preprocessed, tuple) and \
-                                all(x is None for x in preprocessed):
+                    # Event-based cardiac preprocessing
+                    if segment_by_event:
+                        try:
+                            preprocessed, preprocessed_by_event, \
+                                metrics_by_event = preprocessor.preprocess_event(
+                                data, artifact_method = artifact_method,
+                                artifact_tol = artifact_tol)
+                        except Exception as e:
                             pipeline_error = True
-                            error_msg = ('PipelineError: No beats detected. '
-                                         'Please try a different beat '
-                                         'detector.')
+                            error_type = type(e).__name__
+                            error_msg = f'{error_type}: {e}'
+                            print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
                                 error_msg, temp_input_error, None
 
-                    except Exception as e:
-                        pipeline_error = True
-                        error_type = type(e).__name__
-                        error_msg = f'{error_type}: {e}'
-                        print(traceback.format_exc())
-                        return dtype_error, map_error, pipeline_error, \
-                            error_msg, temp_input_error, None
-                    metrics = preprocessed[2]
+                        for event_label, event_data in preprocessed_by_event.items():
 
-                    # Write IBI data to 'temp' folder
-                    ibi = preprocessed[1]
-                    ibi.to_csv(
-                        str(temp_path / f'{file}_IBI.csv'), index = False)
+                            # Write event data to 'temp' folder
+                            event_data.to_csv(
+                                temp_path / f'{file}_{event_label}_{dtype}.csv')
 
-                    # Get downsampled data for rendering
-                    if len(preprocessed) > 3:
-                        ds_data = preprocessed[3]
-                        ds_ibi = preprocessed[4]
-                        ds_acc = preprocessed[5]
-                        ds_fs = preprocessed[6]
+                            # Compute IBIs and downsample data for rendering
+                            beats_ix = preprocessor.peaks_by_event[event_label]
+                            artifacts_ix = preprocessor.artifacts_by_event[event_label]
+                            event_ibi = physioview.compute_ibis(
+                                event_data, fs, beats_ix, ts_col)
+                            event_ibi.to_csv(
+                                temp_path / f'{file}_{event_label}_IBI.csv',
+                                index = False)
+                            ds_data, ds_ibi, _, ds_acc, ds_fs = \
+                                _core.io._downsample_data(
+                                    event_data, fs, dtype, beats_ix,
+                                    artifacts_ix, acc = acc)
+
+                            # Write downsampled event data to '_render' subdirectory
+                            _core.io._create_render(
+                                f'{file}_{event_label}', ds_data, ds_ibi, ds_acc)
+
+                        # Write SQA metrics to 'temp' folder
+                        for event_label, metrics in metrics_by_event.items():
+                            metrics.to_csv(
+                                temp_path / f'{file}_{event_label}_SQA.csv',
+                                index = False)
+
+                    # Segment-based cardiac preprocessing
+                    else:
+                        try:
+                            preprocessed, metrics = preprocessor.preprocess_full(
+                                data, dtype, artifact_method = artifact_method,
+                                artifact_tol = artifact_tol)
+                        except Exception as e:
+                            pipeline_error = True
+                            error_type = type(e).__name__
+                            error_msg = f'{error_type}: {e}'
+                            print(traceback.format_exc())
+                            return dtype_error, map_error, pipeline_error, \
+                                error_msg, temp_input_error, None
+
+                        # Compute and write IBI data to 'temp' folder
+                        beats_ix = preprocessor.peaks_ix
+                        ibi = physioview.compute_ibis(
+                            preprocessed, fs, beats_ix, ts_col)
+                        ibi.to_csv(temp_path / f'{file}_IBI.csv', index = False)
+
+                        # Downsample data for rendering
+                        artifacts_ix = preprocessor.artifacts_ix
+                        ds_data, ds_ibi, _, ds_acc, ds_fs = \
+                            _core.io._downsample_data(
+                                preprocessed, fs, dtype, beats_ix,
+                                artifacts_ix, acc = acc)
+
+                        # Write SQA metrics to 'temp' folder
+                        metrics.to_csv(temp_path / f'{file}_SQA.csv', index = False)
 
                 # Preprocess any EDA data
-                elif dtype == 'EDA' or e4_dtype == 'EDA':
+                if dtype == 'EDA' or e4_dtype == 'EDA':
                     if temp_data is not None:
-                        temp = temp_data['TEMP']
-                    elif 'TEMP' in data.columns:
-                        temp = data['TEMP'].values
+                        temp = temp_data['Temp']
+                    elif 'Temp' in data.columns:
+                        temp = data['Temp'].values
                     elif (temp_path / f'{file}_TEMP.csv').exists():
                         temperature = pd.read_csv(str(temp_path / f'{file}_TEMP.csv'))
                         temperature.Timestamp = pd.to_datetime(temperature.Timestamp)
                         data = pd.merge(data, temperature, on = 'Timestamp',
                                         how = 'inner')
-                        temp = data['TEMP'].values
+                        temp = data['Temp'].values
                     else:
                         temp = None
 
-                    try:
-                        preprocessed = utils._preprocess_eda(
-                            data, fs, rs, temp, seg_size, filt_on,
-                            filter_highcut, scr_detector, scr_amp,
-                            eda_min, eda_max)
-                    except Exception as e:
-                        pipeline_error = True
-                        error_type = type(e).__name__
-                        error_msg = f'{error_type}: {e}'
-                        print(traceback.format_exc())
-                        return dtype_error, map_error, pipeline_error, \
-                            error_msg, temp_input_error, None
-                    metrics = preprocessed[1]
+                    # Event-based preprocessing
+                    if segment_by_event:
+                        try:
+                            preprocessed, preprocessed_by_event, \
+                                metrics_by_event = preprocessor.preprocess_event(
+                                data, rs, min_peak_amp, temp_data = temp,
+                                eda_min = eda_min, eda_max = eda_max)
+                        except Exception as e:
+                            pipeline_error = True
+                            error_type = type(e).__name__
+                            error_msg = f'{error_type}: {e}'
+                            print(traceback.format_exc())
+                            return dtype_error, map_error, pipeline_error, \
+                                error_msg, temp_input_error, None
 
-                # Write preprocessed data and metrics to 'temp' folder
-                preprocessed_data = preprocessed[0]
-                preprocessed_data.to_csv(
-                    str(temp_path / f'{file}_{dtype}.csv'), index = False)
-                metrics.to_csv(
-                    str(temp_path / f'{file}_SQA.csv'), index = False)
+                        for event_label, event_data in preprocessed_by_event.items():
+                            event_data.to_csv(
+                                temp_path / f'{file}_{event_label}_EDA.csv',
+                                index = False)
 
-                # Write any downsampled data to '_render' folder
-                render_subdir = render_dir / file
-                render_subdir.mkdir(parents = True, exist_ok = True)
-                if ds_data is not None:
-                    ds_data.to_csv(
-                        str(render_subdir / 'signal.csv'), index = False)
-                else:
-                    preprocessed_data.to_csv(
-                        str(render_subdir / 'signal.csv'), index = False)
+                            # Write downsampled event data to '_render' subdirectory
+                            _core.io._create_render(
+                                f'{file}_{event_label}', event_data)
 
-                # Write any IBI render data
-                if ibi is not None:
-                    if ds_ibi is not None:
-                        ds_ibi.to_csv(
-                            str(render_subdir / 'ibi.csv'), index = False)
+                        # Write SQA metrics to 'temp' folder
+                        for event_label, metrics in metrics_by_event.items():
+                            metrics.to_csv(temp_path / f'{file}_{event_label}_SQA.csv', index = False)
+
+                    # Segment-based EDA preprocessing
                     else:
-                        ibi.to_csv(
-                            str(render_subdir / 'ibi.csv'), index = False)
+                        try:
+                            preprocessed, metrics = preprocessor.preprocess_full(
+                                data, rs, min_peak_amp, temp_data = temp,
+                                eda_min = eda_min, eda_max = eda_max)
+                        except Exception as e:
+                            pipeline_error = True
+                            error_type = type(e).__name__
+                            error_msg = f'{error_type}: {e}'
+                            print(traceback.format_exc())
+                            return dtype_error, map_error, pipeline_error, \
+                                error_msg, temp_input_error, None
 
-                # Write any ACC render data
-                if acc is not None and not acc.empty:
-                    if ds_acc is not None:
-                        ds_acc.to_csv(
-                            str(render_subdir / 'acc.csv'), index = False)
-                    else:
-                        acc.to_csv(
-                            str(render_subdir / 'acc.csv'), index = False)
+                        # Downsample EDA data for rendering
+                        peaks_ix = preprocessor.peaks_ix
+                        artifacts_ix = preprocessor.artifacts_ix
+                        ds_data, ds_ibi, _, ds_acc, ds_fs = _core.io._downsample_data(  # ds_ibi = None
+                            preprocessed, preprocessor.fs, dtype,
+                            peaks_ix, artifacts_ix, acc = acc)
+
+                # Write preprocessed and downsampled data
+                if not segment_by_event:
+
+                    # to 'temp/' directory
+                    preprocessed.to_csv(
+                        str(temp_path / f'{file}_{dtype}.csv'), index = False)
+                    metrics.to_csv(
+                        str(temp_path / f'{file}_SQA.csv'), index = False)
+
+                    # to '_render' directory
+                    _core.io._create_render(file, ds_data, ds_ibi, ds_acc)
 
                 # Update progress bar: 83%
                 perc = (5 / total_progress) * 100
@@ -1208,7 +1373,7 @@ def get_callbacks(app):
         [Input('beat-correction-status', 'data'),
          Input('be-edited-trigger', 'children')],
         [State('memory-db', 'data'),
-         State('subject-dropdown', 'value'),
+         State('data-dropdown', 'value'),
          State('seg-size', 'value')],
         prevent_initial_call = True
     )
@@ -1244,9 +1409,9 @@ def get_callbacks(app):
                 edited.Artifact == 1].index.values
 
             # Map edited indices back to original sampling rate
-            beats_ix = utils._map_beat_edits(
+            beats_ix = _core.beat_editing._map_beat_edits(
                 edited_beats_ix, beat_editor_fs, fs)
-            artifacts_ix = utils._map_beat_edits(
+            artifacts_ix = _core.beat_editing._map_beat_edits(
                 edited_artifacts_ix, beat_editor_fs, fs)
 
             # Remove any existing 'Beat' or 'Artifact' columns to prevent
@@ -1264,6 +1429,13 @@ def get_callbacks(app):
                 preprocessed_data.Artifact == 1].index.values
 
         ts_col = 'Timestamp' if 'Timestamp' in preprocessed_data.columns else None
+
+        # Set segment size for entire event if segment size is empty
+        segment_by_event = memory['segment by event']
+        if segment_by_event and segment_size is None:
+            segment_size = len(preprocessed_data)
+
+        # Compute SQA metrics
         metrics = sqa.compute_metrics(
             preprocessed_data, beats_ix, artifacts_ix, ts_col,
             seg_size = segment_size, show_progress = False)
@@ -1276,8 +1448,8 @@ def get_callbacks(app):
         [Output('beat-editor-spinner', 'children'),
          Output('beat-editor-spinner', 'spinner_class_name'),
          Output('open-beat-editor', 'disabled', allow_duplicate = True)],
-        [Input('subject-dropdown', 'options'),
-         Input('subject-dropdown', 'value'),
+        [Input('data-dropdown', 'options'),
+         Input('data-dropdown', 'value'),
          Input('beat-correction-status', 'data')],
         [State('memory-db', 'data'),
          State('toggle-filter', 'on'),
@@ -1294,6 +1466,7 @@ def get_callbacks(app):
 
         file_type = memory['file type']
         data_type = memory['data type']
+        segment_by_event = memory['segment by event']
         beat_editor_btn_disabled = True
         trig = ctx.triggered_id
 
@@ -1322,7 +1495,7 @@ def get_callbacks(app):
                             artifacts_ix = None
 
                         # Downsample Beat Editor data to match dashboard render
-                        ds, _, _, _, ds_fs = utils._downsample_data(
+                        ds, _, _, _, ds_fs = _core.io._downsample_data(
                             data, fs, data_type, beats_ix, artifacts_ix)
                         physioview.write_beat_editor_file(
                             ds, ds_fs, signal_col, 'Beat', ts_col, name,
@@ -1330,7 +1503,7 @@ def get_callbacks(app):
 
                 # Handle single files
                 else:
-                    if file_type == 'batch':
+                    if file_type == 'batch' or segment_by_event:
                         filename = selected_subject
                         batch = True
                     else:
@@ -1345,7 +1518,7 @@ def get_callbacks(app):
                         artifacts_ix = None
 
                     # Downsample Beat Editor data to match dashboard render
-                    ds, _, _, _, ds_fs = utils._downsample_data(
+                    ds, _, _, _, ds_fs = _core.io._downsample_data(
                         data, fs, data_type, beats_ix, artifacts_ix)
                     physioview.write_beat_editor_file(
                         ds, ds_fs, signal_col, 'Beat', ts_col, filename,
@@ -1383,9 +1556,10 @@ def get_callbacks(app):
 
     # === Populate dropdowns ================================================
     @app.callback(
-        [Output('subject-dropdown', 'options'),
-         Output('subject-dropdown', 'value'),
-         Output('subject-dropdown', 'disabled'),
+        [Output('data-dropdown', 'options'),
+         Output('data-dropdown', 'value'),
+         Output('data-dropdown', 'disabled'),
+         Output('data-dropdown-icon', 'children'),
          Output('qa-charts-dropdown', 'options'),
          Output('qa-charts-dropdown', 'value')],
         Input('memory-db', 'data'),
@@ -1396,17 +1570,22 @@ def get_callbacks(app):
         types according to uploaded data type."""
         file_type = memory['file type']
         data_type = memory['data type']
+        segment_by_event = memory['segment by event']
         subject_drop_disabled = True  # dropdown is disabled by default
         sqa_drop_options = []  # empty SQA chart dropdown by default
         sqa_drop_value = ''
+        dropdown_icon = html.I(className = 'fa-solid fa-user')
 
-        # Handle batch files
-        if file_type == 'batch':
+        # Handle batch and event-segmented files
+        if file_type == 'batch' or segment_by_event:
             filenames = sorted(
                 [p.name for p in render_dir.iterdir() if (p.is_dir())])
             drop_options = {name: name for name in filenames}
             drop_value = filenames[0]
             subject_drop_disabled = False
+
+        if segment_by_event:
+            dropdown_icon = html.I(className = 'fa-solid fa-calendar')
 
         # Handle single E4, Actiwave, and CSV files
         else:
@@ -1430,7 +1609,7 @@ def get_callbacks(app):
             ]
             sqa_drop_value = 'validity'
 
-        return drop_options, drop_value, subject_drop_disabled, \
+        return drop_options, drop_value, subject_drop_disabled, dropdown_icon, \
             sqa_drop_options, sqa_drop_value
 
     # === Update SQA plots ====================================================
@@ -1440,7 +1619,7 @@ def get_callbacks(app):
          Output('postprocess-data', 'disabled')],
         [Input('memory-db', 'data'),
          Input('qa-charts-dropdown', 'value'),
-         Input('subject-dropdown', 'value'),
+         Input('data-dropdown', 'value'),
          Input('re-render-sqa-flag', 'data')],
         prevent_initial_call = True
     )
@@ -1482,9 +1661,9 @@ def get_callbacks(app):
          Output('export-mode', 'options'),
          Output('postprocess-export-mode', 'options')],
         [Input('memory-db', 'data'),
-         Input('subject-dropdown', 'value'),
+         Input('data-dropdown', 'value'),
          Input('re-render-sqa-flag', 'data')],
-        [State('subject-dropdown', 'options'),
+        [State('data-dropdown', 'options'),
          State('toggle-filter', 'on'),
          State('seg-size', 'value')],
         prevent_initial_call = True
@@ -1503,7 +1682,8 @@ def get_callbacks(app):
 
         # Output signal quality table for cardiac data
         if data_type in ('ECG', 'PPG', 'BVP'):
-            table, quality_summary = utils._cardiac_summary_table(sqa)
+            table, quality_summary = \
+                _core.visualization._cardiac_summary_table(sqa)
 
         # Output signal quality table for EDA data
         else:
@@ -1512,7 +1692,14 @@ def get_callbacks(app):
             eda_signal = eda[signal_col].to_numpy()
             tonic_scl = compute_tonic_scl(eda_signal)
             scr_series = eda['SCR'].values if 'SCR' in eda.columns else None
-            table, quality_summary = utils._eda_summary_table(
+
+            # Set segment size to entire signal if seg_size is empty
+            segment_by_event = memory['segment by event']
+            if segment_by_event and seg_size is None:
+                seg_size = len(eda_signal)
+
+            # Generate EDA quality summary table
+            table, quality_summary = _core.visualization._eda_summary_table(
                 sqa, tonic_scl, scr_series, seg_size)
 
         # Create quality_summary.txt file(s)
@@ -1527,7 +1714,8 @@ def get_callbacks(app):
                     f.write(f'{label}: {value}\n')
 
         # Enable 'Batch' mode export
-        if file_type == 'batch':
+        segment_by_event = memory['segment by event']
+        if file_type == 'batch' or segment_by_event:
             export_options = [
                 {'label': 'Single', 'value': 'Single'},
                 {'label': 'Batch', 'value': 'Batch', 'disabled': False}
@@ -1554,7 +1742,7 @@ def get_callbacks(app):
          Output('plot-displayed', 'data')],
         [Input('memory-db', 'data'),
          Input('segment-dropdown', 'value'),
-         Input('subject-dropdown', 'value'),
+         Input('data-dropdown', 'value'),
          Input('prev-segment', 'n_clicks'),
          Input('next-segment', 'n_clicks'),
          Input('beat-correction', 'n_clicks'),
@@ -1562,7 +1750,7 @@ def get_callbacks(app):
          Input('reject-corrections', 'n_clicks'),
          Input('revert-corrections', 'n_clicks'),
          Input('be-edited-trigger', 'children')],
-        [State('subject-dropdown', 'options'),
+        [State('data-dropdown', 'options'),
          State('beat-correction-status', 'data'),
          State('seg-size', 'value'),
          State('toggle-filter', 'on'),
@@ -1596,6 +1784,12 @@ def get_callbacks(app):
             x_axis_label = 'Timestamp' if 'Timestamp' in signal.columns else \
                 'Sample'
             ts_col = 'Timestamp' if 'Timestamp' in signal.columns else None
+
+            # For visualization: Set segment size to length of entire signal
+            # if segmenting by event and no segment size is given
+            segment_by_event = memory['segment by event']
+            if segment_by_event and segment_size is None:
+                segment_size = len(signal)
 
             # Get ACC data if available
             try:
@@ -1639,7 +1833,7 @@ def get_callbacks(app):
                     if corrected_beats_ix is not None:
                         corrected_beats_ix = np.array(corrected_beats_ix)
                     signal.to_csv(str(temp_path / f'{file}_{data_type}.csv'), index = False)
-                    ds_signal, ds_ibi, ds_ibi_corrected, _, _ = utils._downsample_data(
+                    ds_signal, ds_ibi, ds_ibi_corrected, _, _ = _core.io._downsample_data(
                         signal, fs, data_type, beats_ix, artifacts_ix, corrected_beats_ix)
                     ds_signal.to_csv(str(render_subdir / 'signal.csv'), index = False)
                     return ds_signal, ds_ibi, ds_ibi_corrected
@@ -1652,8 +1846,8 @@ def get_callbacks(app):
                     signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
                     beats_ix = signal.loc[signal['Beat'] == 1].index.values
                     artifacts_ix = signal.loc[signal['Artifact'] == 1].index.values
-                    signal, beats_ix_corrected, ibi_corrected = utils._correct_beats(
-                        signal, fs_full, beats_ix)
+                    signal, beats_ix_corrected, ibi_corrected = \
+                        _core.beat_editing._correct_beats(signal, fs_full, beats_ix)
                     ibi_corrected.to_csv(str(temp_path / f'{file}_IBI_corrected.csv'), index = False)
                     signal, _, ibi_corrected = _save_temp_and_render(
                         signal, file, data_type, fs_full, beats_ix, artifacts_ix,
@@ -1672,8 +1866,9 @@ def get_callbacks(app):
                     ibi.to_csv(str(render_subdir / 'ibi.csv'), index = False)
                     # ibi_corrected = None
                     signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
-                    signal, beats_ix, artifacts_ix = utils._accept_beat_corrections(
-                        signal, fs_full, artifact_method, artifact_tol)
+                    signal, beats_ix, artifacts_ix = \
+                        _core.beat_editing._accept_beat_corrections(
+                            signal, fs_full, artifact_method, artifact_tol)
                     signal, _, _ = _save_temp_and_render(
                         signal, file, data_type, fs_full, beats_ix, artifacts_ix)
 
@@ -1687,8 +1882,9 @@ def get_callbacks(app):
                     beat_correction_status[selected_subject] = None
                     # ibi_corrected = None
                     signal = pd.read_csv(str(temp_path / f'{file}_{data_type}.csv'))
-                    signal, beats_ix, artifacts_ix = utils._revert_beat_corrections(
-                        signal, fs_full, artifact_method, artifact_tol)
+                    signal, beats_ix, artifacts_ix = \
+                        _core.beat_editing._revert_beat_corrections(
+                            signal, fs_full, artifact_method, artifact_tol)
                     ibi = physioview.compute_ibis(
                         signal, fs_full, beats_ix, 'Timestamp')
                     ibi.to_csv(str(temp_path / f'{file}_IBI.csv'), index = False)
@@ -1818,10 +2014,10 @@ def get_callbacks(app):
 
                 # Add temperature to subplots if data was provided
                 if temp_data is not None:
-                    signal['TEMP'] = temp_data['TEMP']
-                if temp_data is not None or 'TEMP' in signal.columns:
+                    signal['Temp'] = temp_data['Temp']
+                if temp_data is not None or 'Temp' in signal.columns:
                     signal_types.append('TEMP')
-                    eda_subplots['TEMP'] = 'TEMP'
+                    eda_subplots['TEMP'] = 'Temp'
 
                 # Check whether SCRs were detected
                 has_scr = 'SCR' in signal.columns
@@ -1898,8 +2094,8 @@ def get_callbacks(app):
             Input('close-export2', 'n_clicks'),
             State('export-mode', 'value'),
             State('export-type', 'value'),
-            State('subject-dropdown', 'value'),
-            State('subject-dropdown', 'options'),
+            State('data-dropdown', 'value'),
+            State('data-dropdown', 'options'),
             State('memory-db', 'data'),
         ],
         background = True,
@@ -2058,7 +2254,7 @@ def get_callbacks(app):
 
                         # Create Excel file for each subject's set of files
                         for i, (subj, subj_files) in enumerate(subject_groups.items()):
-                            output_xls = utils._make_excel(subj_files)
+                            output_xls = _core.io._make_excel(subj_files)
 
                             # Update progress bar per file
                             n_processed += 1
@@ -2076,7 +2272,7 @@ def get_callbacks(app):
                 # --- Single file mode ---------------------------------------
                 else:
                     # Create Excel file for a single subject
-                    xls_workbook = utils._make_excel(
+                    xls_workbook = _core.io._make_excel(
                         files2export, set_progress = set_progress)
 
                     # Save Excel file
@@ -2103,7 +2299,7 @@ def get_callbacks(app):
          Output('revert-corrections', 'disabled')],
         [Input('plot-displayed', 'data'),
          Input('be-edited-trigger', 'children')],
-        [State('subject-dropdown', 'value'),
+        [State('data-dropdown', 'value'),
          State('data-types', 'value'),
          State('e4-data-types', 'value')]
     )
@@ -2125,9 +2321,9 @@ def get_callbacks(app):
          Output('be-edited-trigger', 'children')],
         [Input('ok-beat-edits', 'n_clicks'),
          Input('cancel-beat-edits', 'n_clicks'),
-         Input('subject-dropdown', 'value'),
+         Input('data-dropdown', 'value'),
          State('beat-editor-modal', 'is_open'),
-         State('subject-dropdown', 'value'),
+         State('data-dropdown', 'value'),
          State('be-edited-trigger', 'children')],
         prevent_initial_call = True
     )
@@ -2145,13 +2341,13 @@ def get_callbacks(app):
         saved_dir = Path('beat-editor/saved')
         edited_file = saved_dir / f'{selected_subject}_edited.json'
 
-        if trig == 'subject-dropdown':
+        if trig == 'data-dropdown':
             if prev_beats_edited != selected_subject and edited_file.exists():
                 btn_label = 'Beats Edited'
                 btn_style = {'background': '#f1ab2a'}
                 beats_edited = selected_subject
         elif trig == 'ok-beat-edits':
-            if edited_file.exists() and utils._check_beat_editor_status():
+            if edited_file.exists() and _core.beat_editing._check_beat_editor_status():
                 btn_label = 'Beats Edited'
                 btn_style = {'background': '#f1ab2a'}
                 beats_edited = selected_subject
@@ -2172,7 +2368,7 @@ def get_callbacks(app):
         [Input('open-beat-editor', 'n_clicks'),
          Input('ok-beat-edits', 'n_clicks'),
          Input('cancel-beat-edits', 'n_clicks'),
-         State('subject-dropdown', 'value')],
+         State('data-dropdown', 'value')],
         prevent_initial_call = True
     )
     def toggle_beat_editor(beat_editor_clicked, apply_beats_clicked,
@@ -2214,7 +2410,7 @@ def get_callbacks(app):
                     content = html.Span('No data available.')
                     apply_disabled = True
                 else:
-                    if utils._check_beat_editor_status():
+                    if _core.beat_editing._check_beat_editor_status():
                         content = html.Iframe(
                             id = 'beat-editor-iframe',
                             src = 'http://localhost:3000',
@@ -2253,7 +2449,7 @@ def get_callbacks(app):
          Output('postprocess-options', 'options')],
         [Input('postprocess-data', 'n_clicks'),
          Input('cancel-postprocess', 'n_clicks')],
-        [State('subject-dropdown', 'value'),
+        [State('data-dropdown', 'value'),
          State('postprocess-modal', 'is_open'),
          State('memory-db', 'data')],
         prevent_initial_call = True
@@ -2352,8 +2548,8 @@ def get_callbacks(app):
         ],
         state = [
             State('memory-db', 'data'),
-            State('subject-dropdown', 'value'),
-            State('subject-dropdown', 'options'),
+            State('data-dropdown', 'value'),
+            State('data-dropdown', 'options'),
             State('postprocess-options', 'value'),
             State('feature-window-size', 'value'),
             State('feature-step-size', 'value'),
@@ -2476,22 +2672,22 @@ def get_callbacks(app):
                     unusable_ix = np.array([], dtype = int)
 
                     # Map edited beats to original sampling rate
-                    mapped_edits_ix = utils._map_beat_edits(
+                    mapped_edits_ix = _core.beat_editing._map_beat_edits(
                         edited_beats_ix, beat_editor_fs, fs_full)
                     if 'Deleted Beat' in edited.columns:
                         deletions_ix = edited[edited.get(
                             'Deleted Beat').eq(1)].index.values
-                    mapped_deletions_ix = utils._map_beat_edits(
+                    mapped_deletions_ix = _core.beat_editing._map_beat_edits(
                         deletions_ix, beat_editor_fs, fs_full)
                     if 'Added Beat' in edited.columns:
                         additions_ix = edited[edited.get(
                             'Added Beat').eq(1)].index.values
-                    mapped_additions_ix = utils._map_beat_edits(
+                    mapped_additions_ix = _core.beat_editing._map_beat_edits(
                         additions_ix, beat_editor_fs, fs_full)
                     if 'Unusable' in edited.columns:
                         unusable_ix = edited[edited.get(
                             'Unusable').eq(1)].index.values
-                    mapped_unusable_ix = utils._map_beat_edits(
+                    mapped_unusable_ix = _core.beat_editing._map_beat_edits(
                         unusable_ix, beat_editor_fs, fs_full)
 
                     # Record edited beats in original data
@@ -2672,7 +2868,7 @@ def get_callbacks(app):
         if export_fmt.lower() == 'excel':
             if export_mode.lower() == 'single':
                 ext = 'xlsx'
-                buf = utils._make_excel(
+                buf = _core.io._make_excel(
                     files2make, set_progress = set_progress,
                     progress_start = progress_done,
                     progress_total = total_progress)
@@ -2682,19 +2878,19 @@ def get_callbacks(app):
                     for subj in subjects:
                         files = [f for flist in files2make for f in flist
                                  if subj in str(f)]
-                        xls_out = utils._make_excel(files)
+                        xls_out = _core.io._make_excel(files)
                         zf.writestr(f'{subj}_processed.xlsx', xls_out.getvalue())
                         _update_progress()  # add progress per subject
         elif export_fmt.lower() == 'zip':  # if 'zip' format
             ext = 'zip'
             if export_mode.lower() == 'single':
-                buf = utils._make_zip(
+                buf = _core.io._make_zip(
                     files2make, set_progress = set_progress,
                     progress_start = progress_done,
                     progress_total = total_progress)
             elif export_mode.lower() == 'batch':
                 files = [f for sub in files2make for f in sub]
-                buf = utils._make_zip(
+                buf = _core.io._make_zip(
                     files, set_progress = set_progress,
                     progress_start = progress_done,
                     progress_total = total_progress)

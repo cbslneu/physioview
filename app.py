@@ -1,6 +1,6 @@
 from pathlib import Path
 from dash import Dash, DiskcacheManager
-from physioview.dashboard.utils import _clear_temp, _make_subdirs, _clear_edits
+from physioview.dashboard._core import _clear_edits, _clear_temp, _make_subdirs
 from physioview.dashboard.layout import layout
 from physioview.dashboard.callbacks import get_callbacks
 import dash_bootstrap_components as dbc

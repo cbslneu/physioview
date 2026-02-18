@@ -78,7 +78,7 @@ h6 {
     padding: 0px 0px 5px 3px;
     margin-bottom: -45px;
 }
-#select-subject > i {
+#select-subject i {
     font-size: 14pt;
 }
 #qa-section {
@@ -145,14 +145,14 @@ h6 {
     display: flex;
     align-items: center;
 }
-#subject-dropdown {
+#data-dropdown {
     padding: 0px 5px 0px 5px;
     width: 350px;
 }
-#subject-dropdown .Select.is-disabled {
+#data-dropdown .Select.is-disabled {
     color: #bababa;
 }
-#subject-dropdown .Select.is-disabled > .Select-control {
+#data-dropdown .Select.is-disabled > .Select-control {
     color: #bababa;
     border: 1px solid #bababa !important;
 }
@@ -160,14 +160,14 @@ h6 {
     padding: 0px 5px 0px 5px;
     width: 70px;
 }
-#subject-dropdown > .is-open,
+#data-dropdown > .is-open,
 #segment-dropdown > .is-open {
     font-weight: 400;
 }
 #qa-charts-dropdown {
     width: 170px;
 }
-#subject-dropdown .Select-control,
+#data-dropdown .Select-control,
 #qa-charts-dropdown .Select-control,
 #segment-dropdown .Select-control {
     border: 1px solid #de7765 !important;
@@ -246,7 +246,14 @@ h6 {
 #data-types {
     margin-left: 10px;
 }
-#segment-data span, #artifact-params > span, #scr-amplitude-threshold span {
+#segment-data-by-time > span {
+    font-weight: 600;
+    padding-right: 5px;
+    font-size: 10pt;
+}
+#segment-data-overview > span,
+#artifact-params > span,
+#scr-amplitude-threshold span {
     font-weight: 600;
     padding-right: 5px;
 }
@@ -381,8 +388,25 @@ h6 {
 }
 /* -- containers -----------------------------------------------------------*/
 #segment-data {
+    display: block;
+    align-items: center;
+    padding-top: 8px;
+}
+#segment-data-overview {
     display: flex;
     align-items: center;
+}
+#segment-data-overview label {
+    font-size: 10pt;
+}
+.segment-data-detailed {
+    padding-top: 5px;
+}
+#segment-data-by-event {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    width: 410px;
 }
 #scr-amplitude-threshold {
     display: inline-flex;
@@ -399,13 +423,16 @@ h6 {
     gap: 0.5em
 }
 #load-temperature {
-    padding-top: 8px;
+    padding-top: 10px;
 }
 #temp-upload-div {
     display: inline-flex;
     align-items: center;
     gap: 0.5em;
     width: 410px;
+}
+#temp-upload-section {
+    display: grid;
 }
 /* -- dropdowns ----------------------------------------------------------- */
 .setup-data-dropdowns {  /* dbc.Row containing dropdowns */
@@ -426,6 +453,11 @@ h6 {
     padding-right: 10px;
     font-size: 13pt;
     margin-top: 1px;
+}
+#by-event-help {
+    margin-left: -20px;
+    margin-top: 2px;
+    font-size: 12pt;
 }
 
 /* --- advanced filter configuration ---------------------------------------*/
@@ -506,7 +538,7 @@ h6 {
     margin-top: 0px;
     font-size: 10pt !important;
 }
-#temp-uploader {
+#temp-uploader, #event-uploader {
     height: 30px;
     width: 310px;
     line-height: 25px !important;
@@ -526,17 +558,18 @@ h6 {
     font-size: 12pt;
     color: #313c42;
 }
-#clear-temp-upload:hover {
+#clear-temp-upload:hover, #clear-event-upload:hover {
     cursor: pointer;
 }
-#temp-uploader > div { /* padding inside uploader */
+#temp-uploader > div, #event-uploader > div { /* padding inside uploader */
     padding: 2px 0px 3px 0px !important;
 }
-#temp-uploader span {
+#temp-uploader span, #event-uploader span {
     font-weight: normal;
     font-size: 9.5pt !important;
 }
-#temp-upload-section span {
+#temp-upload-section span,
+#segment-data-by-event span {
     font-size: 10pt;
 }
 #temp-variable-mapping {
@@ -563,18 +596,19 @@ h6 {
     float: right;
     margin-top: 5px;
 }
-#temp-file-check {
+#temp-file-check, #event-file-check {
     float: right;
     align-items: center;
+    justify-content: right;
     display: inline-flex;
     padding-top: 5px;
     gap: 0.25em;
 }
-#temp-file-check span {
+#temp-file-check span, #event-file-check span {
     font-size: 11px;
     font-style: italic;
 }
-#temp-file-check i {
+#temp-file-check i, #event-file-check i {
     font-size: 12px;
 }
 
