@@ -191,8 +191,8 @@ class Cardio:
                 metrics = pd.merge(missing, artifacts, on = ['Segment'])
 
         metrics['Invalid'] = metrics['N Detected'].apply(
-            lambda x: 1 if x < int(min_hr * (seg_size/60)) or x > 220
-            else np.nan)
+            lambda x: 1 if x < int(min_hr * (seg_size/60)) or \
+                           x > int(220 * (seg_size/60)) else np.nan)
 
         return metrics
 
