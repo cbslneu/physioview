@@ -135,7 +135,6 @@ class Filters:
     def filter_signal(
         self,
         signal: np.ndarray,
-        fs: int = 4,
         cutoff: float = 0.35,
         filter_length: int = 2057,
         window_type: Literal['hamming', 'hann', 'blackman'] = 'hamming'
@@ -147,8 +146,6 @@ class Filters:
         ----------
         signal : array_like
             An array containing the raw EDA signal to be filtered.
-        fs : int, optional
-            The sampling rate of the signal in Hz; by default, 4 Hz.
         cutoff : float, optional
             The cut-off frequency above which frequencies are attenuated;
             by default, 0.35 Hz.
@@ -179,7 +176,7 @@ class Filters:
         """
 
         # Normalize cutoff frequency to Nyquist
-        cutoff_norm = cutoff / (fs / 2)
+        cutoff_norm = cutoff / (self.fs / 2)
 
         # Design FIR filter
         fir_coeff = firwin(
