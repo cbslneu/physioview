@@ -193,9 +193,9 @@ layout = html.Div(id = 'main', children = [
                             color = '#ee8a78',
                             label = 'Filter Signal',
                             labelPosition = 'left',
-                            on = False),
+                            on = True),
                         html.I(className = 'fa-regular fa-circle-question',
-                               id = 'filter-help'),
+                                id = 'filter-help'),
                         dbc.Tooltip('Apply a filter to remove low- and '
                                     'high-frequency noise, including baseline '
                                     'drift, powerline interference, '

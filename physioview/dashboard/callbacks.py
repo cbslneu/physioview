@@ -438,7 +438,7 @@ def get_callbacks(app):
 
         # Default toggler states
         temp_on = False
-        filter_on = False
+        filter_on = True
 
         # Default parameter values
         base_headers = ['<Var>', '<Var>']
