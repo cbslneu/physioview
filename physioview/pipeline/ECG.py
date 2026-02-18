@@ -20,7 +20,7 @@ class Filters:
         50 or 60 (by default, 60). The 50 Hz power grid is prevalent in
         many European, Asian, and African countries.
     """
-    def __init__(self,fs: int, powerline_freq: Literal[50, 60] = 60):
+    def __init__(self, fs: int, powerline_freq: Literal[50, 60] = 60):
         """
         Initialize the Filters object.
 
@@ -143,7 +143,7 @@ class Filters:
         signal: np.ndarray,
         lowcut: float = 1,
         highcut: float = 15,
-        rp: float= 0.15,
+        rp: float = 0.15,
         rs: float = 80,
         order: int = 2
     ) -> np.ndarray:
@@ -386,10 +386,6 @@ class BeatDetectors:
                 thi = False
                 thf = False
 
-        # Remove the first detection as it requires QRS complex amplitude
-        # for the threshold
-        ecg_beats.pop(0)
-
         # Convert list of beats to numpy array and return
         ecg_beats = np.array(ecg_beats, dtype = 'int')
 
@@ -459,6 +455,11 @@ class BeatDetectors:
             pass
         signal = np.array(signal)
 
+        # Guard against segments too short for the moving average filter
+        ma_len = int(self.fs * 2.5)
+        if signal.size < ma_len:
+            return np.array([], dtype = int)
+
         # Differentiate the ECG signal
         dn = (np.append(signal[1:], 0) - signal)
 
@@ -489,7 +490,6 @@ class BeatDetectors:
         # Apply a moving average filter again to remove low-frequency drift
         # 2.5 sec from Manikandan & Soman (900 samples)
         # 2.5 sec in 500 Hz == 1250 samples
-        ma_len = int(self.fs * 2.5)
         zn_ma = np.insert(
             self._ma_cumulative_sum(zn, ma_len), 0, [0] * (ma_len - 1))
 
