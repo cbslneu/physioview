@@ -185,6 +185,13 @@ layout = html.Div(id = 'main', children = [
         ]),
         html.Div(id = 'preprocess-data', hidden = True, children = [
             html.H4('Preprocess Data'),
+            html.Div(id = 'beat-detector-settings', hidden = True, children = [
+                html.Div(id = 'select-beat-detector', children = [
+                    html.Span('Beat Detector:'),
+                    dcc.Dropdown(id = 'beat-detectors',
+                                 options = [], clearable = False)
+                ])
+            ]),
             html.Div(id = 'filter-data', children = [
                 html.Div(id = 'filter-settings', children = [
                     html.Div([
@@ -204,26 +211,25 @@ layout = html.Div(id = 'main', children = [
                                     style = {'--bs-tooltip-max-width': '225px'})
                     ], style = {'display': 'flex', 'alignItems': 'center'}),
                     html.A('Filter Settings', id = 'filter-config-link',
-                           n_clicks = 0, href = '#', hidden = True)
+                            n_clicks = 0, href = '#', hidden = True)
                 ]),
                 html.Div(
                     dbc.Card(dbc.CardBody([
                         html.Div(id = 'lower-cutoff-div', children = [
                             html.Span('Lower Cutoff (Hz):'),
                             dcc.Input(id = 'filter-lowcut', type = 'number',
-                                      value = 1, min = 0.1),
+                                        value = 1, min = 0.1),
                         ]),
                         html.Div(id = 'upper-cutoff-div', children = [
                             html.Span('Upper Cutoff (Hz):'),
                             dcc.Input(id = 'filter-highcut', type = 'number',
-                                      value = 15, min = 0.1),
+                                        value = 15, min = 0.1),
                         ]),
                     ])),
                     id = 'filter-config-collapse',
                     className = 'filter-config-hidden'),
             ]),
-
-            html.Div(id = 'cardio-preprocessing', hidden = True, children = [
+            html.Div(id = 'artifact-settings', hidden = True, children = [
                 html.Div(id = 'artifact-params', children = [
                     html.Div(children = [
                         html.Span('Artifact Identification Method:'),
@@ -251,11 +257,6 @@ layout = html.Div(id = 'main', children = [
                             'detection algorithm. A lower tolerance will lead '
                             'to more artifacts flagged.', target = 'artifact-tol-help')
                     ], style = {'display': 'flex', 'alignItems': 'center'})
-                ]),
-                html.Div(id = 'select-beat-detector', children = [
-                    html.Span('Beat Detector:'),
-                    dcc.Dropdown(id = 'beat-detectors',
-                                 options = [], clearable = False)
                 ]),
             ]),
             html.Div(id = 'eda-preprocessing', hidden = True, children = [
@@ -295,6 +296,7 @@ layout = html.Div(id = 'main', children = [
                     target = 'seg-data-help')
             ]),
         ]),
+
         html.Div(id = 'run-save-buttons', children = [
             html.Button('Run', n_clicks = 0, id = 'run-data', disabled = True),
             html.Button('Stop', n_clicks = 0, id = 'stop-run', hidden = True,

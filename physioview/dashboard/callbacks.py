@@ -190,7 +190,8 @@ def get_callbacks(app):
          Output('resampling-rate', 'disabled'),
          Output('load-temperature', 'hidden'),
          Output('temp-upload-section', 'hidden'),
-         Output('cardio-preprocessing', 'hidden'),
+         Output('beat-detector-settings', 'hidden'),
+         Output('artifact-settings', 'hidden'),
          Output('eda-preprocessing', 'hidden', allow_duplicate = True),
          Output('scr-amplitude-threshold', 'hidden'),
          Output('beat-detectors', 'options'),
@@ -227,7 +228,8 @@ def get_callbacks(app):
         if dtype == 'EDA' or e4_dtype == 'EDA':
             resample_hidden = False
             load_temp_hidden = False
-            cardio_preprocess_hidden = True
+            beat_detector_settings_hidden = True
+            artifact_settings_hidden = True
             eda_preprocess_hidden = False
             seg_size = 180
             if toggle_rs_on is True:
@@ -246,7 +248,8 @@ def get_callbacks(app):
         if dtype in ('PPG', 'ECG')  or e4_dtype == 'PPG' or data_source == 'Actiwave':
             fs = 500
             eda_preprocess_hidden = True
-            cardio_preprocess_hidden = False
+            beat_detector_settings_hidden = False
+            artifact_settings_hidden = False
             if dtype == 'PPG' or e4_dtype == 'PPG':
                 beat_detectors = [
                     {'label': 'Elgendi et al. (2013)', 'value': 'erma'},
@@ -263,7 +266,7 @@ def get_callbacks(app):
 
         return [fs, resample_hidden, resample_disabled,
                 load_temp_hidden, temp_upload_hidden,
-                cardio_preprocess_hidden, eda_preprocess_hidden,
+                beat_detector_settings_hidden, artifact_settings_hidden, eda_preprocess_hidden,
                 scr_amp_thresh_hidden, beat_detectors, default_beat_detector,
                 scr_detectors, default_scr_detector, seg_size]
 
