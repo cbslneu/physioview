@@ -225,6 +225,21 @@ layout = html.Div(id = 'main', children = [
                             dcc.Input(id = 'filter-highcut', type = 'number',
                                         value = 15, min = 0.1),
                         ]),
+                        html.Div(id = 'filter-order-div', children = [
+                            html.Span('Filter Order:'),
+                            dcc.Input(id = 'filter-order', type = 'number',
+                                        value = 2, min = 1),
+                        ]),
+                        html.Div(id = 'filter-rp-div', children = [
+                            html.Span('Passband Ripple (dB):'),
+                            dcc.Input(id = 'filter-rp', type = 'number',
+                                        value = 0.15, min = 0.01),
+                        ]),
+                        html.Div(id = 'filter-rs-div', children = [
+                            html.Span('Stopband Attenuation (dB):'),
+                            dcc.Input(id = 'filter-rs', type = 'number',
+                                        value = 80, min = 0.01),
+                        ]),
                     ])),
                     id = 'filter-config-collapse',
                     className = 'filter-config-hidden'),

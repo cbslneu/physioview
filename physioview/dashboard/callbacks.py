@@ -306,27 +306,40 @@ def get_callbacks(app):
         # Otherwise, keep the link and settings hidden
         return True, 'filter-config-hidden'
 
-    # === Set filter cutoff values ============================================
+    # === Set filter parameters ============================================
     @app.callback(
         [Output('filter-lowcut', 'disabled'),
          Output('filter-lowcut', 'value', allow_duplicate = True),
-         Output('filter-highcut', 'value', allow_duplicate = True)],
+         Output('filter-highcut', 'value', allow_duplicate = True),
+         Output('filter-order-div', 'hidden'),
+         Output('filter-order', 'value', allow_duplicate = True),
+         Output('filter-rp-div', 'hidden'),
+         Output('filter-rp', 'value', allow_duplicate = True),
+         Output('filter-rs-div', 'hidden'),
+         Output('filter-rs', 'value', allow_duplicate = True)],
         [Input('data-types', 'value'),
-         Input('e4-data-types', 'value')],
+         Input('e4-data-types', 'value'),
+         Input('beat-detectors', 'value')],
         prevent_initial_call = True
     )
-    def disable_lowcut_input(dtype, e4_dtype):
+    def disable_lowcut_input(dtype, e4_dtype, beat_detector):
         """Disable the filter lowcut input and customize the highcut input
         and value depending on the inputted data type."""
-        ecg_filter_params = [False, 5, 15]
-        ppg_filter_params = [False, 0.5, 10]
-        eda_filter_params = [True, None, 0.35]
+        ppg_filter_params = [False, 0.5, 10, True, None, True, None, True, None]
+        eda_filter_params = [True, None, 0.35, True, None, True, None, True, None]
         if dtype == 'EDA' or e4_dtype == 'EDA':
             return eda_filter_params
         elif dtype == 'PPG' or e4_dtype == 'PPG':
             return ppg_filter_params
         else:
-            return ecg_filter_params
+            if beat_detector == 'engzee':
+                return [False, 1, 15, True, None, True, None, True, None]
+            elif beat_detector == 'manikandan':
+                return [False, 6, 18, False, 4, False, 1, True, None]
+            elif beat_detector == 'nabian':
+                return [False, 0.5, 50, False, 2, False, 0.5, False, 40]
+            elif beat_detector == 'pantompkins':
+                return [False, 0.5, 15, False, 2, True, None, True, None]
 
     # === Read temperature data file if provided ==============================
     @app.callback(
@@ -751,6 +764,9 @@ def get_callbacks(app):
             State('toggle-filter', 'on'),
             State('filter-lowcut', 'value'),
             State('filter-highcut', 'value'),
+            State('filter-order', 'value'),
+            State('filter-rp', 'value'),
+            State('filter-rs', 'value'),
             State('scr-detectors', 'value'),
             State('scr-amp-thresh', 'value'),
             State('eda-valid-min', 'value'),
@@ -774,8 +790,8 @@ def get_callbacks(app):
     def run_pipeline(set_progress, n, load_data, e4_dtype, dtype, fs, rs, d1,
                      d2, d3, d4, d5, temp_data, temp_var, beat_detector,
                      seg_size, artifact_method, artifact_tol, filt_on,
-                     filter_lowcut, filter_highcut, scr_detector, scr_amp,
-                     eda_min, eda_max):
+                     filter_lowcut, filter_highcut, filter_order, filter_rp, filter_rs, 
+                     scr_detector, scr_amp, eda_min, eda_max):
         """Read Actiwave Cardio, Empatica E4, or CSV-formatted data, save
         the data to the local memory, and load the progress spinner."""
 
@@ -883,6 +899,7 @@ def get_callbacks(app):
                                 data, dtype, fs, seg_size, beat_detector,
                                 artifact_method, artifact_tol, filt_on,
                                 filter_lowcut, filter_highcut,
+                                filter_order, filter_rp, filter_rs,
                                 acc_data = acc, downsample = ds)
 
                             # Throw beat detection error
