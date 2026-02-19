@@ -178,7 +178,7 @@ class Filters:
         nyquist = 0.5 * self.fs
         low = lowcut / nyquist
         high = highcut / nyquist
-        b, a = butter(N = 2, Wn = [low, high], btype = 'band')
+        b, a = butter(N = order, Wn = [low, high], btype = 'band')
         preprocessed = filtfilt(b, a, signal)
         return preprocessed
 
