@@ -2517,10 +2517,12 @@ def get_callbacks(app):
                             ends = np.ceil(
                                 (mapped_unusable_ix + 1) * ratio).astype(int)
                             ends = np.maximum(ends, starts + 1)
-                            for s, e in zip(starts, ends):
-                                parts = np.arange(s, min(e, len(data)), dtype = int)
-                            if parts:
-                                full = np.unique(np.concatenate(parts))
+                            parts = np.array([], dtype = int)
+                            for start, end in zip(starts, ends):
+                                part = np.arange(start, min(end, len(data)), dtype = int)
+                                parts = np.concatenate([parts, part])
+                            if len(parts) > 0:
+                                full = np.unique(parts)
                                 data.loc[full, 'Unusable'] = 1
 
                     # Reposition columns for clarity
