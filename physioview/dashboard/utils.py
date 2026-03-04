@@ -556,6 +556,8 @@ def _downsample_data(
         # Decimate primary signal
         y_dec = __decimate(df[y_col])
         ds = pd.DataFrame({x_col: df[x_col].iloc[ds_idx].to_numpy(), y_col: y_dec})
+        if 'Segment' in df.columns:
+            ds['Segment'] = df['Segment'].iloc[ds_idx].to_numpy()
 
         # Rescale detected, artifactual, and corrected beat indices
         down_beats = np.rint(
