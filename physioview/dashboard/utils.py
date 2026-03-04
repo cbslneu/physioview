@@ -1,5 +1,5 @@
 import zipfile
-from typing import Callable, Literal, Optional, Union
+from typing import Callable, Optional, Union
 from pathlib import Path
 from shutil import rmtree
 from zipfile import ZipFile
