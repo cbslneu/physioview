@@ -340,7 +340,12 @@ layout = html.Div(id = 'main', children = [
                         html.Span('Stopband Attenuation (dB):'),
                         dcc.Input(id = 'filter-rs', type = 'number',
                                     value = 80, min = 0.01),
-                    ])
+                    ]),
+                    html.Div(id = 'filter-window-len-div', className='filter-config-item', children = [
+                        html.Span('Moving Average Window Length (s):'),
+                        dcc.Input(id = 'filter-window-len', type = 'number',
+                                    value = 0.5, min = 0.01),
+                    ]),
                 ]),
                 html.Div(id = 'filter-customization-buttons', children = [
                     html.Button('Apply', n_clicks = 0, id = 'apply-filter-btn'),

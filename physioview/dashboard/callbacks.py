@@ -326,6 +326,8 @@ def get_callbacks(app):
          Output('filter-rp', 'value', allow_duplicate = True),
          Output('filter-rs-div', 'hidden'),
          Output('filter-rs', 'value', allow_duplicate = True),
+         Output('filter-window-len-div', 'hidden'),
+         Output('filter-window-len', 'value', allow_duplicate = True),
          Output('selected-filter', 'children')],
         [Input('memory-load', 'data'),
          Input('data-types', 'value'),
@@ -342,21 +344,21 @@ def get_callbacks(app):
             dtype = 'ECG'
 
         if dtype in ['ECG', 'PPG', 'EDA']:
-            lowcut, highcut, order, rp, rs, filt_type = utils._default_filter_params(dtype, beat_detector)
+            lowcut, highcut, order, rp, rs, window_len, filt_type = utils._default_filter_params(dtype, beat_detector)
             selected_filter_children = filt_type
         elif e4_dtype in ['PPG', 'EDA']:
-            lowcut, highcut, order, rp, rs, filt_type = utils._default_filter_params(e4_dtype, beat_detector)
+            lowcut, highcut, order, rp, rs, window_len, filt_type = utils._default_filter_params(e4_dtype, beat_detector)
             selected_filter_children = filt_type
         else:
-            lowcut, highcut, order, rp, rs, filt_type = None, None, None, None, None, None
-            selected_filter_children = 'Please select the signal type to customize the filter settings.'
+            lowcut, highcut, order, rp, rs, window_len, filt_type = None, None, None, None, None, None, None
+            selected_filter_children = 'No filter selected.'
 
         disable_lowcut = True if lowcut is None else False
         hide_order = True if order is None else False
         hide_rp = True if rp is None else False
         hide_rs = True if rs is None else False
-
-        return [disable_lowcut, lowcut, highcut, hide_order, order, hide_rp, rp, hide_rs, rs, selected_filter_children]
+        hide_window_len = True if window_len is None else False
+        return [disable_lowcut, lowcut, highcut, hide_order, order, hide_rp, rp, hide_rs, rs, hide_window_len, window_len, selected_filter_children]
 
     # === Close filter customization modal =====================================
     @app.callback(
@@ -793,6 +795,7 @@ def get_callbacks(app):
             State('filter-order', 'value'),
             State('filter-rp', 'value'),
             State('filter-rs', 'value'),
+            State('filter-window-len', 'value'),
             State('scr-detectors', 'value'),
             State('scr-amp-thresh', 'value'),
             State('eda-valid-min', 'value'),
@@ -817,7 +820,7 @@ def get_callbacks(app):
                      d2, d3, d4, d5, temp_data, temp_var, beat_detector,
                      seg_size, artifact_method, artifact_tol, filt_on,
                      filter_lowcut, filter_highcut, filter_order, filter_rp, filter_rs, 
-                     scr_detector, scr_amp, eda_min, eda_max):
+                     filter_window_len, scr_detector, scr_amp, eda_min, eda_max):
         """Read Actiwave Cardio, Empatica E4, or CSV-formatted data, save
         the data to the local memory, and load the progress spinner."""
 
@@ -926,6 +929,7 @@ def get_callbacks(app):
                                 artifact_method, artifact_tol, filt_on,
                                 filter_lowcut, filter_highcut,
                                 filter_order, filter_rp, filter_rs,
+                                filter_window_len,
                                 acc_data = acc, downsample = ds)
 
                             # Throw beat detection error
@@ -1132,6 +1136,8 @@ def get_callbacks(app):
                             data, dtype, fs, seg_size, beat_detector,
                             artifact_method, artifact_tol, filt_on,
                             filter_lowcut, filter_highcut,
+                            filter_order, filter_rp, filter_rs,
+                            filter_window_len,
                             acc_data = acc, downsample = ds)
 
                         # Throw beat detection error

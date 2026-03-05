@@ -61,6 +61,7 @@ def _default_filter_params(dtype: str, beat_detector: str) -> tuple:
     order = None
     rp = None
     rs = None
+    window_len = None
     filt_type = None
     if dtype == 'ECG':
         if beat_detector == 'engzee':
@@ -90,13 +91,15 @@ def _default_filter_params(dtype: str, beat_detector: str) -> tuple:
     elif dtype == 'PPG':
         lowcut = 0.5
         highcut = 10
-        filt_type = 'Chebyshev Type II filter'
+        order = 4
+        window_len = 0.5
+        filt_type = 'Chebyshev Type II filter with moving average smoothing'
     elif dtype == 'EDA':
         highcut = 0.35
         filt_type = 'FIR low-pass filter'
     else:
         raise ValueError(f'Invalid data type: {dtype}')
-    return lowcut, highcut, order, rp, rs, filt_type
+    return lowcut, highcut, order, rp, rs, window_len, filt_type
 
 def _preprocess_cardiac(
     data: pd.DataFrame,
@@ -110,8 +113,9 @@ def _preprocess_cardiac(
     filter_lowcut: float = None,
     filter_highcut: float = None,
     order: Optional[int] = None,
-    rs: Optional[float] = None,
     rp: Optional[float] = None,
+    rs: Optional[float] = None,
+    window_len: Optional[float] = None,
     acc_data: Optional[pd.DataFrame] = None,
     downsample: bool = True
 ) -> tuple:
@@ -158,13 +162,14 @@ def _preprocess_cardiac(
     elif dtype in ('PPG', 'BVP'):
         filt = PPG.Filters(fs)
         detect_beats = PPG.BeatDetectors(fs, is_preprocessed)
-
-    # Filter ECG
-    if filter_on:
-        preprocessed_data['Filtered'] = filt.filter_signal(
-            preprocessed_data[dtype],
-            lowcut = filter_lowcut,
-            highcut = filter_highcut)
+        # Filter PPG
+        if filter_on:
+            preprocessed_data['Filtered'] = filt.filter_signal(
+                preprocessed_data[dtype],
+                lowcut = filter_lowcut if filter_lowcut is not None else 0.5,
+                highcut = filter_highcut if filter_highcut is not None else 10,
+                order = order if order is not None else 4,
+                window_len = window_len if window_len is not None else 0.5)
 
     # Segment data and detect beats by segment
     preprocessed_data.insert(
