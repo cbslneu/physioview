@@ -272,39 +272,48 @@ def get_callbacks(app):
 
     # === Open advanced filter cutoff settings ================================
     @app.callback(
-        [Output('filter-config-link', 'hidden'),
-         Output('filter-config-collapse', 'className')],
+        [Output('filter-config-btn', 'hidden'),
+         Output('filter-customization-modal', 'is_open'),
+         Output('dtype-validator', 'is_open')],
         [Input('toggle-filter', 'on'),
-         Input('filter-config-link', 'n_clicks')],
-        State('filter-config-collapse', 'className'),
+         Input('filter-config-btn', 'n_clicks')],
+        [State('memory-load', 'data'),
+         State('data-types', 'value'),
+         State('e4-data-types', 'value')],
         prevent_initial_call = True
     )
-    def handle_filter_config_link(filter_on, n_clicks, current_class):
+    def handle_filter_config_link(filter_on, n_clicks, data, dtype, e4_dtype):
         """Enable/disable the filter settings link based on the filter
         toggle state and display/hide the settings when the link is clicked."""
         trig = ctx.triggered_id
-        if current_class is None:
-            current_class = 'filter-config-hidden'
 
         # Handle filter toggle
         if trig == 'toggle-filter':
             if filter_on:
                 # Filter enabled; keep settings hidden
-                return False, 'filter-config-hidden'
+                return False, False, False
             else:
                 # Filter disabled; hide link and settings
-                return True, 'filter-config-hidden'
+                return True, False, False
 
         # Handle link click only if the filter oggle is already on
-        if trig == 'filter-config-link':
+        if trig == 'filter-config-btn':
             if filter_on:
-                if current_class == 'filter-config-hidden':
-                    return False, 'filter-config-visible'
+                if data['source'] == 'Actiwave':
+                    return False, True, False
+                elif data['source'] == 'E4':
+                    if e4_dtype is None:
+                        return False, False, True
+                    else:
+                        return False, True, False
                 else:
-                    return False, 'filter-config-hidden'
+                    if dtype is None:
+                        return False, False, True
+                    else:
+                        return False, True, False
 
         # Otherwise, keep the link and settings hidden
-        return True, 'filter-config-hidden'
+        return True, False, False
 
     # === Set filter parameters ============================================
     @app.callback(
@@ -316,30 +325,47 @@ def get_callbacks(app):
          Output('filter-rp-div', 'hidden'),
          Output('filter-rp', 'value', allow_duplicate = True),
          Output('filter-rs-div', 'hidden'),
-         Output('filter-rs', 'value', allow_duplicate = True)],
-        [Input('data-types', 'value'),
+         Output('filter-rs', 'value', allow_duplicate = True),
+         Output('selected-filter', 'children')],
+        [Input('memory-load', 'data'),
+         Input('data-types', 'value'),
          Input('e4-data-types', 'value'),
-         Input('beat-detectors', 'value')],
+         Input('beat-detectors', 'value'),
+         Input('reset-config-btn', 'n_clicks')],
         prevent_initial_call = True
     )
-    def disable_lowcut_input(dtype, e4_dtype, beat_detector):
+    def set_default_filter_params(data, dtype, e4_dtype, beat_detector, n_cancel):
         """Disable the filter lowcut input and customize the highcut input
         and value depending on the inputted data type."""
-        ppg_filter_params = [False, 0.5, 10, True, None, True, None, True, None]
-        eda_filter_params = [True, None, 0.35, True, None, True, None, True, None]
-        if dtype == 'EDA' or e4_dtype == 'EDA':
-            return eda_filter_params
-        elif dtype == 'PPG' or e4_dtype == 'PPG':
-            return ppg_filter_params
+        
+        if data['source'] == 'Actiwave':
+            dtype = 'ECG'
+
+        if dtype in ['ECG', 'PPG', 'EDA']:
+            lowcut, highcut, order, rp, rs, filt_type = utils._default_filter_params(dtype, beat_detector)
+            selected_filter_children = filt_type
+        elif e4_dtype in ['PPG', 'EDA']:
+            lowcut, highcut, order, rp, rs, filt_type = utils._default_filter_params(e4_dtype, beat_detector)
+            selected_filter_children = filt_type
         else:
-            if beat_detector == 'engzee':
-                return [False, 1, 15, True, None, True, None, True, None]
-            elif beat_detector == 'manikandan':
-                return [False, 6, 18, False, 4, False, 1, True, None]
-            elif beat_detector == 'nabian':
-                return [False, 0.5, 50, False, 2, False, 0.5, False, 40]
-            elif beat_detector == 'pantompkins':
-                return [False, 0.5, 15, False, 2, True, None, True, None]
+            lowcut, highcut, order, rp, rs, filt_type = None, None, None, None, None, None
+            selected_filter_children = 'Please select the signal type to customize the filter settings.'
+
+        disable_lowcut = True if lowcut is None else False
+        hide_order = True if order is None else False
+        hide_rp = True if rp is None else False
+        hide_rs = True if rs is None else False
+
+        return [disable_lowcut, lowcut, highcut, hide_order, order, hide_rp, rp, hide_rs, rs, selected_filter_children]
+
+    # === Close filter customization modal =====================================
+    @app.callback(
+        Output('filter-customization-modal', 'is_open', allow_duplicate = True),
+        Input('apply-filter-btn', 'n_clicks'),
+        prevent_initial_call = True
+    )
+    def close_filter_customization_modal(n_apply):
+        return False
 
     # === Read temperature data file if provided ==============================
     @app.callback(
@@ -736,7 +762,7 @@ def get_callbacks(app):
     # ============================= RUN PIPELINE ==============================
     @callback(
         output = [
-            Output('dtype-validator', 'is_open'),
+            Output('dtype-validator', 'is_open', allow_duplicate=True),
             Output('mapping-validator', 'is_open'),
             Output('pipeline-error-modal', 'is_open'),
             Output('pipeline-error-message', 'children'),

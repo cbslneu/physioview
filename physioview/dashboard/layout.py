@@ -210,39 +210,8 @@ layout = html.Div(id = 'main', children = [
                                     target = 'filter-help',
                                     style = {'--bs-tooltip-max-width': '225px'})
                     ], style = {'display': 'flex', 'alignItems': 'center'}),
-                    html.A('Filter Settings', id = 'filter-config-link',
-                            n_clicks = 0, href = '#', hidden = True)
+                    html.Button('Customize Filter', n_clicks = 0, id = 'filter-config-btn', hidden = True)
                 ]),
-                html.Div(
-                    dbc.Card(dbc.CardBody([
-                        html.Div(id = 'lower-cutoff-div', children = [
-                            html.Span('Lower Cutoff (Hz):'),
-                            dcc.Input(id = 'filter-lowcut', type = 'number',
-                                        value = 1, min = 0.1),
-                        ]),
-                        html.Div(id = 'upper-cutoff-div', children = [
-                            html.Span('Upper Cutoff (Hz):'),
-                            dcc.Input(id = 'filter-highcut', type = 'number',
-                                        value = 15, min = 0.1),
-                        ]),
-                        html.Div(id = 'filter-order-div', children = [
-                            html.Span('Filter Order:'),
-                            dcc.Input(id = 'filter-order', type = 'number',
-                                        value = 2, min = 1),
-                        ]),
-                        html.Div(id = 'filter-rp-div', children = [
-                            html.Span('Passband Ripple (dB):'),
-                            dcc.Input(id = 'filter-rp', type = 'number',
-                                        value = 0.15, min = 0.01),
-                        ]),
-                        html.Div(id = 'filter-rs-div', children = [
-                            html.Span('Stopband Attenuation (dB):'),
-                            dcc.Input(id = 'filter-rs', type = 'number',
-                                        value = 80, min = 0.01),
-                        ]),
-                    ])),
-                    id = 'filter-config-collapse',
-                    className = 'filter-config-hidden'),
             ]),
             html.Div(id = 'artifact-settings', hidden = True, children = [
                 html.Div(id = 'artifact-params', children = [
@@ -319,6 +288,66 @@ layout = html.Div(id = 'main', children = [
             html.Button('Save', n_clicks = 0, id = 'configure',
                         disabled = True)
         ]),
+
+        # Filter Customization
+        dbc.Modal(id = 'filter-customization-modal', is_open = False, children = [
+            dbc.ModalHeader(children = [
+                dbc.ModalTitle('Customize Filter')
+            ], close_button = True),
+            dbc.ModalBody(children = [
+                html.Span('Customize the filter settings.'),
+                html.Div(id = 'selected-filter-container', children = [
+                    html.Div(children = [
+                        html.Span('Selected filter:', id = 'selected-filter-label'),
+                        html.I(className = 'fa-regular fa-circle-question',
+                                id = 'selected-filter-help'),
+                        dbc.Tooltip('Filter type is automaticallly selected based on the data type and selected beat detection method.',
+                                    target = 'selected-filter-help',
+                                    style = {'--bs-tooltip-max-width': '225px'})
+                    ]),
+                    html.Span('Please select the signal type to customize the filter settings.', id = 'selected-filter'),
+                ]),
+                html.Div(id = 'filter-parameters-container', children = [html.Div(children = [
+                        html.Span('Filter Parameters:', id = 'filter-parameters-label'),
+                        html.I(className = 'fa-regular fa-circle-question',
+                                id = 'filter-parameters-help'),
+                        dbc.Tooltip('Parameters used in the original paper of the selected beat detector are selected by default. \
+                                    Customize the filter parameters to your data.',
+                                    target = 'filter-parameters-help',
+                                    style = {'--bs-tooltip-max-width': '225px'})
+                    ]),
+                    html.Div(id = 'lower-cutoff-div', className='filter-config-item', children = [
+                        html.Span('Lower Cutoff (Hz):'),
+                        dcc.Input(id = 'filter-lowcut', type = 'number',
+                                    value = 1, min = 0.1),
+                    ]),
+                    html.Div(id = 'upper-cutoff-div', className='filter-config-item', children = [
+                        html.Span('Upper Cutoff (Hz):'),
+                        dcc.Input(id = 'filter-highcut', type = 'number',
+                                    value = 15, min = 0.1),
+                    ]),
+                    html.Div(id = 'filter-order-div', className='filter-config-item', children = [
+                        html.Span('Filter Order:'),
+                        dcc.Input(id = 'filter-order', type = 'number',
+                                    value = 2, min = 1),
+                    ]),
+                    html.Div(id = 'filter-rp-div', className='filter-config-item', children = [
+                        html.Span('Passband Ripple (dB):'),
+                        dcc.Input(id = 'filter-rp', type = 'number',
+                                    value = 0.15, min = 0.01),
+                    ]),
+                    html.Div(id = 'filter-rs-div', className='filter-config-item', children = [
+                        html.Span('Stopband Attenuation (dB):'),
+                        dcc.Input(id = 'filter-rs', type = 'number',
+                                    value = 80, min = 0.01),
+                    ])
+                ]),
+                html.Div(id = 'filter-customization-buttons', children = [
+                    html.Button('Apply', n_clicks = 0, id = 'apply-filter-btn'),
+                    html.Button('Reset', n_clicks = 0, id = 'reset-config-btn'),
+                ])
+            ])
+        ], centered = True),
 
         # Variable Mappings Validator
         dbc.Modal(id = 'mapping-validator', is_open = False, children = [

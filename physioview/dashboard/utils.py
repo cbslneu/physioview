@@ -54,6 +54,50 @@ def _clear_edits():
                 rmtree(item)
 
 # ======================= HearView Pipeline Functions ========================
+def _default_filter_params(dtype: str, beat_detector: str) -> tuple:
+    """Return the default filter parameters for a given data type and beat detector."""
+    lowcut = None
+    highcut = None
+    order = None
+    rp = None
+    rs = None
+    filt_type = None
+    if dtype == 'ECG':
+        if beat_detector == 'engzee':
+            lowcut = 1
+            highcut = 15
+            filt_type = 'Elliptic bandpass filter'
+        elif beat_detector == 'manikandan':
+            lowcut = 6
+            highcut = 18
+            order = 4
+            rp = 1
+            filt_type = 'Chebyshev Type I bandpass filter'
+        elif beat_detector == 'nabian':
+            lowcut = 0.5
+            highcut = 50
+            order = 2
+            rp = 0.5
+            filt_type = 'Elliptic bandpass filter'
+            rs = 40
+        elif beat_detector == 'pantompkins':
+            lowcut = 0.5
+            highcut = 15
+            order = 2
+            filt_type = 'Butterworth bandpass filter'
+        else:
+            raise ValueError(f'Invalid beat detector: {beat_detector}')
+    elif dtype == 'PPG':
+        lowcut = 0.5
+        highcut = 10
+        filt_type = 'Chebyshev Type II filter'
+    elif dtype == 'EDA':
+        highcut = 0.35
+        filt_type = 'FIR low-pass filter'
+    else:
+        raise ValueError(f'Invalid data type: {dtype}')
+    return lowcut, highcut, order, rp, rs, filt_type
+
 def _preprocess_cardiac(
     data: pd.DataFrame,
     dtype: str,
