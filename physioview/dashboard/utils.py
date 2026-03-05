@@ -339,7 +339,7 @@ def _preprocess_eda(
     if filter_on:
         filter_eda = EDA.Filters(fs)
         preprocessed_data['Filtered'] = filter_eda.filter_signal(
-            preprocessed_data['EDA'], fs = fs, cutoff = filter_highcut)
+            preprocessed_data['EDA'], cutoff = filter_highcut)
         is_preprocessed = True
         if temp is not None:
             preprocessed_data['TEMP'] = filter_eda.moving_average(
