@@ -438,6 +438,11 @@ h6 {
     display: block;
     padding-bottom: 5px;
 }
+.filter-config-error {
+    color: #d32f2f;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
 #filter-lowcut, #filter-highcut, #filter-order, #filter-rp, #filter-rs, #filter-window-len, #filter-length {
     width: 65px;
 }
@@ -464,6 +469,13 @@ h6 {
     margin-top: 5px;
     margin-bottom: 5px;
     align-items: left;
+}
+#reset-to-default-btn {
+    font-size: 10pt;
+    color: #ee8a78;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-left: 15px;
 }
 /* --- file uploaders ------------------------------------------------------*/
 #config-uploader { /* configuration file uploader */
@@ -946,7 +958,7 @@ th:first-child {  /* style only first table header */
 #ok-export:hover, #config-btn:hover, #apply-filter-btn:hover {
     background-color: #313d44;
 }
-#close-export, #close-config1, #reset-config-btn {
+#close-export, #close-config1, #cancel-config-btn {
     background-color: #bbbbbb;
     padding: 8px;
     font-weight: bold;
@@ -964,7 +976,7 @@ th:first-child {  /* style only first table header */
     letter-spacing: 2px;
     position: relative;
 }
-#close-export:hover, #close-config1:hover, #reset-config-btn:hover {
+#close-export:hover, #close-config1:hover, #cancel-config-btn:hover {
     background-color: #969696 !important;
 }
 .fa-download {

@@ -293,7 +293,7 @@ layout = html.Div(id = 'main', children = [
         dbc.Modal(id = 'filter-customization-modal', is_open = False, children = [
             dbc.ModalHeader(children = [
                 dbc.ModalTitle('Customize Filter')
-            ], close_button = True),
+            ], close_button = False),
             dbc.ModalBody(children = [
                 html.Span('Customize the filter settings.'),
                 html.Div(id = 'selected-filter-container', children = [
@@ -314,7 +314,14 @@ layout = html.Div(id = 'main', children = [
                         dbc.Tooltip('Parameters used in the original paper of the selected beat detector are selected by default. \
                                     Customize the filter parameters to your data.',
                                     target = 'filter-parameters-help',
-                                    style = {'--bs-tooltip-max-width': '225px'})
+                                    style = {'--bs-tooltip-max-width': '225px'}),
+                        html.A('Reset to Default', href = '#', id = 'reset-to-default-btn')
+                    ]),
+                    html.Div(id = 'empty-param-error-div', className='filter-config-error', hidden = True, children = [
+                        html.Span('One or more filter parameters are empty. Please fill in all parameters.')
+                    ]),
+                    html.Div(id = 'lowcut-highcut-error-div', className='filter-config-error', hidden = True, children = [
+                        html.Span('Lower cutoff must be less than upper cutoff.')
                     ]),
                     html.Div(id = 'lower-cutoff-div', className='filter-config-item', children = [
                         html.Span('Lower Cutoff (Hz):'),
@@ -364,7 +371,7 @@ layout = html.Div(id = 'main', children = [
                 ]),
                 html.Div(id = 'filter-customization-buttons', children = [
                     html.Button('Apply', n_clicks = 0, id = 'apply-filter-btn'),
-                    html.Button('Reset', n_clicks = 0, id = 'reset-config-btn'),
+                    html.Button('Cancel', n_clicks = 0, id = 'cancel-config-btn'),
                 ])
             ])
         ], centered = True),

@@ -337,10 +337,11 @@ def get_callbacks(app):
          Input('data-types', 'value'),
          Input('e4-data-types', 'value'),
          Input('beat-detectors', 'value'),
-         Input('reset-config-btn', 'n_clicks')],
+         Input('cancel-config-btn', 'n_clicks'),
+         Input('reset-to-default-btn', 'n_clicks')],
         prevent_initial_call = True
     )
-    def set_default_filter_params(data, dtype, e4_dtype, beat_detector, n_cancel):
+    def set_default_filter_params(data, dtype, e4_dtype, beat_detector, n_cancel, n_reset):
         """Disable the filter lowcut input and customize the highcut input
         and value depending on the inputted data type."""
         
@@ -368,12 +369,61 @@ def get_callbacks(app):
 
     # === Close filter customization modal =====================================
     @app.callback(
-        Output('filter-customization-modal', 'is_open', allow_duplicate = True),
-        Input('apply-filter-btn', 'n_clicks'),
+        [Output('filter-customization-modal', 'is_open', allow_duplicate = True),
+         Output('empty-param-error-div', 'hidden'),
+         Output('lowcut-highcut-error-div', 'hidden')],
+        [Input('apply-filter-btn', 'n_clicks'),
+         Input('cancel-config-btn', 'n_clicks'),
+         Input('reset-to-default-btn', 'n_clicks')],
+        [State('lower-cutoff-div', 'hidden'),
+         State('filter-lowcut', 'value'),
+         State('upper-cutoff-div', 'hidden'),
+         State('filter-highcut', 'value'),
+         State('filter-order-div', 'hidden'),
+         State('filter-order', 'value'),
+         State('filter-rp-div', 'hidden'),
+         State('filter-rp', 'value'),
+         State('filter-rs-div', 'hidden'),
+         State('filter-rs', 'value'),
+         State('filter-window-len-div', 'hidden'),
+         State('filter-window-len', 'value'),
+         State('filter-length-div', 'hidden'),
+         State('filter-length', 'value'),
+         State('filter-window-type-div', 'hidden'),
+         State('filter-window-type', 'value')],
         prevent_initial_call = True
     )
-    def close_filter_customization_modal(n_apply):
-        return False
+    def close_filter_customization_modal(n_apply, n_cancel, n_reset, hide_lowcut, lowcut, hide_highcut, highcut, \
+        hide_order, order, hide_rp, rp, hide_rs, rs, hide_window_len, window_len, hide_filter_length, \
+            filter_length, hide_window_type, window_type):
+        """Close the filter customization modal and validate the filter parameters."""
+
+        trig = ctx.triggered_id
+
+        if trig == 'reset-to-default-btn':
+            return True, True, True
+
+        if trig == 'cancel-config-btn':
+            return False, True, True
+
+        lowcut_empty = True if not hide_lowcut and lowcut is None else False
+        highcut_empty = True if not hide_highcut and highcut is None else False
+        order_empty = True if not hide_order and order is None else False
+        rp_empty = True if not hide_rp and rp is None else False
+        rs_empty = True if not hide_rs and rs is None else False
+        window_len_empty = True if not hide_window_len and window_len is None else False
+        filter_length_empty = True if not hide_filter_length and filter_length is None else False
+        window_type_empty = True if not hide_window_type and window_type is None else False
+
+        hide_empty_param_error = not any([lowcut_empty, highcut_empty, order_empty, rp_empty, rs_empty, window_len_empty, filter_length_empty, window_type_empty])
+        if hide_empty_param_error:
+            hide_lowcut_highcut_error = False if not hide_lowcut and not hide_highcut and lowcut >= highcut else True
+        else:
+            hide_lowcut_highcut_error = True
+
+        open_modal = False if hide_empty_param_error and hide_lowcut_highcut_error else True
+
+        return [open_modal, hide_empty_param_error, hide_lowcut_highcut_error]
 
     # === Read temperature data file if provided ==============================
     @app.callback(
