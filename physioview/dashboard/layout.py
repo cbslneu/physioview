@@ -192,6 +192,32 @@ layout = html.Div(id = 'main', children = [
                                  options = [], clearable = False)
                 ])
             ]),
+            html.Div(id = 'eda-preprocessing', hidden = True, children = [
+                html.Div(id = 'select-scr-detector', children = [
+                    html.Span('SCR Detector:'),
+                    dcc.Dropdown(id = 'scr-detectors',
+                                 options = [], clearable = False)
+                ]),
+                html.Div(id = 'scr-amplitude-threshold', children = [
+                    html.Span('Minimum Peak Amplitude (µS):'),
+                    dcc.Input(id = 'scr-amp-thresh', value = None, type =
+                    'number'),
+                    html.I(className = 'fa-regular fa-circle-question',
+                       id = 'min-peak-amp-help'),
+                    dbc.Tooltip(
+                        'Exclude SCR peaks with ampitudes below this '
+                        'threshold. If this field is empty, no amplitude '
+                        'threshold is used.',
+                        target = 'min-peak-amp-help')
+                ], hidden = True),
+                html.Div(id = 'valid-amplitude-range', children = [
+                    html.Span('Valid EDA Range (µS):'),
+                    html.Span('Min:'),
+                    dcc.Input(id = 'eda-valid-min', value = 0.2, type = 'number'),
+                    html.Span('Max:'),
+                    dcc.Input(id = 'eda-valid-max', value = 40, type = 'number'),
+                ])
+            ], style = {'padding': '5px 0px 7px 0px'}),
             html.Div(id = 'filter-data', children = [
                 html.Div(id = 'filter-settings', children = [
                     html.Div([
@@ -243,32 +269,6 @@ layout = html.Div(id = 'main', children = [
                     ], style = {'display': 'flex', 'alignItems': 'center'})
                 ]),
             ]),
-            html.Div(id = 'eda-preprocessing', hidden = True, children = [
-                html.Div(id = 'select-scr-detector', children = [
-                    html.Span('SCR Detector:'),
-                    dcc.Dropdown(id = 'scr-detectors',
-                                 options = [], clearable = False)
-                ]),
-                html.Div(id = 'scr-amplitude-threshold', children = [
-                    html.Span('Minimum Peak Amplitude (µS):'),
-                    dcc.Input(id = 'scr-amp-thresh', value = None, type =
-                    'number'),
-                    html.I(className = 'fa-regular fa-circle-question',
-                       id = 'min-peak-amp-help'),
-                    dbc.Tooltip(
-                        'Exclude SCR peaks with ampitudes below this '
-                        'threshold. If this field is empty, no amplitude '
-                        'threshold is used.',
-                        target = 'min-peak-amp-help')
-                ], hidden = True),
-                html.Div(id = 'valid-amplitude-range', children = [
-                    html.Span('Valid EDA Range (µS):'),
-                    html.Span('Min:'),
-                    dcc.Input(id = 'eda-valid-min', value = 0.2, type = 'number'),
-                    html.Span('Max:'),
-                    dcc.Input(id = 'eda-valid-max', value = 40, type = 'number'),
-                ])
-            ], style = {'padding': '5px 0px 7px 0px'}),
             html.Div(id = 'segment-data', children = [
                 html.Span('Segment Size (sec):'),
                 dcc.Input(id = 'seg-size', type = 'number'),
@@ -301,7 +301,7 @@ layout = html.Div(id = 'main', children = [
                         html.Span('Selected filter:', id = 'selected-filter-label'),
                         html.I(className = 'fa-regular fa-circle-question',
                                 id = 'selected-filter-help'),
-                        dbc.Tooltip('Filter type is automaticallly selected based on the data type and selected beat detection method.',
+                        dbc.Tooltip('Filter type is automaticallly selected based on the data type and selected beat/SCR detection method.',
                                     target = 'selected-filter-help',
                                     style = {'--bs-tooltip-max-width': '225px'})
                     ]),
