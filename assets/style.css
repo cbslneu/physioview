@@ -719,7 +719,7 @@ button:hover {
 #filter-config-btn {
     width: auto;
     height: 26px;
-    background: #ee8a78;
+    background-color: #47555e;
     font-size: 11pt;
     display: flex;
     align-items: center;
@@ -727,7 +727,7 @@ button:hover {
     padding: 0px 4px 0px 5px;
 }
 #filter-config-btn:hover {
-    background: #ce6e5d !important;
+    background-color: #313d44;
 }
 #run-save-buttons {
     margin-top: -5px;

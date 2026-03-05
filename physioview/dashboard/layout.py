@@ -236,7 +236,7 @@ layout = html.Div(id = 'main', children = [
                                     target = 'filter-help',
                                     style = {'--bs-tooltip-max-width': '225px'})
                     ], style = {'display': 'flex', 'alignItems': 'center'}),
-                    html.Button('Customize Filter', n_clicks = 0, id = 'filter-config-btn', hidden = True)
+                    html.Button('Advanced Settings', n_clicks = 0, id = 'filter-config-btn', hidden = True)
                 ]),
             ]),
             html.Div(id = 'artifact-settings', hidden = True, children = [
@@ -292,10 +292,10 @@ layout = html.Div(id = 'main', children = [
         # Filter Customization
         dbc.Modal(id = 'filter-customization-modal', is_open = False, children = [
             dbc.ModalHeader(children = [
-                dbc.ModalTitle('Customize Filter')
+                dbc.ModalTitle('Advanced Filter Settings')
             ], close_button = False),
             dbc.ModalBody(children = [
-                html.Span('Customize the filter settings.'),
+                html.Span('Customize the filter settings for more control.'),
                 html.Div(id = 'selected-filter-container', children = [
                     html.Div(children = [
                         html.Span('Selected filter:', id = 'selected-filter-label'),
