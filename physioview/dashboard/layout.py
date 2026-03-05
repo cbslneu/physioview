@@ -411,9 +411,17 @@ layout = html.Div(id = 'main', children = [
                 dbc.ModalTitle('Error')
             ], close_button = True),
             dbc.ModalBody([
-                html.Span('An unexpected error occurred:',
+                html.Span('An error occurred while processing the data. Please check the following:',
                           style = {'fontWeight': '600'}),
-                html.Div(id = 'pipeline-error-message', children = [])
+                html.Ul(id = 'pipeline-error-message', children = [
+                    html.Li('The selected data type is correct.'),
+                    html.Li('The configured sampling rate is correct.'),
+                    html.Li('Time/sample and signal columns are mapped correctly.'),
+                    html.Li('The uploaded signal is already filtered or the filter is toggled on. Some beat detectors may not work well with unfiltered signals.'),
+                    html.Li('The custom filter configuration is reasonable.'),
+                    html.Li('The data contains valid signals.'),
+                    html.Li('Try a different beat detector or preprocess the data differently.'),
+                ])
             ])
         ], className = 'validation-error-modal', centered = True),
 

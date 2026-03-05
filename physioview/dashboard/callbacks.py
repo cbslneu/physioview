@@ -773,7 +773,6 @@ def get_callbacks(app):
             Output('dtype-validator', 'is_open', allow_duplicate=True),
             Output('mapping-validator', 'is_open'),
             Output('pipeline-error-modal', 'is_open'),
-            Output('pipeline-error-message', 'children'),
             Output('duplicate-temp-error-modal', 'is_open'),
             Output('memory-db', 'data'),
         ],
@@ -849,11 +848,11 @@ def get_callbacks(app):
             if file_type not in ('Actiwave', 'E4'):
                 if dtype is None:
                     dtype_error = True
-                    return dtype_error, map_error, pipeline_error, '', \
+                    return dtype_error, map_error, pipeline_error, \
                         temp_input_error, None
                 elif d2 is None:
                     map_error = True
-                    return dtype_error, map_error, pipeline_error, '', \
+                    return dtype_error, map_error, pipeline_error, \
                         temp_input_error, None
 
             filepath = load_data['filename']
@@ -942,19 +941,14 @@ def get_callbacks(app):
                             if isinstance(preprocessed, tuple) and \
                                     all(x is None for x in preprocessed):
                                 pipeline_error = True
-                                error_msg = ('PipelineError: No beats detected. '
-                                             'Please try a different beat '
-                                             'detector.')
                                 return dtype_error, map_error, pipeline_error, \
-                                    error_msg, temp_input_error, None
+                                    temp_input_error, None
 
                         except Exception as e:
                             pipeline_error = True
-                            error_type = type(e).__name__
-                            error_msg = f'{error_type}: {e}'
                             print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                error_msg, temp_input_error, None
+                                temp_input_error, None
                         metrics = preprocessed[2]
 
                         # Write IBI data to 'temp' folder
@@ -981,9 +975,9 @@ def get_callbacks(app):
                         except Exception as e:
                             pipeline_error = True
                             error_type = type(e).__name__
-                            error_msg = f'{error_type}: {e}'
+                            print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                error_msg, temp_input_error, None
+                                temp_input_error, None
                         metrics = preprocessed[1]
 
                         # Get downsampled data for rendering
@@ -1086,7 +1080,7 @@ def get_callbacks(app):
                     # Check if duplicate temperature inputs
                     if temp_data is not None and temp_var is not None:
                         temp_input_error = True
-                        return dtype_error, map_error, pipeline_error, '', \
+                        return dtype_error, map_error, pipeline_error, \
                             temp_input_error, None
 
                     # If timestamps are given
@@ -1150,19 +1144,15 @@ def get_callbacks(app):
                         if isinstance(preprocessed, tuple) and \
                                 all(x is None for x in preprocessed):
                             pipeline_error = True
-                            error_msg = ('PipelineError: No beats detected. '
-                                         'Please try a different beat '
-                                         'detector.')
+                            print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                error_msg, temp_input_error, None
+                                temp_input_error, None
 
                     except Exception as e:
                         pipeline_error = True
-                        error_type = type(e).__name__
-                        error_msg = f'{error_type}: {e}'
                         print(traceback.format_exc())
                         return dtype_error, map_error, pipeline_error, \
-                            error_msg, temp_input_error, None
+                            temp_input_error, None
                     metrics = preprocessed[2]
 
                     # Write IBI data to 'temp' folder
@@ -1203,7 +1193,7 @@ def get_callbacks(app):
                         error_msg = f'{error_type}: {e}'
                         print(traceback.format_exc())
                         return dtype_error, map_error, pipeline_error, \
-                            error_msg, temp_input_error, None
+                            temp_input_error, None
                     metrics = preprocessed[1]
 
                 # Write preprocessed data and metrics to 'temp' folder
@@ -1257,7 +1247,7 @@ def get_callbacks(app):
             set_progress((100, '100%'))
             sleep(1)
 
-            return [dtype_error, map_error, pipeline_error, '',
+            return [dtype_error, map_error, pipeline_error,
                     temp_input_error, memory]
 
     # == Recompute SQA metrics for re-rendering ==============================
