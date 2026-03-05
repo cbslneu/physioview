@@ -62,6 +62,8 @@ def _default_filter_params(dtype: str, beat_detector: str) -> tuple:
     rp = None
     rs = None
     window_len = None
+    filter_length = None
+    window_type = None
     filt_type = None
     if dtype == 'ECG':
         if beat_detector == 'engzee':
@@ -96,10 +98,12 @@ def _default_filter_params(dtype: str, beat_detector: str) -> tuple:
         filt_type = 'Chebyshev Type II filter with moving average smoothing'
     elif dtype == 'EDA':
         highcut = 0.35
+        filter_length = 2057
+        window_type = 'hamming'
         filt_type = 'FIR low-pass filter'
     else:
         raise ValueError(f'Invalid data type: {dtype}')
-    return lowcut, highcut, order, rp, rs, window_len, filt_type
+    return lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type
 
 def _preprocess_cardiac(
     data: pd.DataFrame,

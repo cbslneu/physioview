@@ -346,6 +346,21 @@ layout = html.Div(id = 'main', children = [
                         dcc.Input(id = 'filter-window-len', type = 'number',
                                     value = 0.5, min = 0.01),
                     ]),
+                    html.Div(id = 'filter-length-div', className='filter-config-item', children = [
+                        html.Span('Filter Length (taps):'),
+                        dcc.Input(id = 'filter-length', type = 'number',
+                                    value = 2057, min = 1),
+                    ]),
+                    html.Div(id = 'filter-window-type-div', className='filter-config-item', children = [
+                        html.Span('Window Type:'),
+                        dcc.Dropdown(id = 'filter-window-type',
+                                    options = [
+                                        {'label': 'Hamming', 'value': 'hamming'},
+                                        {'label': 'Hann', 'value': 'hann'},
+                                        {'label': 'Blackman', 'value': 'blackman'}
+                                    ],
+                                    value = 'hamming', clearable = False),
+                    ]),
                 ]),
                 html.Div(id = 'filter-customization-buttons', children = [
                     html.Button('Apply', n_clicks = 0, id = 'apply-filter-btn'),

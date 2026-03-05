@@ -317,7 +317,7 @@ def get_callbacks(app):
 
     # === Set filter parameters ============================================
     @app.callback(
-        [Output('filter-lowcut', 'disabled'),
+        [Output('lower-cutoff-div', 'hidden'),
          Output('filter-lowcut', 'value', allow_duplicate = True),
          Output('filter-highcut', 'value', allow_duplicate = True),
          Output('filter-order-div', 'hidden'),
@@ -328,6 +328,10 @@ def get_callbacks(app):
          Output('filter-rs', 'value', allow_duplicate = True),
          Output('filter-window-len-div', 'hidden'),
          Output('filter-window-len', 'value', allow_duplicate = True),
+         Output('filter-length-div', 'hidden'),
+         Output('filter-length', 'value', allow_duplicate = True),
+         Output('filter-window-type-div', 'hidden'),
+         Output('filter-window-type', 'value', allow_duplicate = True),
          Output('selected-filter', 'children')],
         [Input('memory-load', 'data'),
          Input('data-types', 'value'),
@@ -344,21 +348,23 @@ def get_callbacks(app):
             dtype = 'ECG'
 
         if dtype in ['ECG', 'PPG', 'EDA']:
-            lowcut, highcut, order, rp, rs, window_len, filt_type = utils._default_filter_params(dtype, beat_detector)
+            lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type = utils._default_filter_params(dtype, beat_detector)
             selected_filter_children = filt_type
         elif e4_dtype in ['PPG', 'EDA']:
-            lowcut, highcut, order, rp, rs, window_len, filt_type = utils._default_filter_params(e4_dtype, beat_detector)
+            lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type = utils._default_filter_params(e4_dtype, beat_detector)
             selected_filter_children = filt_type
         else:
-            lowcut, highcut, order, rp, rs, window_len, filt_type = None, None, None, None, None, None, None
+            lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type = None, None, None, None, None, None, None, None, None
             selected_filter_children = 'No filter selected.'
 
-        disable_lowcut = True if lowcut is None else False
+        hide_lowcut = True if lowcut is None else False
         hide_order = True if order is None else False
         hide_rp = True if rp is None else False
         hide_rs = True if rs is None else False
         hide_window_len = True if window_len is None else False
-        return [disable_lowcut, lowcut, highcut, hide_order, order, hide_rp, rp, hide_rs, rs, hide_window_len, window_len, selected_filter_children]
+        hide_filter_length = True if filter_length is None else False
+        hide_window_type = True if window_type is None else False
+        return [hide_lowcut, lowcut, highcut, hide_order, order, hide_rp, rp, hide_rs, rs, hide_window_len, window_len, hide_filter_length, filter_length, hide_window_type, window_type, selected_filter_children]
 
     # === Close filter customization modal =====================================
     @app.callback(

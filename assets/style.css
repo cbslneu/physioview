@@ -438,10 +438,14 @@ h6 {
     display: block;
     padding-bottom: 5px;
 }
-#filter-lowcut, #filter-highcut, #filter-order, #filter-rp, #filter-rs, #filter-window-len {
-    width: 55px;
+#filter-lowcut, #filter-highcut, #filter-order, #filter-rp, #filter-rs, #filter-window-len, #filter-length {
+    width: 65px;
 }
-#lower-cutoff-div, #upper-cutoff-div, #filter-order-div, #filter-rp-div, #filter-rs-div, #filter-window-len-div {
+#filter-window-type {
+    width: 150px;
+}
+#lower-cutoff-div, #upper-cutoff-div, #filter-order-div, #filter-rp-div, #filter-rs-div, 
+#filter-window-len-div, #filter-length-div, #filter-window-type-div {
     display: inline-flex;
     align-items: center;
     gap: 0.5em;
