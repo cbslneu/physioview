@@ -290,7 +290,8 @@ layout = html.Div(id = 'main', children = [
         ]),
 
         # Filter Customization
-        dbc.Modal(id = 'filter-customization-modal', is_open = False, children = [
+        dbc.Modal(id = 'filter-customization-modal', is_open = False, keyboard=False,
+            backdrop="static", children = [
             dbc.ModalHeader(children = [
                 dbc.ModalTitle('Advanced Filter Settings')
             ], close_button = False),
