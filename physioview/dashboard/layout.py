@@ -335,7 +335,7 @@ layout = html.Div(id = 'main', children = [
                     ]),
                     html.Div(id = 'filter-order-div', className='filter-config-item', children = [
                         html.Span('Filter Order:'),
-                        dcc.Input(id = 'filter-order', type = 'number',
+                        dcc.Input(id = 'filter-order', type = 'number', step = 1,
                                     value = 2, min = 1),
                     ]),
                     html.Div(id = 'filter-rp-div', className='filter-config-item', children = [
