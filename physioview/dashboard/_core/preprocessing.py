@@ -28,6 +28,37 @@ class Preprocessor:
         segmented. Preprocesses the entire data or event window if not
         provided.
     """
+    DEFAULT_FILTER_PARAMS = {
+        'ECG': {
+            'engzee': {
+                'filt_method': 'filter_signal',
+                'lowcut': 1, 'highcut': 15,
+                'filt_type': 'Elliptic bandpass filter'},
+            'manikandan': {
+                'filt_method': 'cheby1_filter',
+                'lowcut': 6, 'highcut': 18, 'order': 4, 'rp': 1,
+                'filt_type': 'Chebyshev Type I bandpass filter'},
+            'nabian': {
+                'filt_method': 'elliptic_bandpass_filter',
+                'lowcut': 0.5, 'highcut': 50, 'order': 2, 'rp': 0.5,
+                'rs': 40, 'filt_type': 'Elliptic bandpass filter'},
+            'pantompkins': {
+                'filt_method': 'butter_bandpass_filter',
+                'lowcut': 0.5, 'highcut': 15, 'order': 2,
+                'filt_type': 'Butterworth bandpass filter'}
+        },
+        'PPG': {
+            'filt_method': 'filter_signal',
+            'lowcut': 0.5, 'highcut': 10, 'order': 4, 'window_len': 0.5,
+            'filt_type': 'Chebyshev Type II filter with moving average '
+                         'smoothing'
+        },
+        'EDA': {
+            'filt_method': 'filter_signal',
+            'highcut': 0.35, 'filter_length': 2057, 'window_type': 'hamming',
+            'filt_type': 'FIR low-pass filter'
+        },
+    }
     def __init__(
         self,
         dtype: Literal['BVP', 'ECG', 'EDA', 'PPG'],
@@ -35,7 +66,8 @@ class Preprocessor:
         filter_on: bool,
         peak_detector: Optional[str] = None,
         event_times: Optional[pd.DataFrame] = None,
-        seg_size: Optional[int] = None
+        seg_size: Optional[int] = None,
+        filter_kwargs: Optional[dict] = None
     ):
         """
         Initialize the Preprocessor object.
@@ -60,6 +92,9 @@ class Preprocessor:
             The size of the windows, in seconds, into which data will be
             segmented. Preprocesses the entire data or event window if not
             provided.
+        filter_kwargs : dict, optional
+            A dictionary containing filter keyword arguments relevant to the
+            selected peak detector.
         """
         if dtype not in ['ECG', 'EDA', 'PPG']:
             raise ValueError(f"dtype must be one of 'ECG', 'EDA', 'PPG'.")
@@ -70,7 +105,7 @@ class Preprocessor:
         self.peak_detector = peak_detector or self._get_default_peak_detector()
         self.event_times = event_times
         self.seg_size = seg_size
-        self.filter_config = self._get_default_filter_config()
+        self.filter_kwargs = filter_kwargs or {}
 
         # Initialize storage for peak and artifact indices
         self.peaks_ix = None
@@ -337,20 +372,27 @@ class Preprocessor:
             'ECG': ('physioview.pipeline.ECG', 'Filters'),
             'PPG': ('physioview.pipeline.PPG', 'Filters'),
             'EDA': ('physioview.pipeline.EDA', 'Filters')}
+
+        # Get the default filter parameters
+        if self.dtype == 'ECG':
+            params = self.DEFAULT_FILTER_PARAMS['ECG'][self.peak_detector]
+        else:
+            params = self.DEFAULT_FILTER_PARAMS[self.dtype]
+        filter_kwargs = {k: v for k, v in params.items()
+                         if k not in ('filt_type', 'filt_method')}
+
+        # Update with any user-customized filter parameters
+        filter_kwargs.update(self.filter_kwargs)
+
+        # Get the filter method from the signal type's Filters class
+        filt_method = params.get('filt_method', 'filter_signal')
+
+        # Apply the filter with its specific filter parameters
         module_name, class_name = filter_classes[self.dtype]
         module = importlib.import_module(module_name)
         FilterClass = getattr(module, class_name)
-        return FilterClass(self.fs).filter_signal(signal, **self.filter_config)
-
-    def _get_default_filter_config(self) -> dict:
-        """Get the default filter configuration for the signal type."""
-        filter_config = {
-            'ECG': {'lowcut': 5.0, 'highcut': 15.0, 'order': 2},
-            'PPG': {'lowcut': 0.5, 'highcut': 10.0, 'order': 4},
-            'EDA': {'cutoff': 0.35, 'filter_length': 2057,
-                    'window_type': 'hamming'}
-        }
-        return filter_config.get(self.dtype)
+        method = getattr(FilterClass(self.fs), filt_method)
+        return method(signal, **filter_kwargs)
 
     def _get_default_peak_detector(self) -> dict:
         """Get the default peak detector for the signal type."""
