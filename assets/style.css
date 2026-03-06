@@ -480,6 +480,7 @@ h6 {
 }
 #filter-window-type {
     width: 150px;
+    font-size: 10pt;
 }
 #lower-cutoff-div, #upper-cutoff-div, #filter-order-div, #filter-rp-div, #filter-rs-div, 
 #filter-window-len-div, #filter-length-div, #filter-window-type-div {
@@ -752,9 +753,9 @@ button:hover {
 }
 #filter-config-btn {
     width: auto;
-    height: 26px;
+    height: 22px;
     background-color: #47555e;
-    font-size: 11pt;
+    font-size: 9pt;
     display: flex;
     align-items: center;
     color: #ffffff;
@@ -812,12 +813,14 @@ label {
     font-size: 16pt;
 }
 #duplicate-temp-error-modal .modal-content,
+#event-file-error-modal .modal-content,
 #mapping-validator .modal-content{
     min-width: 515px;
     background-color: #fee4e1;
     border-bottom: 5px solid #cf0e22;
 }
-#duplicate-temp-error-modal span {
+#duplicate-temp-error-modal span,
+#event-file-error-modal span {
     font-size: 10pt;
     color: #313c42;
 }
@@ -827,9 +830,11 @@ label {
     border-bottom: 5px solid #cf0e22;
 }
 #duplicate-temp-error-modal .modal-header,
+#event-file-error-modal .modal-header,
 #pipeline-error-modal .modal-header,
 #mapping-validator .modal-header,
 #artifact-identification-modal .modal-header,
+#filter-customization-modal .modal-header,
 #dtype-validator .modal-header {
     padding: 10px 10px 5px 13px;
     align-items: center;
@@ -837,9 +842,11 @@ label {
     border-bottom: 0;
 }
 #duplicate-temp-error-modal .modal-title,
+#event-file-error-modal .modal-title,
 #pipeline-error-modal .modal-title,
 #mapping-validator .modal-title,
 #artifact-identification-modal .modal-title,
+#filter-customization-modal .modal-title,
 #dtype-validator .modal-title {
     font-size: 14pt;
 }
@@ -860,7 +867,7 @@ label {
     border-bottom: 5px solid #ee8a78;
 }
 .validation-error-modal .modal-body{
-    padding: 5px 10px 15px 15px;
+    padding: 5px 15px 15px 15px;
 }
 .information-content {
     display: inline-flex;
