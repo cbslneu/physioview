@@ -358,21 +358,28 @@ def get_callbacks(app):
         prevent_initial_call = True
     )
     def set_default_filter_params(data, dtype, e4_dtype, beat_detector, n_cancel, n_reset):
-        """Disable the filter lowcut input and customize the highcut input
-        and value depending on the inputted data type."""
+        """Populate and show/hide filter parameter inputs based on the
+        selected data type and beat detector."""
 
         if data['source'] == 'Actiwave':
-            dtype = 'ECG'
-
-        if dtype in ['ECG', 'PPG', 'EDA']:
-            lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type = utils._default_filter_params(dtype, beat_detector)
-            selected_filter_children = filt_type
-        elif e4_dtype in ['PPG', 'EDA']:
-            lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type = utils._default_filter_params(e4_dtype, beat_detector)
-            selected_filter_children = filt_type
+            selected_dtype = 'ECG'
         else:
-            lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type = None, None, None, None, None, None, None, None, None
-            selected_filter_children = 'No filter selected.'
+            selected_dtype = dtype if dtype in ['ECG', 'PPG', 'EDA'] else e4_dtype
+            if selected_dtype is None:
+                raise PreventUpdate
+
+        filter_params = _core.Preprocessor.DEFAULT_FILTER_PARAMS[selected_dtype]
+        filter_params = filter_params[beat_detector] if selected_dtype == 'ECG' \
+            else filter_params
+        lowcut = filter_params.get('lowcut')
+        highcut = filter_params.get('highcut')
+        order = filter_params.get('order')
+        rp = filter_params.get('rp')
+        rs = filter_params.get('rs')
+        window_len = filter_params.get('window_len')
+        filter_length = filter_params.get('filter_length')
+        window_type = filter_params.get('window_type')
+        filt_type = filter_params.get('filt_type', 'No filter selected.')
 
         hide_lowcut = True if lowcut is None else False
         hide_order = True if order is None else False
@@ -381,7 +388,11 @@ def get_callbacks(app):
         hide_window_len = True if window_len is None else False
         hide_filter_length = True if filter_length is None else False
         hide_window_type = True if window_type is None else False
-        return [hide_lowcut, lowcut, highcut, hide_order, order, hide_rp, rp, hide_rs, rs, hide_window_len, window_len, hide_filter_length, filter_length, hide_window_type, window_type, selected_filter_children]
+
+        return [hide_lowcut, lowcut, highcut, hide_order, order,
+                hide_rp, rp, hide_rs, rs, hide_window_len, window_len,
+                hide_filter_length, filter_length,
+                hide_window_type, window_type, filt_type]
 
     # === Close filter customization modal =====================================
     @app.callback(
@@ -955,6 +966,8 @@ def get_callbacks(app):
             State('filter-rp', 'value'),
             State('filter-rs', 'value'),
             State('filter-window-len', 'value'),
+            State('filter-length', 'value'),
+            State('filter-window-type', 'value'),
             State('scr-detectors', 'value'),
             State('scr-amp-thresh', 'value'),
             State('eda-valid-min', 'value'),
@@ -1048,8 +1061,20 @@ def get_callbacks(app):
                 peak_detector = scr_detector
 
             # Initialize data preprocessing class
+            filter_kwargs = {
+                k: v for k, v in {
+                    'lowcut': filter_lowcut,
+                    'highcut': filter_highcut,
+                    'order': filter_order,
+                    'rp': filter_rp,
+                    'rs': filter_rs,
+                    'window_len': filter_window_len,
+                    'filter_length': filter_len,
+                    'window_type': filter_window_type,
+            }.items() if v is not None}
             preprocessor = _core.Preprocessor(
-                dtype, fs, filt_on, peak_detector, event_df, seg_size)
+                dtype, fs, filt_on, peak_detector, event_df, seg_size,
+                filter_kwargs)
 
             # -- batch sources -----------------------------------------------
             if file_type == 'batch':
