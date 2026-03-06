@@ -936,6 +936,7 @@ def get_callbacks(app):
             Output('dtype-validator', 'is_open', allow_duplicate=True),
             Output('mapping-validator', 'is_open'),
             Output('pipeline-error-modal', 'is_open'),
+            Output('event-file-error-modal', 'is_open'),
             Output('duplicate-temp-error-modal', 'is_open'),
             Output('memory-db', 'data'),
         ],
@@ -993,13 +994,15 @@ def get_callbacks(app):
                      temp_var, beat_detector, seg_size, artifact_method,
                      artifact_tol, filt_on, filter_lowcut,  filter_highcut,
                      filter_order, filter_rp, filter_rs, filter_window_len,
-                     scr_detector, min_peak_amp, eda_min, eda_max):
+                     filter_len, filter_window_type, scr_detector,
+                     min_peak_amp, eda_min, eda_max):
         """Read Actiwave Cardio, Empatica E4, or CSV-formatted data, save
         the data to the local memory, and load the progress spinner."""
 
         dtype_error = False
         map_error = False
         pipeline_error = False
+        event_file_error = False
         temp_input_error = False
 
         # Set up storage
@@ -1020,11 +1023,11 @@ def get_callbacks(app):
                 if dtype is None:
                     dtype_error = True
                     return dtype_error, map_error, pipeline_error, \
-                        temp_input_error, None
+                        event_file_error, temp_input_error, None
                 elif d2 is None:
                     map_error = True
                     return dtype_error, map_error, pipeline_error, \
-                        temp_input_error, None
+                        event_file_error, temp_input_error, None
 
             filepath = load_data['filename']
             filename = Path(filepath).name  # e.g., "example.csv"
@@ -1039,11 +1042,9 @@ def get_callbacks(app):
             else:
                 event_df = None
                 if segment_by == 'event':
-                    pipeline_error = True
-                    error_msg = f'Missing event file. Please upload an event ' \
-                                'file or segment your data by time.'
+                    event_file_error = True
                     return dtype_error, map_error, pipeline_error, \
-                        error_msg, temp_input_error, None
+                        event_file_error, temp_input_error, None
             memory['segment by event'] = segment_by_event
 
             # Enable downsampling if fs or rs is greater than the sampling
@@ -1137,24 +1138,16 @@ def get_callbacks(app):
                     # ---- cardiac data --------------------------------------
                     if dtype in ('ECG', 'PPG'):
                         try:
-                            preprocessed = utils._preprocess_cardiac(
-                                data, dtype, fs, seg_size, beat_detector,
-                                artifact_method, artifact_tol, filt_on,
-                                filter_lowcut, filter_highcut,
-                                filter_order, filter_rp, filter_rs,
-                                filter_window_len,
-                                acc_data = acc, downsample = ds)
-
-                            # preprocessed, metrics = preprocessor.preprocess_full(
-                            #     data, artifact_method = artifact_method,
-                            #     artifact_tol = artifact_tol)
+                            preprocessed, metrics = preprocessor.preprocess_full(
+                                data, artifact_method = artifact_method,
+                                artifact_tol = artifact_tol)
 
                             # Check for detected beats
                             beats_ix = preprocessor.peaks_ix
                             if len(beats_ix) == 0:
                                 pipeline_error = True
                                 return dtype_error, map_error, pipeline_error, \
-                                    temp_input_error, None
+                                    event_file_error, temp_input_error, None
 
                             # Downsample preprocessed data for rendering
                             artifacts_ix = preprocessor.artifacts_ix
@@ -1167,8 +1160,7 @@ def get_callbacks(app):
                             pipeline_error = True
                             print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                temp_input_error, None
-                        metrics = preprocessed[2]
+                                event_file_error, temp_input_error, None
 
                         # Write IBI data to 'temp' folder
                         ibi = physioview.compute_ibis(
@@ -1176,13 +1168,6 @@ def get_callbacks(app):
                             ts_col = 'Timestamp' if has_ts else None)
                         ibi.to_csv(
                             str(temp_path / f'{fname}_IBI.csv'), index = False)
-
-                        # Get downsampled data for rendering
-                        # if len(preprocessed) > 3:
-                        #     ds_data = preprocessed[3]
-                        #     ds_ibi = preprocessed[4]
-                        #     ds_acc = preprocessed[5]
-                        #     ds_fs = preprocessed[6]
 
                     # ---- EDA data ------------------------------------------
                     else:
@@ -1194,17 +1179,16 @@ def get_callbacks(app):
                                 eda_min = eda_min, eda_max = eda_max)
                         except Exception as e:
                             pipeline_error = True
-                            error_type = type(e).__name__
                             print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                temp_input_error, None
-                        metrics = preprocessed[1]
+                                event_file_error, temp_input_error, None
 
                         # Downsample data for rendering
                         ds_data, ds_ibi, _, ds_acc, ds_fs = \
                             _core.io._downsample_data(
-                                preprocessed, fs, dtype, beats_ix,
-                                artifacts_ix, acc = acc)
+                                preprocessed, preprocessor.fs, dtype,
+                                preprocessor.peaks_ix,
+                                preprocessor.artifacts_ix, acc = acc)
 
                     # Write preprocessed data and metrics to 'temp' folder
                     preprocessed.to_csv(
@@ -1286,7 +1270,7 @@ def get_callbacks(app):
                     if temp_data is not None and temp_var is not None:
                         temp_input_error = True
                         return dtype_error, map_error, pipeline_error, \
-                            temp_input_error, None
+                            event_file_error, temp_input_error, None
 
                     # If timestamps are given
                     if d1 is not None:
@@ -1343,24 +1327,16 @@ def get_callbacks(app):
                     # Event-based cardiac preprocessing
                     if segment_by_event:
                         try:
-                            preprocessed = utils._preprocess_cardiac(
-                                data, dtype, fs, seg_size, beat_detector,
-                                artifact_method, artifact_tol, filt_on,
-                                filter_lowcut, filter_highcut,
-                                filter_order, filter_rp, filter_rs,
-                                filter_window_len,
-                                acc_data = acc, downsample = ds)
-
-                            # preprocessed, preprocessed_by_event, \
-                            #     metrics_by_event = preprocessor.preprocess_event(
-                            #     data, artifact_method = artifact_method,
-                            #     artifact_tol = artifact_tol)
+                            preprocessed, preprocessed_by_event, \
+                                metrics_by_event = preprocessor.preprocess_event(
+                                data, artifact_method = artifact_method,
+                                artifact_tol = artifact_tol)
 
                         except Exception as e:
                             pipeline_error = True
                             print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                temp_input_error, None
+                                event_file_error, temp_input_error, None
 
                         for event_label, event_data in preprocessed_by_event.items():
 
@@ -1399,11 +1375,9 @@ def get_callbacks(app):
                                 artifact_tol = artifact_tol)
                         except Exception as e:
                             pipeline_error = True
-                            error_type = type(e).__name__
-                            error_msg = f'{error_type}: {e}'
                             print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                error_msg, temp_input_error, None
+                                event_file_error, temp_input_error, None
 
                         # Compute and write IBI data to 'temp' folder
                         beats_ix = preprocessor.peaks_ix
@@ -1445,11 +1419,9 @@ def get_callbacks(app):
                                 eda_min = eda_min, eda_max = eda_max)
                         except Exception as e:
                             pipeline_error = True
-                            error_type = type(e).__name__
-                            error_msg = f'{error_type}: {e}'
                             print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                error_msg, temp_input_error, None
+                                event_file_error, temp_input_error, None
 
                         for event_label, event_data in preprocessed_by_event.items():
                             event_data.to_csv(
@@ -1472,11 +1444,9 @@ def get_callbacks(app):
                                 eda_min = eda_min, eda_max = eda_max)
                         except Exception as e:
                             pipeline_error = True
-                            error_type = type(e).__name__
-                            error_msg = f'{error_type}: {e}'
                             print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                error_msg, temp_input_error, None
+                                event_file_error, temp_input_error, None
 
                         # Downsample EDA data for rendering
                         peaks_ix = preprocessor.peaks_ix
@@ -1514,7 +1484,7 @@ def get_callbacks(app):
             sleep(1)
 
             return [dtype_error, map_error, pipeline_error,
-                    temp_input_error, memory]
+                    event_file_error, temp_input_error, memory]
 
     # == Recompute SQA metrics for re-rendering ==============================
     @app.callback(
@@ -1733,8 +1703,8 @@ def get_callbacks(app):
             drop_value = filenames[0]
             subject_drop_disabled = False
 
-        if segment_by_event:
-            dropdown_icon = html.I(className = 'fa-solid fa-calendar')
+            if segment_by_event:
+                dropdown_icon = html.I(className = 'fa-solid fa-calendar')
 
         # Handle single E4, Actiwave, and CSV files
         else:
