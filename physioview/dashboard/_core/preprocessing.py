@@ -55,7 +55,7 @@ class Preprocessor:
         },
         'EDA': {
             'filt_method': 'filter_signal',
-            'highcut': 0.35, 'filter_length': 2057, 'window_type': 'hamming',
+            'cutoff': 0.35, 'filter_length': 2057, 'window_type': 'hamming',
             'filt_type': 'FIR low-pass filter'
         },
     }
