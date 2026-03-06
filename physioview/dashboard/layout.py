@@ -319,16 +319,6 @@ layout = html.Div(id = 'main', children = [
                     ], style = {'display': 'flex', 'alignItems': 'center'})
                 ]),
             ]),
-            html.Div(id = 'segment-data', children = [
-                html.Span('Segment Size (sec):'),
-                dcc.Input(id = 'seg-size', type = 'number'),
-                html.I(className = 'fa-regular fa-circle-question',
-                       id = 'seg-data-help'),
-                dbc.Tooltip(
-                    'This sets the size of the windows into which your data '
-                    'will be segmented.',
-                    target = 'seg-data-help')
-            ]),
         ]),
         html.Div(id = 'run-save-buttons', children = [
             html.Button('Run', n_clicks = 0, id = 'run-data', disabled = True),
@@ -449,7 +439,7 @@ layout = html.Div(id = 'main', children = [
             ])
         ], className = 'validation-error-modal', centered = True),
 
-        # Duplicate Temperature Input Modal
+        # Duplicate Temperature Input Error Modal
         dbc.Modal(id = 'duplicate-temp-error-modal', is_open = False, children = [
             dbc.ModalHeader([
                 html.I(className = 'fa-solid fa-circle-xmark'),
@@ -618,64 +608,62 @@ layout = html.Div(id = 'main', children = [
                         children = [
                             dbc.ModalHeader(
                                 dbc.ModalTitle(children = [
-                                    'Export Summary',
-                                ])
+                                    'Export Summary'])
                             ),
-                                dbc.ModalBody(children = [
-                                    html.Div(
-                                        id = 'export-description',
-                                        children = [
+                            dbc.ModalBody(children = [
+                                html.Div(
+                                    id = 'export-description',
+                                    children = [
+                                        html.Div([
+                                            html.Span('''Download summary data as a Zip archive file (.zip) 
+                                            or Excel (.xlsx) file for a single file or batch of files.'''),
+                                            html.Span(''' Excel files may take longer to write.''',
+                                                      style = {'fontStyle': 'italic', 'color': '#de7765'})]
+                                        ),
+                                        html.Div(className = 'export-options', children = [
                                             html.Div([
-                                                html.Span('''Download summary data as a Zip archive file (.zip) 
-                                                or Excel (.xlsx) file for a single file or batch of files.'''),
-                                                html.Span(''' Excel files may take longer to write.''',
-                                                          style = {'fontStyle': 'italic', 'color': '#de7765'})]
-                                            ),
-                                            html.Div(className = 'export-options', children = [
-                                                html.Div([
-                                                    html.Label('Export Mode', htmlFor = 'export-mode'),
-                                                    html.I(className = 'fa-regular fa-circle-question',
-                                                           style = {'marginLeft': '5px'},
-                                                           id = 'export-mode-help'),
-                                                    dbc.Tooltip(
-                                                        "'Single' exports summary data of the current file. "
-                                                        "'Batch' exports data for all preprocessed subjects.",
-                                                        target = 'export-mode-help'),
-                                                    dbc.RadioItems(
-                                                        id = 'export-mode',
-                                                        options = [
-                                                            {'label': 'Single', 'value': 'Single'},
-                                                            {'label': 'Batch', 'value': 'Batch', 'disabled': True}
-                                                        ],
-                                                        inline = True)
-                                                ], style = {'display': 'inline-block'}),
-                                                html.Div(children = [
-                                                    html.Label('File Format', htmlFor = 'export-type'),
-                                                    html.I(className = 'fa-regular fa-circle-question',
-                                                                       style = {'marginLeft': '5px'},
-                                                                       id = 'export-format-help'),
-                                                    dbc.Tooltip(
-                                                        "'Zip' creates a .zip file containing CSVs and a summary "
-                                                        "text file. 'Excel' generates a workbook. In 'Batch' mode, all "
-                                                        "subjects' Excel files are bundled into a single .zip archive.",
-                                                        target = 'export-format-help',
-                                                    style = {'--bs-tooltip-max-width': '225px'}),
-                                                    dbc.RadioItems(
-                                                        ['Zip', 'Excel'],
-                                                        inline = True,
-                                                        id = 'export-type')
-                                                ], style = {'display': 'inline-block'})])
-                                            ]),
-                                    dbc.Progress(id = 'export-progress-bar',
-                                                 animated = True),
-                                    html.Div(id = 'export-confirm',
-                                             children = [
-                                                 html.I(className = 'fa-solid fa-circle-check',
-                                                        style = {'color': '#63e6be', 'fontSize': '26pt'}),
-                                                 html.P('Summary file created.',
-                                                        style = {'marginTop': '5px'})],
-                                             hidden = True)]),
-                                # ]),
+                                                html.Label('Export Mode', htmlFor = 'export-mode'),
+                                                html.I(className = 'fa-regular fa-circle-question',
+                                                       style = {'marginLeft': '5px'},
+                                                       id = 'export-mode-help'),
+                                                dbc.Tooltip(
+                                                    "'Single' exports summary data of the current file. "
+                                                    "'Batch' exports data for all preprocessed subjects/events.",
+                                                    target = 'export-mode-help'),
+                                                dbc.RadioItems(
+                                                    id = 'export-mode',
+                                                    options = [
+                                                        {'label': 'Single', 'value': 'Single'},
+                                                        {'label': 'Batch', 'value': 'Batch', 'disabled': True}
+                                                    ],
+                                                    inline = True)
+                                            ], style = {'display': 'inline-block'}),
+                                            html.Div(children = [
+                                                html.Label('File Format', htmlFor = 'export-type'),
+                                                html.I(className = 'fa-regular fa-circle-question',
+                                                                   style = {'marginLeft': '5px'},
+                                                                   id = 'export-format-help'),
+                                                dbc.Tooltip(
+                                                    "'Zip' creates a .zip file containing CSVs and a summary "
+                                                    "text file. 'Excel' generates a workbook. In 'Batch' mode, all "
+                                                    "subjects/events' Excel files are bundled into a single .zip archive.",
+                                                    target = 'export-format-help',
+                                                style = {'--bs-tooltip-max-width': '225px'}),
+                                                dbc.RadioItems(
+                                                    ['Zip', 'Excel'],
+                                                    inline = True,
+                                                    id = 'export-type')
+                                            ], style = {'display': 'inline-block'})])
+                                        ]),
+                                dbc.Progress(id = 'export-progress-bar',
+                                             animated = True),
+                                html.Div(id = 'export-confirm',
+                                         children = [
+                                             html.I(className = 'fa-solid fa-circle-check',
+                                                    style = {'color': '#63e6be', 'fontSize': '26pt'}),
+                                             html.P('Summary file created.',
+                                                    style = {'marginTop': '5px'})],
+                                         hidden = True)]),
                             dbc.ModalFooter(children = [
                                 html.Div(id = 'export-modal-btns',
                                          children = [
