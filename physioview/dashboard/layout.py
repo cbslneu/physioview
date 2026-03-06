@@ -451,6 +451,17 @@ layout = html.Div(id = 'main', children = [
             ])
         ], className = 'validation-error-modal', centered = True),
 
+        # Event File Error Modal
+        dbc.Modal(id = 'event-file-error-modal', is_open = False, children = [
+            dbc.ModalHeader([
+                html.I(className = 'fa-solid fa-circle-xmark'),
+                dbc.ModalTitle('Missing Event File')
+            ], close_button = True),
+            dbc.ModalBody(className = 'popup-error', children = [
+                html.Span('Please upload an event file or segment your data by time.')
+            ])
+        ], className = 'validation-error-modal', centered = True),
+
         # Pipeline Error Modal
         dbc.Modal(id = 'pipeline-error-modal', is_open = False, children = [
             dbc.ModalHeader([
