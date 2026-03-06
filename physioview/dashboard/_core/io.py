@@ -194,7 +194,7 @@ def _setup_data(
                 df['Timestamp'], unit = unix_format)
         else:
             df['Timestamp'] = pd.to_datetime(
-                df['Timestamp'], errors = 'coerce')
+                df['Timestamp'], errors = 'coerce', format = 'ISO8601')
 
             # Check if conversion was successful
             if df['Timestamp'].isna().any():
