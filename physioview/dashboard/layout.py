@@ -267,7 +267,7 @@ layout = html.Div(id = 'main', children = [
                     html.Span('Max:'),
                     dcc.Input(id = 'eda-valid-max', value = 40, type = 'number'),
                 ])
-            ], style = {'padding': '5px 0px 7px 0px'}),
+            ], style = {'padding': '0px 0px 7px 0px'}),
             html.Div(id = 'filter-data', children = [
                 html.Div(id = 'filter-settings', children = [
                     html.Div([

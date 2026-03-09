@@ -1,5 +1,5 @@
 from . import _core
-from dash import html, Input, Output, State, ctx, callback
+from dash import html, Input, Output, State, ctx, callback, no_update
 from dash.exceptions import PreventUpdate
 from dash.dcc import send_bytes
 from physioview import physioview
@@ -194,8 +194,8 @@ def get_callbacks(app):
          Output('artifact-settings', 'hidden'),
          Output('eda-preprocessing', 'hidden', allow_duplicate = True),
          Output('scr-amplitude-threshold', 'hidden'),
-         Output('beat-detectors', 'options'),
-         Output('beat-detectors', 'value'),
+         Output('beat-detectors', 'options', allow_duplicate = True),
+         Output('beat-detectors', 'value', allow_duplicate = True),
          Output('scr-detectors', 'options'),
          Output('scr-detectors', 'value', allow_duplicate = True),
          Output('seg-size', 'value', allow_duplicate = True)],
@@ -218,8 +218,8 @@ def get_callbacks(app):
         scr_amp_thresh_hidden = True
         resample_hidden = True
         resample_disabled = True
-        beat_detectors = []
-        default_beat_detector = None
+        beat_detectors = no_update
+        default_beat_detector = no_update
         scr_detectors = []
         default_scr_detector = None
         data_source = loaded_data['source']
@@ -246,12 +246,22 @@ def get_callbacks(app):
             fs = 4
 
         # Handle cardiac components
-        if dtype in ('PPG', 'ECG')  or e4_dtype == 'PPG' or data_source == 'Actiwave':
+        trig = ctx.triggered_id
+        if trig == 'e4-data-types' and e4_dtype == 'PPG':
+            fs = 64
+            eda_preprocess_hidden = True
+            beat_detector_settings_hidden = False
+            artifact_settings_hidden = False
+            beat_detectors = [
+                {'label': 'Elgendi et al. (2013)', 'value': 'erma'},
+                {'label': 'Van Gent et al. (2018)', 'value': 'adaptive_threshold'}]
+            default_beat_detector = 'adaptive_threshold'
+        elif ctx.triggered_id == 'data-types' and dtype in ('PPG', 'ECG'):
             fs = 500
             eda_preprocess_hidden = True
             beat_detector_settings_hidden = False
             artifact_settings_hidden = False
-            if dtype == 'PPG' or e4_dtype == 'PPG':
+            if dtype == 'PPG':
                 beat_detectors = [
                     {'label': 'Elgendi et al. (2013)', 'value': 'erma'},
                     {'label': 'Van Gent et al. (2018)', 'value': 'adaptive_threshold'}]
@@ -261,8 +271,7 @@ def get_callbacks(app):
                     {'label': 'Manikandan & Soman (2012)', 'value': 'manikandan'},
                     {'label': 'Engels & Zeelenberg (1979)', 'value': 'engzee'},
                     {'label': 'Nabian et al. (2018)', 'value': 'nabian'},
-                    {'label': 'Pan & Tompkins (1985)', 'value': 'pantompkins'}
-                ]
+                    {'label': 'Pan & Tompkins (1985)', 'value': 'pantompkins'}]
                 default_beat_detector = 'manikandan'
 
         return [fs, resample_hidden, resample_disabled,
@@ -604,6 +613,8 @@ def get_callbacks(app):
          Output('by-event-help', 'style'),
          Output('by-event-tooltip', 'className'),
          Output('seg-size', 'value', allow_duplicate = True),
+         Output('beat-detectors', 'options', allow_duplicate = True),
+         Output('beat-detectors', 'value', allow_duplicate = True),
          Output('artifact-method', 'value'),
          Output('artifact-tol', 'value'),
          Output('toggle-filter', 'on'),
@@ -657,6 +668,8 @@ def get_callbacks(app):
         ]
         by_event_help = {}
         hide_seg_by_tooltip = ''
+        beat_detectors = []
+        default_beat_detector = None
 
         if loaded == 'memory-load':
 
@@ -665,6 +678,15 @@ def get_callbacks(app):
                 hide_setup = True
                 hide_data_types = True
                 hide_data_vars = True
+                dtype = 'ECG'
+                beat_detectors = [
+                    {'label': 'Manikandan & Soman (2012)',
+                     'value': 'manikandan'},
+                    {'label': 'Engels & Zeelenberg (1979)', 'value': 'engzee'},
+                    {'label': 'Nabian et al. (2018)', 'value': 'nabian'},
+                    {'label': 'Pan & Tompkins (1985)', 'value': 'pantompkins'}
+                ]
+                default_beat_detector = 'manikandan'
                 if toggle_config_on:
                     seg_size = configs['segment size']
                     fs = configs['sampling rate']
@@ -805,8 +827,8 @@ def get_callbacks(app):
             temp_uploader_disabled, temp_uploader_text,
 
             fs, segment_by, by_event_help, hide_seg_by_tooltip, seg_size,
-            artifact_method, artifact_tol, filter_on,
-            scr_detector, eda_min, eda_max
+            beat_detectors, default_beat_detector, artifact_method,
+            artifact_tol, filter_on, scr_detector, eda_min, eda_max
         )
 
     # =================== TOGGLE EXPORT CONFIGURATION MODAL ===================
