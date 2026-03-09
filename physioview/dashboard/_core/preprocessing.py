@@ -185,10 +185,10 @@ class Preprocessor:
             signal_col = 'Phasic'
 
         # Segment the data
-        event_segments = self._segment_data(preprocessed)
+        data_segments = self._segment_data(preprocessed)
 
-        # Process each segment within the event
-        for seg_label, seg_data in event_segments.groupby('Segment'):
+        # Process each segment
+        for seg_label, seg_data in data_segments.groupby('Segment'):
 
             # Detect peaks in the window
             seg_peaks, peak_label = self._detect_peaks(
@@ -282,8 +282,6 @@ class Preprocessor:
         preprocessed['Timestamp'] = pd.to_datetime(preprocessed['Timestamp'])
         preprocessed.insert(1, 'Event', None)
         event_times = self.event_times.copy()
-        event_times['start'] = pd.to_datetime(event_times['start'])
-        event_times['end'] = pd.to_datetime(event_times['end'])
         for _, event in event_times.iterrows():
             event_label = event['event']
             event_start = event['start']
