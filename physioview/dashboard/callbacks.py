@@ -480,22 +480,17 @@ def get_callbacks(app):
             return None, file_check, uploaded
 
         # Convert start and end to datetime
-        try:  # from strings first
-            event_data['start'] = pd.to_datetime(event_data['start'])
-            event_data['end'] = pd.to_datetime(event_data['end'])
+        try:
+            for col in ['start', 'end']:
+                event_data[col] = _core.io._convert_timestamps(
+                    event_data[col])
         except Exception as e:
-            try:  # from Unix values
-                event_data['start'] = pd.to_datetime(
-                    event_data['start'], unit = 's')
-                event_data['end'] = pd.to_datetime(
-                    event_data['end'], unit = 's')
-            except Exception:
-                file_check = [
-                    html.I(className = 'fa-solid fa-circle-xmark'),
-                    html.Span('Invalid timestamp format.')
-                ]
-                uploaded = html.Span('Select File...')
-                return None, file_check, uploaded
+            file_check = [
+                html.I(className = 'fa-solid fa-circle-xmark'),
+                html.Span('Invalid timestamp format.')
+            ]
+            uploaded = html.Span('Select File...')
+            return None, file_check, uploaded
 
         if filename:
             uploaded = html.Span(f'{filename}')
