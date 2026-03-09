@@ -143,6 +143,26 @@ def _parse_temp_csv(contents: str) -> pd.DataFrame:
     buf = StringIO(raw.decode('utf-8'))
     return pd.read_csv(buf)
 
+def _convert_timestamps(ts: pd.Series) -> pd.Series:
+    """Convert a Series of timestamps to tz-naive UTC datetime64[ns]. Handles
+    Unix timestamps (seconds or milliseconds) and ISO8601 strings."""
+    unix_format = _check_unix(ts)
+    if unix_format is not None:
+        converted = pd.to_datetime(ts, unit = unix_format)
+        return converted
+
+    # Parse ISO8601 strings
+    converted = pd.to_datetime(ts, errors = 'coerce', format = 'ISO8601')
+    if converted.isna().any():
+        raise ValueError(
+            'Invalid timestamp format detected. Please ensure '
+            'timestamps are in a valid datetime format.')
+
+    # Convert to timezone-naive UTC
+    if converted.dt.tz is not None:
+        converted = converted.dt.tz_convert('UTC').dt.tz_localize(None)
+    return converted
+
 def _setup_data(
     csv: str,
     dtype: str,
@@ -188,19 +208,7 @@ def _setup_data(
 
     # Convert timestamps to datetime format
     if has_ts:
-        unix_format = _check_unix(df['Timestamp'])
-        if unix_format is not None:
-            df['Timestamp'] = pd.to_datetime(
-                df['Timestamp'], unit = unix_format)
-        else:
-            df['Timestamp'] = pd.to_datetime(
-                df['Timestamp'], errors = 'coerce', format = 'ISO8601')
-
-            # Check if conversion was successful
-            if df['Timestamp'].isna().any():
-                raise ValueError(
-                    'Invalid timestamp format detected. Please ensure '
-                    'timestamps are in a valid datetime format.')
+        df['Timestamp'] = _convert_timestamps(df['Timestamp'])
         ts_col = 'Timestamp'
 
     # Insert 'Sample column' if no timestamp
