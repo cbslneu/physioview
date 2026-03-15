@@ -190,7 +190,8 @@ def get_callbacks(app):
          Output('resampling-rate', 'disabled'),
          Output('load-temperature', 'hidden'),
          Output('temp-upload-section', 'hidden'),
-         Output('cardio-preprocessing', 'hidden'),
+         Output('beat-detector-settings', 'hidden'),
+         Output('artifact-settings', 'hidden'),
          Output('eda-preprocessing', 'hidden', allow_duplicate = True),
          Output('scr-amplitude-threshold', 'hidden'),
          Output('beat-detectors', 'options'),
@@ -227,7 +228,8 @@ def get_callbacks(app):
         if dtype == 'EDA' or e4_dtype == 'EDA':
             resample_hidden = False
             load_temp_hidden = False
-            cardio_preprocess_hidden = True
+            beat_detector_settings_hidden = True
+            artifact_settings_hidden = True
             eda_preprocess_hidden = False
             seg_size = 180
             if toggle_rs_on is True:
@@ -246,7 +248,8 @@ def get_callbacks(app):
         if dtype in ('PPG', 'ECG')  or e4_dtype == 'PPG' or data_source == 'Actiwave':
             fs = 500
             eda_preprocess_hidden = True
-            cardio_preprocess_hidden = False
+            beat_detector_settings_hidden = False
+            artifact_settings_hidden = False
             if dtype == 'PPG' or e4_dtype == 'PPG':
                 beat_detectors = [
                     {'label': 'Elgendi et al. (2013)', 'value': 'erma'},
@@ -263,67 +266,164 @@ def get_callbacks(app):
 
         return [fs, resample_hidden, resample_disabled,
                 load_temp_hidden, temp_upload_hidden,
-                cardio_preprocess_hidden, eda_preprocess_hidden,
+                beat_detector_settings_hidden, artifact_settings_hidden, eda_preprocess_hidden,
                 scr_amp_thresh_hidden, beat_detectors, default_beat_detector,
                 scr_detectors, default_scr_detector, seg_size]
 
     # === Open advanced filter cutoff settings ================================
     @app.callback(
-        [Output('filter-config-link', 'hidden'),
-         Output('filter-config-collapse', 'className')],
+        [Output('filter-config-btn', 'hidden'),
+         Output('filter-customization-modal', 'is_open'),
+         Output('dtype-validator', 'is_open')],
         [Input('toggle-filter', 'on'),
-         Input('filter-config-link', 'n_clicks')],
-        State('filter-config-collapse', 'className'),
+         Input('filter-config-btn', 'n_clicks')],
+        [State('memory-load', 'data'),
+         State('data-types', 'value'),
+         State('e4-data-types', 'value')],
         prevent_initial_call = True
     )
-    def handle_filter_config_link(filter_on, n_clicks, current_class):
+    def handle_filter_config_link(filter_on, n_clicks, data, dtype, e4_dtype):
         """Enable/disable the filter settings link based on the filter
         toggle state and display/hide the settings when the link is clicked."""
         trig = ctx.triggered_id
-        if current_class is None:
-            current_class = 'filter-config-hidden'
 
         # Handle filter toggle
         if trig == 'toggle-filter':
             if filter_on:
                 # Filter enabled; keep settings hidden
-                return False, 'filter-config-hidden'
+                return False, False, False
             else:
                 # Filter disabled; hide link and settings
-                return True, 'filter-config-hidden'
+                return True, False, False
 
         # Handle link click only if the filter oggle is already on
-        if trig == 'filter-config-link':
+        if trig == 'filter-config-btn':
             if filter_on:
-                if current_class == 'filter-config-hidden':
-                    return False, 'filter-config-visible'
+                if data['source'] == 'Actiwave':
+                    return False, True, False
+                elif data['source'] == 'E4':
+                    if e4_dtype is None:
+                        return False, False, True
+                    else:
+                        return False, True, False
                 else:
-                    return False, 'filter-config-hidden'
+                    if dtype is None:
+                        return False, False, True
+                    else:
+                        return False, True, False
 
         # Otherwise, keep the link and settings hidden
-        return True, 'filter-config-hidden'
+        return True, False, False
 
-    # === Set filter cutoff values ============================================
+    # === Set filter parameters ============================================
     @app.callback(
-        [Output('filter-lowcut', 'disabled'),
+        [Output('lower-cutoff-div', 'hidden'),
          Output('filter-lowcut', 'value', allow_duplicate = True),
-         Output('filter-highcut', 'value', allow_duplicate = True)],
-        [Input('data-types', 'value'),
-         Input('e4-data-types', 'value')],
+         Output('filter-highcut', 'value', allow_duplicate = True),
+         Output('filter-order-div', 'hidden'),
+         Output('filter-order', 'value', allow_duplicate = True),
+         Output('filter-rp-div', 'hidden'),
+         Output('filter-rp', 'value', allow_duplicate = True),
+         Output('filter-rs-div', 'hidden'),
+         Output('filter-rs', 'value', allow_duplicate = True),
+         Output('filter-window-len-div', 'hidden'),
+         Output('filter-window-len', 'value', allow_duplicate = True),
+         Output('filter-length-div', 'hidden'),
+         Output('filter-length', 'value', allow_duplicate = True),
+         Output('filter-window-type-div', 'hidden'),
+         Output('filter-window-type', 'value', allow_duplicate = True),
+         Output('selected-filter', 'children')],
+        [Input('memory-load', 'data'),
+         Input('data-types', 'value'),
+         Input('e4-data-types', 'value'),
+         Input('beat-detectors', 'value'),
+         Input('cancel-config-btn', 'n_clicks'),
+         Input('reset-to-default-btn', 'n_clicks')],
         prevent_initial_call = True
     )
-    def disable_lowcut_input(dtype, e4_dtype):
+    def set_default_filter_params(data, dtype, e4_dtype, beat_detector, n_cancel, n_reset):
         """Disable the filter lowcut input and customize the highcut input
         and value depending on the inputted data type."""
-        ecg_filter_params = [False, 5, 15]
-        ppg_filter_params = [False, 0.5, 10]
-        eda_filter_params = [True, None, 0.35]
-        if dtype == 'EDA' or e4_dtype == 'EDA':
-            return eda_filter_params
-        elif dtype == 'PPG' or e4_dtype == 'PPG':
-            return ppg_filter_params
+        
+        if data['source'] == 'Actiwave':
+            dtype = 'ECG'
+
+        if dtype in ['ECG', 'PPG', 'EDA']:
+            lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type = utils._default_filter_params(dtype, beat_detector)
+            selected_filter_children = filt_type
+        elif e4_dtype in ['PPG', 'EDA']:
+            lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type = utils._default_filter_params(e4_dtype, beat_detector)
+            selected_filter_children = filt_type
         else:
-            return ecg_filter_params
+            lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type = None, None, None, None, None, None, None, None, None
+            selected_filter_children = 'No filter selected.'
+
+        hide_lowcut = True if lowcut is None else False
+        hide_order = True if order is None else False
+        hide_rp = True if rp is None else False
+        hide_rs = True if rs is None else False
+        hide_window_len = True if window_len is None else False
+        hide_filter_length = True if filter_length is None else False
+        hide_window_type = True if window_type is None else False
+        return [hide_lowcut, lowcut, highcut, hide_order, order, hide_rp, rp, hide_rs, rs, hide_window_len, window_len, hide_filter_length, filter_length, hide_window_type, window_type, selected_filter_children]
+
+    # === Close filter customization modal =====================================
+    @app.callback(
+        [Output('filter-customization-modal', 'is_open', allow_duplicate = True),
+         Output('empty-param-error-div', 'hidden'),
+         Output('lowcut-highcut-error-div', 'hidden')],
+        [Input('apply-filter-btn', 'n_clicks'),
+         Input('cancel-config-btn', 'n_clicks'),
+         Input('reset-to-default-btn', 'n_clicks')],
+        [State('lower-cutoff-div', 'hidden'),
+         State('filter-lowcut', 'value'),
+         State('upper-cutoff-div', 'hidden'),
+         State('filter-highcut', 'value'),
+         State('filter-order-div', 'hidden'),
+         State('filter-order', 'value'),
+         State('filter-rp-div', 'hidden'),
+         State('filter-rp', 'value'),
+         State('filter-rs-div', 'hidden'),
+         State('filter-rs', 'value'),
+         State('filter-window-len-div', 'hidden'),
+         State('filter-window-len', 'value'),
+         State('filter-length-div', 'hidden'),
+         State('filter-length', 'value'),
+         State('filter-window-type-div', 'hidden'),
+         State('filter-window-type', 'value')],
+        prevent_initial_call = True
+    )
+    def close_filter_customization_modal(n_apply, n_cancel, n_reset, hide_lowcut, lowcut, hide_highcut, highcut, \
+        hide_order, order, hide_rp, rp, hide_rs, rs, hide_window_len, window_len, hide_filter_length, \
+            filter_length, hide_window_type, window_type):
+        """Close the filter customization modal and validate the filter parameters."""
+
+        trig = ctx.triggered_id
+
+        if trig == 'reset-to-default-btn':
+            return True, True, True
+
+        if trig == 'cancel-config-btn':
+            return False, True, True
+
+        lowcut_empty = True if not hide_lowcut and lowcut is None else False
+        highcut_empty = True if not hide_highcut and highcut is None else False
+        order_empty = True if not hide_order and order is None else False
+        rp_empty = True if not hide_rp and rp is None else False
+        rs_empty = True if not hide_rs and rs is None else False
+        window_len_empty = True if not hide_window_len and window_len is None else False
+        filter_length_empty = True if not hide_filter_length and filter_length is None else False
+        window_type_empty = True if not hide_window_type and window_type is None else False
+
+        hide_empty_param_error = not any([lowcut_empty, highcut_empty, order_empty, rp_empty, rs_empty, window_len_empty, filter_length_empty, window_type_empty])
+        if hide_empty_param_error:
+            hide_lowcut_highcut_error = False if not hide_lowcut and not hide_highcut and lowcut >= highcut else True
+        else:
+            hide_lowcut_highcut_error = True
+
+        open_modal = False if hide_empty_param_error and hide_lowcut_highcut_error else True
+
+        return [open_modal, hide_empty_param_error, hide_lowcut_highcut_error]
 
     # === Read temperature data file if provided ==============================
     @app.callback(
@@ -438,7 +538,7 @@ def get_callbacks(app):
 
         # Default toggler states
         temp_on = False
-        filter_on = False
+        filter_on = True
 
         # Default parameter values
         base_headers = ['<Var>', '<Var>']
@@ -720,10 +820,9 @@ def get_callbacks(app):
     # ============================= RUN PIPELINE ==============================
     @callback(
         output = [
-            Output('dtype-validator', 'is_open'),
+            Output('dtype-validator', 'is_open', allow_duplicate=True),
             Output('mapping-validator', 'is_open'),
             Output('pipeline-error-modal', 'is_open'),
-            Output('pipeline-error-message', 'children'),
             Output('duplicate-temp-error-modal', 'is_open'),
             Output('memory-db', 'data'),
         ],
@@ -748,6 +847,10 @@ def get_callbacks(app):
             State('toggle-filter', 'on'),
             State('filter-lowcut', 'value'),
             State('filter-highcut', 'value'),
+            State('filter-order', 'value'),
+            State('filter-rp', 'value'),
+            State('filter-rs', 'value'),
+            State('filter-window-len', 'value'),
             State('scr-detectors', 'value'),
             State('scr-amp-thresh', 'value'),
             State('eda-valid-min', 'value'),
@@ -771,8 +874,8 @@ def get_callbacks(app):
     def run_pipeline(set_progress, n, load_data, e4_dtype, dtype, fs, rs, d1,
                      d2, d3, d4, d5, temp_data, temp_var, beat_detector,
                      seg_size, artifact_method, artifact_tol, filt_on,
-                     filter_lowcut, filter_highcut, scr_detector, scr_amp,
-                     eda_min, eda_max):
+                     filter_lowcut, filter_highcut, filter_order, filter_rp, filter_rs, 
+                     filter_window_len, scr_detector, scr_amp, eda_min, eda_max):
         """Read Actiwave Cardio, Empatica E4, or CSV-formatted data, save
         the data to the local memory, and load the progress spinner."""
 
@@ -795,11 +898,11 @@ def get_callbacks(app):
             if file_type not in ('Actiwave', 'E4'):
                 if dtype is None:
                     dtype_error = True
-                    return dtype_error, map_error, pipeline_error, '', \
+                    return dtype_error, map_error, pipeline_error, \
                         temp_input_error, None
                 elif d2 is None:
                     map_error = True
-                    return dtype_error, map_error, pipeline_error, '', \
+                    return dtype_error, map_error, pipeline_error, \
                         temp_input_error, None
 
             filepath = load_data['filename']
@@ -880,25 +983,22 @@ def get_callbacks(app):
                                 data, dtype, fs, seg_size, beat_detector,
                                 artifact_method, artifact_tol, filt_on,
                                 filter_lowcut, filter_highcut,
+                                filter_order, filter_rp, filter_rs,
+                                filter_window_len,
                                 acc_data = acc, downsample = ds)
 
                             # Throw beat detection error
                             if isinstance(preprocessed, tuple) and \
                                     all(x is None for x in preprocessed):
                                 pipeline_error = True
-                                error_msg = ('PipelineError: No beats detected. '
-                                             'Please try a different beat '
-                                             'detector.')
                                 return dtype_error, map_error, pipeline_error, \
-                                    error_msg, temp_input_error, None
+                                    temp_input_error, None
 
                         except Exception as e:
                             pipeline_error = True
-                            error_type = type(e).__name__
-                            error_msg = f'{error_type}: {e}'
                             print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                error_msg, temp_input_error, None
+                                temp_input_error, None
                         metrics = preprocessed[2]
 
                         # Write IBI data to 'temp' folder
@@ -925,9 +1025,9 @@ def get_callbacks(app):
                         except Exception as e:
                             pipeline_error = True
                             error_type = type(e).__name__
-                            error_msg = f'{error_type}: {e}'
+                            print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                error_msg, temp_input_error, None
+                                temp_input_error, None
                         metrics = preprocessed[1]
 
                         # Get downsampled data for rendering
@@ -1030,7 +1130,7 @@ def get_callbacks(app):
                     # Check if duplicate temperature inputs
                     if temp_data is not None and temp_var is not None:
                         temp_input_error = True
-                        return dtype_error, map_error, pipeline_error, '', \
+                        return dtype_error, map_error, pipeline_error, \
                             temp_input_error, None
 
                     # If timestamps are given
@@ -1086,25 +1186,23 @@ def get_callbacks(app):
                             data, dtype, fs, seg_size, beat_detector,
                             artifact_method, artifact_tol, filt_on,
                             filter_lowcut, filter_highcut,
+                            filter_order, filter_rp, filter_rs,
+                            filter_window_len,
                             acc_data = acc, downsample = ds)
 
                         # Throw beat detection error
                         if isinstance(preprocessed, tuple) and \
                                 all(x is None for x in preprocessed):
                             pipeline_error = True
-                            error_msg = ('PipelineError: No beats detected. '
-                                         'Please try a different beat '
-                                         'detector.')
+                            print(traceback.format_exc())
                             return dtype_error, map_error, pipeline_error, \
-                                error_msg, temp_input_error, None
+                                temp_input_error, None
 
                     except Exception as e:
                         pipeline_error = True
-                        error_type = type(e).__name__
-                        error_msg = f'{error_type}: {e}'
                         print(traceback.format_exc())
                         return dtype_error, map_error, pipeline_error, \
-                            error_msg, temp_input_error, None
+                            temp_input_error, None
                     metrics = preprocessed[2]
 
                     # Write IBI data to 'temp' folder
@@ -1145,7 +1243,7 @@ def get_callbacks(app):
                         error_msg = f'{error_type}: {e}'
                         print(traceback.format_exc())
                         return dtype_error, map_error, pipeline_error, \
-                            error_msg, temp_input_error, None
+                            temp_input_error, None
                     metrics = preprocessed[1]
 
                 # Write preprocessed data and metrics to 'temp' folder
@@ -1199,7 +1297,7 @@ def get_callbacks(app):
             set_progress((100, '100%'))
             sleep(1)
 
-            return [dtype_error, map_error, pipeline_error, '',
+            return [dtype_error, map_error, pipeline_error,
                     temp_input_error, memory]
 
     # == Recompute SQA metrics for re-rendering ==============================
@@ -2517,10 +2615,12 @@ def get_callbacks(app):
                             ends = np.ceil(
                                 (mapped_unusable_ix + 1) * ratio).astype(int)
                             ends = np.maximum(ends, starts + 1)
-                            for s, e in zip(starts, ends):
-                                parts = np.arange(s, min(e, len(data)), dtype = int)
-                            if parts:
-                                full = np.unique(np.concatenate(parts))
+                            parts = np.array([], dtype = int)
+                            for start, end in zip(starts, ends):
+                                part = np.arange(start, min(end, len(data)), dtype = int)
+                                parts = np.concatenate([parts, part])
+                            if len(parts) > 0:
+                                full = np.unique(parts)
                                 data.loc[full, 'Unusable'] = 1
 
                     # Reposition columns for clarity

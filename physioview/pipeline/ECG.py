@@ -20,7 +20,7 @@ class Filters:
         50 or 60 (by default, 60). The 50 Hz power grid is prevalent in
         many European, Asian, and African countries.
     """
-    def __init__(self,fs: int, powerline_freq: Literal[50, 60] = 60):
+    def __init__(self, fs: int, powerline_freq: Literal[50, 60] = 60):
         """
         Initialize the Filters object.
 
@@ -137,13 +137,98 @@ class Filters:
         b, a = iirnotch(w0, q)
         filtered = filtfilt(b, a, signal)
         return filtered
+    
+    def ma_cumulative_sum(
+        self,
+        signal: np.ndarray,
+        window_len: int
+    ) -> np.ndarray:
+        """Moving average filter using cumulative sums."""
+        cumsum = np.cumsum(np.insert(signal, 0, 0))
+        ma = (cumsum[window_len:] - cumsum[:-window_len]) / float(window_len)
+        return ma
+
+    def ma_convolution(
+        self,
+        signal: np.ndarray,
+        window_len: int
+    ) -> np.ndarray:
+        """Moving average filter using convolution."""
+        padded_diff = np.pad(
+            signal, (window_len // 2, window_len // 2), mode = 'constant')
+        ma = np.convolve(
+            padded_diff, np.ones(window_len) / window_len, mode = 'valid')
+        return ma
+
+    def butter_bandpass_filter(
+        self,
+        signal: np.ndarray,
+        lowcut: float = 0.5,
+        highcut: float = 15,
+        order: int = 2
+    ) -> np.ndarray:
+        """A Butterworth bandpass filter, used in the preprocessing procedure
+        of the Pan & Tompkins (1985) and Hamilton & Tompkins (1986) QRS
+        detection algorithms. All parameters, including the passband frequency
+        range (`Wn`) and order (`N`) of the filter, are provided as default
+        values according to the Pan & Tompkins (1985) algorithms. To use the same
+        configuration with Hamilton & Tompkins (1986), set lowcut to 8Hz and
+        highcut to 16Hz.
+        """
+        nyquist = 0.5 * self.fs
+        low = lowcut / nyquist
+        high = highcut / nyquist
+        b, a = butter(N = order, Wn = [low, high], btype = 'band')
+        preprocessed = filtfilt(b, a, signal)
+        return preprocessed
+
+    def elliptic_bandpass_filter(
+        self,
+        signal: np.ndarray,
+        lowcut: float = 0.5,
+        highcut: float = 50,
+        order: int = 2,
+        rs: float = 0.5,
+        rp: float = 40
+    ) -> np.ndarray:
+        """An elliptic bandpass filter, used in the preprocessing procedure
+        of the Nabian et al. (2018) R peak detection algorithm. All parameters,
+        including the lower and upper cutoff frequencies (`Wn`), passband
+        ripple (`rp`), stopband attenuation (`rs`), and order (`N`) of the
+        filter, are provided as default values according to the algorithm."""
+        nyq = 0.5 * self.fs
+        low = lowcut / nyq
+        high = highcut / nyq
+        b, a = ellip(N = order, rs = rs, rp = rp, Wn = [low, high], btype = 'band')
+        preprocessed = filtfilt(b, a, signal)
+        return preprocessed
+
+    def cheby1_filter(
+        self,
+        signal: np.ndarray,
+        lowcut: float = 6,
+        highcut: float = 18,
+        order: int = 4,
+        rp: float = 1
+    ) -> np.ndarray:
+        """A Chebyshev Type I bandpass filter, used in the preprocessing
+        procedure of the Manikandan and Soman (2012) beat detection algorithm.
+        All parameters, including the lower and upper cutoff frequencies
+        (`Wn`), passband ripple (`rp`), and order (`N`), of the filter are
+        provided as default values according to the algorithm."""
+        nyquist = 0.5 * self.fs
+        low = lowcut / nyquist
+        high = highcut / nyquist
+        b, a = cheby1(N = order, rp = rp, Wn = [low, high], btype = 'bandpass')
+        preprocessed = filtfilt(b, a, signal)
+        return preprocessed
 
     def filter_signal(
         self,
         signal: np.ndarray,
         lowcut: float = 1,
         highcut: float = 15,
-        rp: float= 0.15,
+        rp: float = 0.15,
         rs: float = 80,
         order: int = 2
     ) -> np.ndarray:
@@ -199,7 +284,7 @@ class Filters:
 
         filtered = filtfilt(b, a, signal)
         return filtered
-
+    
 # ======================= ECG Beat Detection Methods =========================
 class BeatDetectors:
     """
@@ -273,14 +358,16 @@ class BeatDetectors:
 
         if not self.preprocessed:
             # Pre-process data using built-in filters
-            signal = Filters.filter_signal(signal, self.fs)
+            filter = Filters(self.fs)
+            signal = filter.filter_signal(signal)
         else:
             pass
 
         # Differentiate the input signal
         diff = np.zeros(len(signal))
+        signal_array = np.array(signal)
         for i in range(4, len(diff)):
-            diff[i] = signal[i] - signal[i - 4]
+            diff[i] = signal_array[i] - signal_array[i - 4]
 
         # Apply low-pass filter to the differentiated signal
         ci = [1, 4, 6, 4, 1]               # coefficients
@@ -384,10 +471,6 @@ class BeatDetectors:
                 thi = False
                 thf = False
 
-        # Remove the first detection as it requires QRS complex amplitude
-        # for the threshold
-        ecg_beats.pop(0)
-
         # Convert list of beats to numpy array and return
         ecg_beats = np.array(ecg_beats, dtype = 'int')
 
@@ -452,10 +535,16 @@ class BeatDetectors:
             return passing_beats
 
         if not self.preprocessed:
-            signal = self._cheby1_filter(signal)
+            filter = Filters(self.fs)
+            signal = filter.cheby1_filter(signal)
         else:
             pass
         signal = np.array(signal)
+
+        # Guard against segments too short for the moving average filter
+        ma_len = int(self.fs * 2.5)
+        if signal.size < ma_len:
+            return np.array([], dtype = int)
 
         # Differentiate the ECG signal
         dn = (np.append(signal[1:], 0) - signal)
@@ -478,7 +567,8 @@ class BeatDetectors:
         window_len = int(0.15 * self.fs)
 
         # Apply a moving average filter to the energy values
-        sn_f = np.insert(self._ma_cumulative_sum(sn, window_len),
+        filter = Filters(self.fs)
+        sn_f = np.insert(filter.ma_cumulative_sum(sn, window_len),
                          0, [0] * (window_len - 1))
 
         # Apply the Hilbert transform to the filtered energy values
@@ -487,9 +577,8 @@ class BeatDetectors:
         # Apply a moving average filter again to remove low-frequency drift
         # 2.5 sec from Manikandan & Soman (900 samples)
         # 2.5 sec in 500 Hz == 1250 samples
-        ma_len = int(self.fs * 2.5)
         zn_ma = np.insert(
-            self._ma_cumulative_sum(zn, ma_len), 0, [0] * (ma_len - 1))
+            filter.ma_cumulative_sum(zn, ma_len), 0, [0] * (ma_len - 1))
 
         # Compute the difference to get only the high-frequency components
         zn_ma_s = zn - zn_ma
@@ -550,7 +639,8 @@ class BeatDetectors:
         """
 
         if not self.preprocessed:
-            signal = self._elliptic_bandpass_filter(signal)
+            filter = Filters(self.fs)
+            signal = filter.elliptic_bandpass_filter(signal)
         else:
             pass
 
@@ -567,7 +657,10 @@ class BeatDetectors:
 
     def pantompkins(
         self,
-        signal: np.ndarray
+        signal: np.ndarray,
+        lowcut: float = 0.5,
+        highcut: float = 15,
+        order: int = 2
     ) -> np.ndarray:
         """
         Extract QRS complex locations from an ECG signal with the
@@ -590,7 +683,8 @@ class BeatDetectors:
         """
 
         if not self.preprocessed:
-            signal = self._butter_bandpass_filter(signal, method = 'pan')
+            filter = Filters(self.fs)
+            signal = filter.butter_bandpass_filter(signal, lowcut=lowcut, highcut=highcut, order=order)
         else:
             pass
 
@@ -671,93 +765,6 @@ class BeatDetectors:
 
         ecg_beats = self._remove_dupes(ecg_beats)
         return ecg_beats
-
-    def _ma_cumulative_sum(
-        self,
-        signal: np.ndarray,
-        window_len: int
-    ) -> np.ndarray:
-        """Moving average filter using cumulative sums."""
-        cumsum = np.cumsum(np.insert(signal, 0, 0))
-        ma = (cumsum[window_len:] - cumsum[:-window_len]) / float(window_len)
-        return ma
-
-    def _ma_convolution(
-        self,
-        signal: np.ndarray,
-        window_len: int
-    ) -> np.ndarray:
-        """Moving average filter using convolution."""
-        padded_diff = np.pad(
-            signal, (window_len // 2, window_len // 2), mode = 'constant')
-        ma = np.convolve(
-            padded_diff, np.ones(window_len) / window_len, mode = 'valid')
-        return ma
-
-    def _butter_bandpass_filter(
-        self,
-        signal: np.ndarray,
-        method: str
-    ) -> np.ndarray:
-        """A Butterworth bandpass filter, used in the preprocessing procedure
-        of the Pan & Tompkins (1985) and Hamilton & Tompkins (1986) QRS
-        detection algorithms. All parameters, including the passband frequency
-        range (`Wn`) and order (`N`) of the filter, are provided as default
-        values according to the algorithms."""
-        if method not in ['pan', 'hamilton']:
-            raise ValueError('The `method` parameter must take either \'pan\' '
-                             'or \'hamilton\'.')
-        else:
-            if method == 'pan':
-                lowcut = 0.5
-                highcut = 15
-            if method == 'hamilton':
-                # Based on https://github.com/berndporr/py-ecg-detectors/
-                lowcut = 8
-                highcut = 16
-
-        nyquist = 0.5 * self.fs
-        low = lowcut / nyquist
-        high = highcut / nyquist
-        b, a = butter(N = 2, Wn = [low, high], btype = 'band')
-        preprocessed = filtfilt(b, a, signal)
-        return preprocessed
-
-    def _elliptic_bandpass_filter(
-        self,
-        signal: np.ndarray
-    ) -> np.ndarray:
-        """An elliptic bandpass filter, used in the preprocessing procedure
-        of the Nabian et al. (2018) R peak detection algorithm. All parameters,
-        including the lower and upper cutoff frequencies (`Wn`), passband
-        ripple (`rp`), stopband attenuation (`rs`), and order (`N`) of the
-        filter, are provided as default values according to the algorithm."""
-        nyq = 0.5 * self.fs
-        lowcut = 0.5
-        highcut = 50
-        low = lowcut / nyq
-        high = highcut / nyq
-        b, a = ellip(N = 2, rs = 0.5, rp = 40, Wn = [low, high], btype = 'band')
-        preprocessed = filtfilt(b, a, signal)
-        return preprocessed
-
-    def _cheby1_filter(
-        self,
-        signal: np.ndarray
-    ) -> np.ndarray:
-        """A Chebyshev Type I bandpass filter, used in the preprocessing
-        procedure of the Manikandan and Soman (2012) beat detection algorithm.
-        All parameters, including the lower and upper cutoff frequencies
-        (`Wn`), passband ripple (`rp`), and order (`N`), of the filter are
-        provided as default values according to the algorithm."""
-        nyquist = 0.5 * self.fs
-        lowcut = 6
-        highcut = 18
-        low = lowcut / nyquist
-        high = highcut / nyquist
-        b, a = cheby1(N = 4, rp = 1, Wn = [low, high], btype = 'bandpass')
-        preprocessed = filtfilt(b, a, signal)
-        return preprocessed
 
     def _remove_dupes(
         self,

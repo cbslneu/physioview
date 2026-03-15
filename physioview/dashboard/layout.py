@@ -185,6 +185,39 @@ layout = html.Div(id = 'main', children = [
         ]),
         html.Div(id = 'preprocess-data', hidden = True, children = [
             html.H4('Preprocess Data'),
+            html.Div(id = 'beat-detector-settings', hidden = True, children = [
+                html.Div(id = 'select-beat-detector', children = [
+                    html.Span('Beat Detector:'),
+                    dcc.Dropdown(id = 'beat-detectors',
+                                 options = [], clearable = False)
+                ])
+            ]),
+            html.Div(id = 'eda-preprocessing', hidden = True, children = [
+                html.Div(id = 'select-scr-detector', children = [
+                    html.Span('SCR Detector:'),
+                    dcc.Dropdown(id = 'scr-detectors',
+                                 options = [], clearable = False)
+                ]),
+                html.Div(id = 'scr-amplitude-threshold', children = [
+                    html.Span('Minimum Peak Amplitude (µS):'),
+                    dcc.Input(id = 'scr-amp-thresh', value = None, type =
+                    'number'),
+                    html.I(className = 'fa-regular fa-circle-question',
+                       id = 'min-peak-amp-help'),
+                    dbc.Tooltip(
+                        'Exclude SCR peaks with ampitudes below this '
+                        'threshold. If this field is empty, no amplitude '
+                        'threshold is used.',
+                        target = 'min-peak-amp-help')
+                ], hidden = True),
+                html.Div(id = 'valid-amplitude-range', children = [
+                    html.Span('Valid EDA Range (µS):'),
+                    html.Span('Min:'),
+                    dcc.Input(id = 'eda-valid-min', value = 0.2, type = 'number'),
+                    html.Span('Max:'),
+                    dcc.Input(id = 'eda-valid-max', value = 40, type = 'number'),
+                ])
+            ], style = {'padding': '5px 0px 7px 0px'}),
             html.Div(id = 'filter-data', children = [
                 html.Div(id = 'filter-settings', children = [
                     html.Div([
@@ -193,9 +226,9 @@ layout = html.Div(id = 'main', children = [
                             color = '#ee8a78',
                             label = 'Filter Signal',
                             labelPosition = 'left',
-                            on = False),
+                            on = True),
                         html.I(className = 'fa-regular fa-circle-question',
-                               id = 'filter-help'),
+                                id = 'filter-help'),
                         dbc.Tooltip('Apply a filter to remove low- and '
                                     'high-frequency noise, including baseline '
                                     'drift, powerline interference, '
@@ -203,27 +236,10 @@ layout = html.Div(id = 'main', children = [
                                     target = 'filter-help',
                                     style = {'--bs-tooltip-max-width': '225px'})
                     ], style = {'display': 'flex', 'alignItems': 'center'}),
-                    html.A('Filter Settings', id = 'filter-config-link',
-                           n_clicks = 0, href = '#', hidden = True)
+                    html.Button('Advanced Settings', n_clicks = 0, id = 'filter-config-btn', hidden = True)
                 ]),
-                html.Div(
-                    dbc.Card(dbc.CardBody([
-                        html.Div(id = 'lower-cutoff-div', children = [
-                            html.Span('Lower Cutoff (Hz):'),
-                            dcc.Input(id = 'filter-lowcut', type = 'number',
-                                      value = 1, min = 0.1),
-                        ]),
-                        html.Div(id = 'upper-cutoff-div', children = [
-                            html.Span('Upper Cutoff (Hz):'),
-                            dcc.Input(id = 'filter-highcut', type = 'number',
-                                      value = 15, min = 0.1),
-                        ]),
-                    ])),
-                    id = 'filter-config-collapse',
-                    className = 'filter-config-hidden'),
             ]),
-
-            html.Div(id = 'cardio-preprocessing', hidden = True, children = [
+            html.Div(id = 'artifact-settings', hidden = True, children = [
                 html.Div(id = 'artifact-params', children = [
                     html.Div(children = [
                         html.Span('Artifact Identification Method:'),
@@ -252,38 +268,7 @@ layout = html.Div(id = 'main', children = [
                             'to more artifacts flagged.', target = 'artifact-tol-help')
                     ], style = {'display': 'flex', 'alignItems': 'center'})
                 ]),
-                html.Div(id = 'select-beat-detector', children = [
-                    html.Span('Beat Detector:'),
-                    dcc.Dropdown(id = 'beat-detectors',
-                                 options = [], clearable = False)
-                ]),
             ]),
-            html.Div(id = 'eda-preprocessing', hidden = True, children = [
-                html.Div(id = 'select-scr-detector', children = [
-                    html.Span('SCR Detector:'),
-                    dcc.Dropdown(id = 'scr-detectors',
-                                 options = [], clearable = False)
-                ]),
-                html.Div(id = 'scr-amplitude-threshold', children = [
-                    html.Span('Minimum Peak Amplitude (µS):'),
-                    dcc.Input(id = 'scr-amp-thresh', value = None, type =
-                    'number'),
-                    html.I(className = 'fa-regular fa-circle-question',
-                       id = 'min-peak-amp-help'),
-                    dbc.Tooltip(
-                        'Exclude SCR peaks with ampitudes below this '
-                        'threshold. If this field is empty, no amplitude '
-                        'threshold is used.',
-                        target = 'min-peak-amp-help')
-                ], hidden = True),
-                html.Div(id = 'valid-amplitude-range', children = [
-                    html.Span('Valid EDA Range (µS):'),
-                    html.Span('Min:'),
-                    dcc.Input(id = 'eda-valid-min', value = 0.2, type = 'number'),
-                    html.Span('Max:'),
-                    dcc.Input(id = 'eda-valid-max', value = 40, type = 'number'),
-                ])
-            ], style = {'padding': '5px 0px 7px 0px'}),
             html.Div(id = 'segment-data', children = [
                 html.Span('Segment Size (sec):'),
                 dcc.Input(id = 'seg-size', type = 'number'),
@@ -295,6 +280,7 @@ layout = html.Div(id = 'main', children = [
                     target = 'seg-data-help')
             ]),
         ]),
+
         html.Div(id = 'run-save-buttons', children = [
             html.Button('Run', n_clicks = 0, id = 'run-data', disabled = True),
             html.Button('Stop', n_clicks = 0, id = 'stop-run', hidden = True,
@@ -302,6 +288,94 @@ layout = html.Div(id = 'main', children = [
             html.Button('Save', n_clicks = 0, id = 'configure',
                         disabled = True)
         ]),
+
+        # Filter Customization
+        dbc.Modal(id = 'filter-customization-modal', is_open = False, keyboard=False,
+            backdrop="static", children = [
+            dbc.ModalHeader(children = [
+                dbc.ModalTitle('Advanced Filter Settings')
+            ], close_button = False),
+            dbc.ModalBody(children = [
+                html.Span('Customize the filter settings for more control.'),
+                html.Div(id = 'selected-filter-container', children = [
+                    html.Div(children = [
+                        html.Span('Selected filter:', id = 'selected-filter-label'),
+                        html.I(className = 'fa-regular fa-circle-question',
+                                id = 'selected-filter-help'),
+                        dbc.Tooltip('Filter type is automaticallly selected based on the data type and selected beat/SCR detection method.',
+                                    target = 'selected-filter-help',
+                                    style = {'--bs-tooltip-max-width': '225px'})
+                    ]),
+                    html.Span('Please select the signal type to customize the filter settings.', id = 'selected-filter'),
+                ]),
+                html.Div(id = 'filter-parameters-container', children = [html.Div(children = [
+                        html.Span('Filter Parameters:', id = 'filter-parameters-label'),
+                        html.I(className = 'fa-regular fa-circle-question',
+                                id = 'filter-parameters-help'),
+                        dbc.Tooltip('Parameters used in the original paper of the selected beat detector are selected by default. \
+                                    Customize the filter parameters to your data.',
+                                    target = 'filter-parameters-help',
+                                    style = {'--bs-tooltip-max-width': '225px'}),
+                        html.A('Reset to Default', href = '#', id = 'reset-to-default-btn')
+                    ]),
+                    html.Div(id = 'empty-param-error-div', className='filter-config-error', hidden = True, children = [
+                        html.Span('One or more filter parameters are empty. Please fill in all parameters.')
+                    ]),
+                    html.Div(id = 'lowcut-highcut-error-div', className='filter-config-error', hidden = True, children = [
+                        html.Span('Lower cutoff must be less than upper cutoff.')
+                    ]),
+                    html.Div(id = 'lower-cutoff-div', className='filter-config-item', children = [
+                        html.Span('Lower Cutoff (Hz):'),
+                        dcc.Input(id = 'filter-lowcut', type = 'number',
+                                    value = 1, min = 0.1),
+                    ]),
+                    html.Div(id = 'upper-cutoff-div', className='filter-config-item', children = [
+                        html.Span('Upper Cutoff (Hz):'),
+                        dcc.Input(id = 'filter-highcut', type = 'number',
+                                    value = 15, min = 0.1),
+                    ]),
+                    html.Div(id = 'filter-order-div', className='filter-config-item', children = [
+                        html.Span('Filter Order:'),
+                        dcc.Input(id = 'filter-order', type = 'number', step = 1,
+                                    value = 2, min = 1),
+                    ]),
+                    html.Div(id = 'filter-rp-div', className='filter-config-item', children = [
+                        html.Span('Passband Ripple (dB):'),
+                        dcc.Input(id = 'filter-rp', type = 'number',
+                                    value = 0.15, min = 0.01),
+                    ]),
+                    html.Div(id = 'filter-rs-div', className='filter-config-item', children = [
+                        html.Span('Stopband Attenuation (dB):'),
+                        dcc.Input(id = 'filter-rs', type = 'number',
+                                    value = 80, min = 0.01),
+                    ]),
+                    html.Div(id = 'filter-window-len-div', className='filter-config-item', children = [
+                        html.Span('Moving Average Window Length (s):'),
+                        dcc.Input(id = 'filter-window-len', type = 'number',
+                                    value = 0.5, min = 0.01),
+                    ]),
+                    html.Div(id = 'filter-length-div', className='filter-config-item', children = [
+                        html.Span('Filter Length (taps):'),
+                        dcc.Input(id = 'filter-length', type = 'number',
+                                    value = 2057, min = 1),
+                    ]),
+                    html.Div(id = 'filter-window-type-div', className='filter-config-item', children = [
+                        html.Span('Window Type:'),
+                        dcc.Dropdown(id = 'filter-window-type',
+                                    options = [
+                                        {'label': 'Hamming', 'value': 'hamming'},
+                                        {'label': 'Hann', 'value': 'hann'},
+                                        {'label': 'Blackman', 'value': 'blackman'}
+                                    ],
+                                    value = 'hamming', clearable = False),
+                    ]),
+                ]),
+                html.Div(id = 'filter-customization-buttons', children = [
+                    html.Button('Apply', n_clicks = 0, id = 'apply-filter-btn'),
+                    html.Button('Cancel', n_clicks = 0, id = 'cancel-config-btn'),
+                ])
+            ])
+        ], centered = True),
 
         # Variable Mappings Validator
         dbc.Modal(id = 'mapping-validator', is_open = False, children = [
@@ -345,9 +419,21 @@ layout = html.Div(id = 'main', children = [
                 dbc.ModalTitle('Error')
             ], close_button = True),
             dbc.ModalBody([
-                html.Span('An unexpected error occurred:',
+                html.Span('An error occurred while processing the data. Please check the following:',
                           style = {'fontWeight': '600'}),
-                html.Div(id = 'pipeline-error-message', children = [])
+                html.Ul(id = 'pipeline-error-message', children = [
+                    html.Li('The correct data type is selected..'),
+                    html.Li('The sampling rate is correct.'),
+                    html.Li('"Time/sample" and "Signal" are mapped correctly.'),
+                    html.Li(children = [
+                        'Filtering:',
+                        html.Ul(children = [
+                            html.Li('"Filter Signal" is toggled on if the signal is unfiltered.'),
+                            html.Li('The filter configuration is reasonable.'),
+                        ]),
+                    ]),
+                    html.Li('Try a different beat detector.'),
+                ]),
             ])
         ], className = 'validation-error-modal', centered = True),
 

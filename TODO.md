@@ -4,13 +4,15 @@ A to-do list of planned features, improvements, and tasks for HeartView.
 
 ## ✨ Features to Add
 - [x] **DB:** Batch post-processing functionality with a UI component [@nmy2103]
-- [ ] **BE:** Plotting of tasks/conditions in the signal chart [@tchen94]
 - [x] **DB:** Automated beat correction functionality with UI component
 - [ ] **BE:** Functionality to flexibly edit added/deleted beats and unusable segments [@tchen94]
 - [x] **DB:** EDA processing and quality assessment functionality [@nmy2103]
 
 ## 🐛 Bugs to Fix
-<!-- Add any bugs to fix with this checklist item: - [ ] -->
+- [ ] **DB:** Recreate Beat Editor files after changing the segment size 
+  when preprocessing the same uploaded file [@nmy2103]
+- [ ] **DB:** Fix rendering mismatch of detected beats on filtered vs. raw 
+  signals
 
 
 ## 🛠️ Improvements

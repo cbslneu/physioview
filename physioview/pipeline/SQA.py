@@ -191,8 +191,8 @@ class Cardio:
                 metrics = pd.merge(missing, artifacts, on = ['Segment'])
 
         metrics['Invalid'] = metrics['N Detected'].apply(
-            lambda x: 1 if x < int(min_hr * (seg_size/60)) or x > 220
-            else np.nan)
+            lambda x: 1 if x < int(min_hr * (seg_size/60)) or \
+                           x > int(220 * (seg_size/60)) else np.nan)
 
         return metrics
 
@@ -240,40 +240,27 @@ class Cardio:
         if 'Artifact' not in df.columns:
             df.loc[artifacts_ix, 'Artifact'] = 1
 
-        n_seg = ceil(len(df) / (self.fs * seg_size))
-        segments = pd.Series(np.arange(1, n_seg + 1))
-        n_detected = df.groupby(
-            df.index // (self.fs * seg_size))['Beat'].sum().fillna(0).astype(int)
-        n_artifact = df.groupby(
-            df.index // (self.fs * seg_size))['Artifact'].sum().fillna(0).astype(int)
-        perc_artifact = round((n_artifact / n_detected) * 100, 2)
+        # Label segments
+        seg_samples = int(self.fs * seg_size)
+        seg_labels = (pd.Series(np.arange(len(df)), index = df.index) // seg_samples) + 1
+
+        # Summarize detected and artifactual beats
+        n_detected = df.groupby(seg_labels)['Beat'].sum().fillna(0).astype(int)
+        n_artifact = df.groupby(seg_labels)['Artifact'].sum().fillna(0).astype(int)
+        perc_artifact = np.where(
+            n_detected == 0, 0.0,
+            np.round((n_artifact / n_detected) * 100, 2))
+
+        artifacts = pd.DataFrame({
+            'Segment': n_detected.index.to_numpy(),
+            'N Artifact': n_artifact.to_numpy(),
+            '% Artifact': perc_artifact,
+        })
 
         if ts_col is not None:
-            timestamps = df.groupby(
-                df.index // (self.fs * seg_size)).first()[ts_col]
-            artifacts = pd.concat([
-                segments,
-                timestamps,
-                n_artifact,
-                perc_artifact,
-            ], axis = 1)
-            artifacts.columns = [
-                'Segment',
-                'Timestamp',
-                'N Artifact',
-                '% Artifact',
-            ]
-        else:
-            artifacts = pd.concat([
-                segments,
-                n_artifact,
-                perc_artifact,
-            ], axis = 1)
-            artifacts.columns = [
-                'Segment',
-                'N Artifact',
-                '% Artifact',
-            ]
+            timestamps = df.groupby(seg_labels).first()[ts_col].to_numpy()
+            artifacts.insert(1, 'Timestamp', timestamps)
+
         return artifacts
 
     def identify_artifacts(
@@ -538,7 +525,8 @@ class Cardio:
     
         # Ensure a "Segment" column exists
         if 'Segment' not in data.columns:
-            data.insert(0, 'Segment', data.index // (self.fs * seg_size) + 1)
+            seg_samples = int(self.fs * seg_size)
+            data.insert(0, 'Segment', np.arange(len(data)) // seg_samples + 1)
     
         # Ensure "Beat" and "Artifact" columns exist
         if 'Beat' not in data.columns:
@@ -1544,10 +1532,10 @@ class Cardio:
             data = [
                 go.Bar(
                     x = sqa_metrics['Segment'],
-                    y = sqa_metrics['N Expected'],
+                    y = sqa_metrics['N Missing'],
                     name = 'Missing',
                     marker = dict(color = '#f2816d'),
-                    hovertemplate = '<b>Segment %{x}:</b> %{customdata:.0f} '
+                    hovertemplate = '<b>Segment %{x}:</b> %{y:.0f} '
                                     'missing<extra></extra>'),
                 go.Bar(
                     x = sqa_metrics['Segment'],
@@ -1558,7 +1546,6 @@ class Cardio:
                                     'detected<extra></extra>')
             ]
         )
-        fig.data[0].update(customdata = sqa_metrics['N Missing'])
 
         # Get invalid segment data points
         invalid_x = []
@@ -1615,7 +1602,7 @@ class Cardio:
             font = dict(family = 'Poppins', size = 13),
             height = 289,
             margin = dict(t = 70, r = 20, l = 40, b = 65),
-            barmode = 'overlay',
+            barmode = 'stack',
             template = 'simple_white',
         )
         if title is not None:

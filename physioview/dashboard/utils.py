@@ -54,6 +54,57 @@ def _clear_edits():
                 rmtree(item)
 
 # ======================= HearView Pipeline Functions ========================
+def _default_filter_params(dtype: str, beat_detector: str) -> tuple:
+    """Return the default filter parameters for a given data type and beat detector."""
+    lowcut = None
+    highcut = None
+    order = None
+    rp = None
+    rs = None
+    window_len = None
+    filter_length = None
+    window_type = None
+    filt_type = None
+    if dtype == 'ECG':
+        if beat_detector == 'engzee':
+            lowcut = 1
+            highcut = 15
+            filt_type = 'Elliptic bandpass filter'
+        elif beat_detector == 'manikandan':
+            lowcut = 6
+            highcut = 18
+            order = 4
+            rp = 1
+            filt_type = 'Chebyshev Type I bandpass filter'
+        elif beat_detector == 'nabian':
+            lowcut = 0.5
+            highcut = 50
+            order = 2
+            rp = 0.5
+            filt_type = 'Elliptic bandpass filter'
+            rs = 40
+        elif beat_detector == 'pantompkins':
+            lowcut = 0.5
+            highcut = 15
+            order = 2
+            filt_type = 'Butterworth bandpass filter'
+        else:
+            raise ValueError(f'Invalid beat detector: {beat_detector}')
+    elif dtype == 'PPG':
+        lowcut = 0.5
+        highcut = 10
+        order = 4
+        window_len = 0.5
+        filt_type = 'Chebyshev Type II filter with moving average smoothing'
+    elif dtype == 'EDA':
+        highcut = 0.35
+        filter_length = 2057
+        window_type = 'hamming'
+        filt_type = 'FIR low-pass filter'
+    else:
+        raise ValueError(f'Invalid data type: {dtype}')
+    return lowcut, highcut, order, rp, rs, window_len, filter_length, window_type, filt_type
+
 def _preprocess_cardiac(
     data: pd.DataFrame,
     dtype: str,
@@ -63,28 +114,66 @@ def _preprocess_cardiac(
     artifact_method: str,
     artifact_tol: float,
     filter_on: bool,
-    filter_lowcut: float = 1,
-    filter_highcut: float = 15,
+    filter_lowcut: float = None,
+    filter_highcut: float = None,
+    order: Optional[int] = None,
+    rp: Optional[float] = None,
+    rs: Optional[float] = None,
+    window_len: Optional[float] = None,
     acc_data: Optional[pd.DataFrame] = None,
     downsample: bool = True
 ) -> tuple:
     """Run the PhysioView pipeline on ECG/PPG data."""
-    is_preprocessed = False if not filter_on else True
+    is_preprocessed = True
+    preprocessed_data = data.copy()
+
     if dtype == 'ECG':
         filt = ECG.Filters(fs)
         detect_beats = ECG.BeatDetectors(fs, is_preprocessed)
+        if filter_on:
+            if beat_detector == 'engzee':
+                preprocessed_data['Filtered'] = filt.filter_signal(
+                preprocessed_data[dtype],
+                lowcut = filter_lowcut if filter_lowcut is not None else 1,
+                highcut = filter_highcut if filter_highcut is not None else 15,
+            )
+            elif beat_detector == 'manikandan':
+                preprocessed_data['Filtered'] = filt.cheby1_filter(
+                    signal=preprocessed_data[dtype],
+                    lowcut = filter_lowcut if filter_lowcut is not None else 6,
+                    highcut = filter_highcut if filter_highcut is not None else 18,
+                    order=order if order is not None else 4,
+                    rp=rp if rp is not None else 1,
+                )
+            elif beat_detector == 'nabian':
+                preprocessed_data['Filtered'] = filt.elliptic_bandpass_filter(
+                    signal=preprocessed_data[dtype],
+                    lowcut = filter_lowcut if filter_lowcut is not None else 0.5,
+                    highcut = filter_highcut if filter_highcut is not None else 50,
+                    order = order if order is not None else 2,
+                    rs = rs if rs is not None else 0.5,
+                    rp = rp if rp is not None else 40,
+                )
+            elif beat_detector == 'pantompkins':
+                preprocessed_data['Filtered'] = filt.butter_bandpass_filter(
+                    signal=preprocessed_data[dtype],
+                    lowcut = filter_lowcut if filter_lowcut is not None else 0.5,
+                    highcut = filter_highcut if filter_highcut is not None else 15,
+                    order = order if order is not None else 2,
+                )
+            else:
+                raise ValueError(f'Invalid beat detector: {beat_detector}')
     elif dtype in ('PPG', 'BVP'):
         filt = PPG.Filters(fs)
         detect_beats = PPG.BeatDetectors(fs, is_preprocessed)
-
-    preprocessed_data = data.copy()
-
-    # Filter ECG
-    if filter_on:
-        preprocessed_data['Filtered'] = filt.filter_signal(
-            preprocessed_data[dtype],
-            lowcut = filter_lowcut,
-            highcut = filter_highcut)
+        # Filter PPG
+        if filter_on:
+            preprocessed_data['Filtered'] = filt.filter_signal(
+                preprocessed_data[dtype],
+                lowcut = filter_lowcut if filter_lowcut is not None else 0.5,
+                highcut = filter_highcut if filter_highcut is not None else 10,
+                order = order if order is not None else 4,
+                window_len = window_len if window_len is not None else 0.5)
 
     # Segment data and detect beats by segment
     preprocessed_data.insert(
@@ -250,7 +339,7 @@ def _preprocess_eda(
     if filter_on:
         filter_eda = EDA.Filters(fs)
         preprocessed_data['Filtered'] = filter_eda.filter_signal(
-            preprocessed_data['EDA'], fs = fs, cutoff = filter_highcut)
+            preprocessed_data['EDA'], cutoff = filter_highcut)
         is_preprocessed = True
         if temp is not None:
             preprocessed_data['TEMP'] = filter_eda.moving_average(
@@ -556,6 +645,8 @@ def _downsample_data(
         # Decimate primary signal
         y_dec = __decimate(df[y_col])
         ds = pd.DataFrame({x_col: df[x_col].iloc[ds_idx].to_numpy(), y_col: y_dec})
+        if 'Segment' in df.columns:
+            ds['Segment'] = df['Segment'].iloc[ds_idx].to_numpy()
 
         # Rescale detected, artifactual, and corrected beat indices
         down_beats = np.rint(

@@ -217,7 +217,7 @@ class BeatDetectors:
         ma = rmean + mn
 
         peaksx = np.where((signal > ma))[0]
-        peaksy = signal[peaksx]
+        peaksy = signal.reset_index(drop=True).iloc[peaksx]
         peakedges = np.concatenate((np.array([0]),
                                     (np.where(np.diff(peaksx) > 1)[0]),
                                     np.array([len(peaksx)])))

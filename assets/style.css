@@ -417,7 +417,7 @@ h6 {
     font-size: 9.5pt;
 }
 /* --- help icons ----------------------------------------------------------*/
-#filter-help {
+#filter-help, #selected-filter-help, #filter-parameters-help {
     margin-left: 5px;
     font-size: 13pt;
 }
@@ -438,54 +438,44 @@ h6 {
     display: block;
     padding-bottom: 5px;
 }
-#filter-config-link {
-    color: #ee8a78 !important;
-    font-weight: 400 !important;
-    font-size: 9pt !important;
-    margin-left: 10px;
-    letter-spacing: 0.7pt;
+.filter-config-error {
+    color: #d32f2f;
+    margin-top: 5px;
+    margin-bottom: 5px;
 }
-#filter-config-link:hover {
-    text-decoration: underline;
+#filter-lowcut, #filter-highcut, #filter-order, #filter-rp, #filter-rs, #filter-window-len, #filter-length {
+    width: 65px;
 }
-#filter-config-collapse {
-    width: 100%;
+#filter-window-type {
+    width: 150px;
 }
-.filter-config-hidden {
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    transform-origin: top;
-    transition: max-height 0.35s ease-out, opacity 0.25s ease-out;
-}
-.filter-config-visible {
-    max-height: 150px;
-    opacity: 1;
-    overflow: hidden;
-    transform-origin: top;
-    transition: max-height 0.35s ease-in, opacity 0.25s ease-in 0.1s;
-    padding-top: 8px;
-}
-#filter-lowcut, #filter-highcut {
-    width: 50px;
-}
-#filter-config-collapse .card {
-    border-radius: 5px;
-    border: 1px dashed #ee8a78;
-    background-color: #fae0da;
-}
-#filter-config-collapse .card-body {
-    padding: 10px;
-    display: flex;
-    gap: 0.5em;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 9.5pt;
-}
-#lower-cutoff-div, #upper-cutoff-div {
+#lower-cutoff-div, #upper-cutoff-div, #filter-order-div, #filter-rp-div, #filter-rs-div, 
+#filter-window-len-div, #filter-length-div, #filter-window-type-div {
     display: inline-flex;
     align-items: center;
     gap: 0.5em;
+}
+#filter-parameters-container, #selected-filter-container {
+    margin-bottom: 20px;
+    margin-top: 10px;
+}
+#selected-filter-label, #filter-parameters-label {
+    font-weight: 600;
+    margin-top: 20px;
+    width: 100%;
+}
+.filter-config-item {
+    width: 100%;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    align-items: left;
+}
+#reset-to-default-btn {
+    font-size: 10pt;
+    color: #ee8a78;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-left: 15px;
 }
 /* --- file uploaders ------------------------------------------------------*/
 #config-uploader { /* configuration file uploader */
@@ -726,6 +716,19 @@ button:hover {
 #setup-signal {  /* dropdown 2*/
     flex: 1 0 8%;
 }
+#filter-config-btn {
+    width: auto;
+    height: 26px;
+    background-color: #47555e;
+    font-size: 11pt;
+    display: flex;
+    align-items: center;
+    color: #ffffff;
+    padding: 0px 4px 0px 5px;
+}
+#filter-config-btn:hover {
+    background-color: #313d44;
+}
 #run-save-buttons {
     margin-top: -5px;
 }
@@ -946,16 +949,16 @@ th:first-child {  /* style only first table header */
 #export-modal .modal-body {
     padding-bottom: 0.5em;
 }
-#ok-export, #config-btn {
+#ok-export, #config-btn, #apply-filter-btn {
     background-color: #47555e;
     position: relative;
     float: left;
     max-width: 225px;
 }
-#ok-export:hover, #config-btn:hover {
+#ok-export:hover, #config-btn:hover, #apply-filter-btn:hover {
     background-color: #313d44;
 }
-#close-export, #close-config1 {
+#close-export, #close-config1, #cancel-config-btn {
     background-color: #bbbbbb;
     padding: 8px;
     font-weight: bold;
@@ -965,7 +968,7 @@ th:first-child {  /* style only first table header */
     float: right;
     max-width: 225px;
 }
-#close-export2, #close-config2 {
+#close-export2, #close-config2, #apply-filter-btn {
     background-color: #47555e;
     padding: 8px;
     font-weight: bold;
@@ -973,7 +976,7 @@ th:first-child {  /* style only first table header */
     letter-spacing: 2px;
     position: relative;
 }
-#close-export:hover, #close-config1:hover {
+#close-export:hover, #close-config1:hover, #cancel-config-btn:hover {
     background-color: #969696 !important;
 }
 .fa-download {
