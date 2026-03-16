@@ -19,10 +19,10 @@ interface UseMarkingUnusableModeProps {
   dragPlotBandRef: React.RefObject<Highcharts.XAxisPlotBandsOptions | null>;
   lastValidDragEnd: React.RefObject<number | null>;
   segmentBoundaries: SegmentBoundary;
-};
+}
 
-const useMarkingUnusableMode = (
-  {isMarkingUnusableMode,
+const useMarkingUnusableMode = ({
+  isMarkingUnusableMode,
   chartRef,
   setUnusableSegments,
   selectedSegment,
@@ -30,7 +30,7 @@ const useMarkingUnusableMode = (
   isDraggingRef,
   dragPlotBandRef,
   lastValidDragEnd,
-  segmentBoundaries
+  segmentBoundaries,
 }: UseMarkingUnusableModeProps) => {
   useEffect(() => {
     if (chartRef.current && chartRef.current.chart && isMarkingUnusableMode) {
@@ -41,12 +41,12 @@ const useMarkingUnusableMode = (
         const rect = chartContainer.getBoundingClientRect();
         return {
           x: event.clientX - rect.left,
-          y: event.clientY - rect.top
-        }
-      }
+          y: event.clientY - rect.top,
+        };
+      };
 
       const handleMouseDown = (event: MouseEvent) => {
-        if (isMarkingUnusableMode && !event.shiftKey) {
+        if (isMarkingUnusableMode && !event.shiftKey && event.button === 2) {
           const target = event.target as HTMLElement;
           if (target && target.textContent?.includes("Reset zoom")) {
             return;
@@ -60,7 +60,7 @@ const useMarkingUnusableMode = (
           if (!isNaN(dragStart)) {
             dragStartRef.current = dragStart;
             isDraggingRef.current = true;
-          } 
+          }
         }
       };
 
@@ -77,7 +77,7 @@ const useMarkingUnusableMode = (
             // Clamp drag end within segment boundaries
             dragEnd = Math.max(
               segmentBoundaries.from.x,
-              Math.min(segmentBoundaries.to.x, dragEnd)
+              Math.min(segmentBoundaries.to.x, dragEnd),
             );
 
             // Remove previous temporary plot band
@@ -94,21 +94,22 @@ const useMarkingUnusableMode = (
               color: "rgba(255, 0, 0, 0.2)",
             };
             chart.xAxis[0].addPlotBand(dragPlotBandRef.current);
-          } 
+          }
         }
       };
 
       const handleMouseUp = () => {
         if (isMarkingUnusableMode && isDraggingRef.current) {
           let dragEnd =
-            lastValidDragEnd.current !== null && lastValidDragEnd.current > segmentBoundaries.to.x
+            lastValidDragEnd.current !== null &&
+            lastValidDragEnd.current > segmentBoundaries.to.x
               ? segmentBoundaries.to.x
               : lastValidDragEnd.current;
 
           // Clamp drag end within segment boundaries
           dragEnd = Math.max(
             segmentBoundaries.from.x,
-            Math.min(segmentBoundaries.to.x, dragEnd ?? 0)
+            Math.min(segmentBoundaries.to.x, dragEnd ?? 0),
           );
 
           if (!isNull(dragStartRef.current) && !isNaN(dragEnd)) {
@@ -152,7 +153,7 @@ const useMarkingUnusableMode = (
           chart.xAxis[0].removePlotBand("draggingPlotBand");
           dragPlotBandRef.current = null;
         }
-        
+
         // Cleanup event listeners
         document.removeEventListener("contextmenu", preventContextMenu);
         chart.container.removeEventListener("mousedown", handleMouseDown);
