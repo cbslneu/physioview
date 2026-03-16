@@ -7,6 +7,8 @@ const multer = require("multer");
 const upload = multer({ dest: "temp/" });
 const app = express();
 
+const validateEditsJson = require("./helper/validateEditsJson");
+
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
 
@@ -150,6 +152,25 @@ app.post("/import-edits", upload.single("file"), async (req, res) => {
     }
 
     const tempPath = req.file.path;
+    const rawData = await fs.promises.readFile(tempPath, "utf-8");
+    let parsedData;
+
+    try {
+      parsedData = JSON.parse(rawData);
+    } catch {
+      await fs.promises.unlink(tempPath);
+      return res.status(400).json({ message: "Invalid JSON file." });
+    }
+
+    const validationResult = validateEditsJson(parsedData);
+    if (!validationResult.ok) {
+      await fs.promises.unlink(tempPath);
+      return res.status(400).json({
+        message: "Invalid JSON structure.",
+        error: validationResult.error,
+      });
+    }
+
     const targetPath = path.join(savedDir, req.file.originalname);
 
     await fs.promises.rename(tempPath, targetPath);

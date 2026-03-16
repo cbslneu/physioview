@@ -36,10 +36,16 @@ const ImportEditsButton = ({ onImportSuccess }: ImportEditsButtonProps) => {
         await axios.post("http://localhost:3001/import-edits", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        toast.success(`${file.name} has been imported`);
+        toast.success(`${file.name} has been imported`, {
+          className: "custom-toast",
+        });
         onImportSuccess();
-      } catch (err) {
-        toast.error(`Error importing file: ${file.name}`);
+      } catch (err: any) {
+        toast.error(
+          err.response?.data?.message ||
+            "Error importing edits. Please try again.",
+          { className: "custom-toast" },
+        );
       }
     };
     input.click();
