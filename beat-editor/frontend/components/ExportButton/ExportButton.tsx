@@ -26,14 +26,14 @@ const ExportButton = (props: ExportButtonParams) => {
 
     const jsonData = JSON.stringify(data, null, 2);
 
-    const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(jsonData)}`;
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(jsonData)}`;
     const link = document.createElement("a");
 
     link.href = jsonString;
     link.download = `${fileName}_edited.json`;
     link.click();
 
-    toast.success(`${fileName}_edited.json has been exported`);
+    toast.success(`${fileName}_edited.json has been exported`, { className: "custom-toast" });
   };
   return (
     <button className="export-button" onClick={exportJSON}>
