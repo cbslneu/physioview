@@ -31,17 +31,17 @@ function BeatChartContainer() {
         const jsonData = allSavedData[0].data;
 
         setAddBeatCoordinates(
-          jsonData.filter((beat: SavedBeat) => beat.editType === EDIT_TYPE_ADD)
+          jsonData.filter((beat: SavedBeat) => beat.editType === EDIT_TYPE_ADD),
         );
         setDeleteBeatCoordinates(
           jsonData.filter(
-            (beat: SavedBeat) => beat.editType === EDIT_TYPE_DELETE
-          )
+            (beat: SavedBeat) => beat.editType === EDIT_TYPE_DELETE,
+          ),
         );
         setUnusableBeats(
           jsonData.filter(
-            (beat: SegmentObj) => beat.editType === EDIT_TYPE_UNUSABLE
-          )
+            (beat: SegmentObj) => beat.editType === EDIT_TYPE_UNUSABLE,
+          ),
         );
       }
 
@@ -67,6 +67,7 @@ function BeatChartContainer() {
         addBeats={addBeatCoordinates}
         deleteBeats={deleteBeatCoordinates}
         unusableBeats={unusableBeats}
+        onRefresh={fetchFile}
       />
     </div>
   );
