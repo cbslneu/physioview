@@ -1609,7 +1609,7 @@ class Cardio:
                 xanchor = 'right',
                 x = 1.0),
             font = dict(family = 'Poppins', size = 13),
-            height = 289,
+            height = 315,
             margin = dict(t = 70, r = 20, l = 40, b = 65),
             barmode = 'stack',
             template = 'simple_white',
@@ -1719,7 +1719,7 @@ class Cardio:
                 x = 1.0,
                 traceorder = 'reversed'),
             font = dict(family = 'Poppins', size = 13),
-            height = 289,
+            height = 315,
             margin = dict(t = 70, r = 20, l = 40, b = 65),
             barmode = 'overlay',
             template = 'simple_white',
@@ -2250,6 +2250,7 @@ class EDA:
         or above temp_max (Rule 3)."""
         if temp is None:
             return None
+        temp = np.asarray(temp)
         return (temp < self.temp_min) | (temp > self.temp_max)
 
     def _set_neighbors_invalid(
@@ -2329,7 +2330,9 @@ class EDA:
                     text = 'Segment',
                     font = dict(size = 16),
                     standoff = 5),
-                tickfont = dict(size = 14)
+                tickfont = dict(size = 14),
+                range = [metrics['Segment'].min() - 0.5,
+                         metrics['Segment'].max() + 0.5]
             ),
             yaxis = dict(
                 title = dict(
@@ -2407,7 +2410,9 @@ class EDA:
                     text = 'Segment',
                     font = dict(size = 16),
                     standoff = 5),
-                tickfont = dict(size = 14)
+                tickfont = dict(size = 14),
+                range = [metrics['Segment'].min() - 0.5,
+                         metrics['Segment'].max() + 0.5]
             ),
             yaxis = dict(
                 title = dict(
