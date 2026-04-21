@@ -96,6 +96,7 @@ class Preprocessor:
             A dictionary containing filter keyword arguments relevant to the
             selected peak detector.
         """
+        dtype = 'PPG' if dtype == 'BVP' else dtype
         if dtype not in ['ECG', 'EDA', 'PPG']:
             raise ValueError(f"dtype must be one of 'ECG', 'EDA', 'PPG'.")
 
@@ -106,6 +107,7 @@ class Preprocessor:
         self.event_times = event_times
         self.seg_size = seg_size
         self.filter_kwargs = filter_kwargs or {}
+        self.duration = None
 
         # Initialize storage for peak and artifact indices
         self.peaks_ix = None
@@ -170,6 +172,9 @@ class Preprocessor:
         """
         preprocessed = data.copy()
         signal_col = self.dtype
+
+        # Compute the signal duration in seconds
+        self.duration = len(preprocessed) / self.fs
 
         # Filter signal
         if self.filter_on:
@@ -278,16 +283,8 @@ class Preprocessor:
         preprocessed_by_event = {}
         sqa_metrics_by_event = {}
 
-        # Insert event labels
-        preprocessed['Timestamp'] = pd.to_datetime(preprocessed['Timestamp'])
-        preprocessed.insert(1, 'Event', None)
-        event_times = self.event_times.copy()
-        for _, event in event_times.iterrows():
-            event_label = event['event']
-            event_start = event['start']
-            event_end = event['end']
-            preprocessed.loc[preprocessed['Timestamp'].between(
-                event_start, event_end), 'Event'] = event_label
+        # Compute the signal duration in seconds
+        self.duration = len(preprocessed) / self.fs
 
         # Filter signal
         if self.filter_on:
@@ -301,6 +298,17 @@ class Preprocessor:
                 preprocessed, temp_data, resample_rate)
             preprocessed = self._decompose_eda(preprocessed)
             signal_col = 'Phasic'
+
+        # Insert event labels
+        preprocessed['Timestamp'] = pd.to_datetime(preprocessed['Timestamp'])
+        preprocessed.insert(1, 'Event', None)
+        event_times = self.event_times.copy()
+        for _, event in event_times.iterrows():
+            event_label = event['event']
+            event_start = event['start']
+            event_end = event['end']
+            preprocessed.loc[preprocessed['Timestamp'].between(
+                event_start, event_end), 'Event'] = event_label
 
         # Preprocess each event
         for event_label, event_data in preprocessed.groupby('Event'):
@@ -341,8 +349,9 @@ class Preprocessor:
                     preprocessed.loc[peak_indices, peak_label] = 1
 
             # Compute and store SQA metrics for this event
+            event_temp_data = event_data['Temp'].values if 'Temp' in event_data.columns else None
             event_data_updated, sqa_metrics = self._assess_signal_quality(
-                event_data, artifact_method, artifact_tol, temp_data,
+                event_data, artifact_method, artifact_tol, event_temp_data,
                 eda_min, eda_max, event_label)
             preprocessed_by_event[event_label] = event_data_updated
             sqa_metrics_by_event[event_label] = sqa_metrics
@@ -529,16 +538,15 @@ class Preprocessor:
             for col in signal_cols:
                 signal_rs = resample(data[col], self.fs, target_fs)
                 data_resampled[col] = signal_rs
+            if temp_data is not None:
+                temp_rs = resample(temp_data, self.fs, target_fs)
 
             # Update the original sampling rate to the resample rate
             self.fs = target_fs
+
         else:
             data_resampled = data[signal_cols].copy()
-
-        if temp_data is not None:
-            temp_rs = resample(temp_data, self.fs, target_fs)
-        else:
-            temp_rs = None
+            temp_rs = temp_data
 
         # Build resampled timestamps/sample indices
         n_samples = len(data_resampled)
@@ -657,20 +665,21 @@ class Preprocessor:
             eda_validity = sqa_eda.get_validity_metrics(
                 signal = data[signal_col].values, temp = temp_data,
                 preprocessed = self.filter_on)
-            data.loc[eda_validity['Invalid'].notna(), 'Invalid'] = 1
+            data.loc[eda_validity['Invalid'].notna().values, 'Invalid'] = 1
 
             # Compute SQA metrics
             eda_quality = sqa_eda.get_quality_metrics(data[signal_col].values)
-            data = pd.concat([  # add 'Out of Range' and 'Excessive Slope'
-                data, eda_quality[eda_quality.columns[-2:]]], axis = 1)
+            data[eda_quality.columns[-2:]] = eda_quality[
+                eda_quality.columns[-2:]].values
             artifacts_ix = data[
                 (data['Invalid'] == 1) & (data['SCR'] == 1)].index.values
             data.loc[artifacts_ix, 'Artifact'] = 1
             peaks_ix = data[data['SCR'] == 1].index.values
 
             sqa_metrics = sqa_eda.compute_metrics(
-                data[signal_col], temp_data, self.filter_on, peaks_ix,
-                seg_size = seg_size, show_progress = False)
+                data[signal_col].reset_index(drop = True), temp_data,
+                self.filter_on, peaks_ix, seg_size = seg_size,
+                show_progress = False)
 
         else:
             raise ValueError(
