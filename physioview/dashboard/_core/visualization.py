@@ -15,38 +15,58 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-def _cardiac_summary_table(sqa_df: pd.DataFrame) -> Tuple[dbc.Table, list]:
+def _cardiac_summary_table(
+    sqa_df: pd.DataFrame,
+    duration: float,
+    windowed: bool = True,
+    window_size: int = 60
+) -> Tuple[dbc.Table, list]:
     """Display the cardiac SQA summary table."""
     valid_df = sqa_df[sqa_df.Invalid != 1].copy().reset_index(drop = True)
-    # valid_ix = np.where(np.diff(valid_df['N Detected']) < 10)[0]
-    # valid_df = valid_df.loc[valid_ix].reset_index(drop = True)
-    if valid_df.empty:
-        avg_n = 'N/A'
-    else:
-        avg_n = '{0:.2f}'.format(valid_df['N Detected'].mean())
-    missing_n = len(sqa_df.loc[sqa_df['N Missing'] > 0])
-    artifact_n = len(sqa_df.loc[sqa_df['N Artifact'] > 0])
+    n_segments = sqa_df['Segment'].max()
     invalid_n = len(sqa_df.loc[sqa_df['Invalid'] == 1])
-    invalid_prop = '{0:.2f}%'.format(
-        (invalid_n / sqa_df['Segment'].max()) * 100)
-    avg_missing = '{0:.2f}%'.format(sqa_df['% Missing'].mean())
+    invalid_prop = f'{(invalid_n / n_segments) * 100:.2f}%'
+    avg_missing = sqa_df.loc[sqa_df['% Missing'] > 0, '% Missing'].mean()
+    avg_missing = f'{0 if pd.isna(avg_missing) else avg_missing:.2f}%'
     avg_artifact = sqa_df.loc[sqa_df['% Artifact'] > 0, '% Artifact'].mean()
+    avg_artifact = f'{0 if pd.isna(avg_artifact) else avg_artifact:.2f}%'
 
-    # Set NaN average artifact values to zero
-    if pd.isna(avg_artifact):
-        avg_artifact = 0
-    avg_artifact = f'{avg_artifact:.2f}%'
+    if valid_df.empty:
+        avg_hr = 'N/A'
+        avg_beats = 'N/A'
+    else:
+        avg_beats = valid_df['N Detected'].mean()
+        if windowed:
+            avg_hr = f'{(avg_beats / window_size) * 60:.2f}'
+        else:
+            total_beats = valid_df['N Detected'].sum()
+            avg_hr = f'{(total_beats / duration) * 60:.2f}'
 
     # Build summary table data
-    data = [
-        ('Average Number of Beats', avg_n),
-        ('Segments with Missing Beats', missing_n),
-        ('Segments with Artifactual Beats', artifact_n),
-        ('Segments with Invalid Beats', invalid_n),
-        ('% Invalid Data', invalid_prop),
-        ('Average % Missing Beats/Segment', avg_missing),
-        ('Average % Artifactual Beats/Segment', avg_artifact)
-    ]
+    if not windowed:
+        missing_n = sqa_df['N Missing'].mean()
+        artifact_n = sqa_df['N Artifact'].mean()
+        data = [
+            ('Average Heart Rate (bpm)', f'{avg_hr}'),
+            ('Number of Detected Beats', f'{avg_beats:.0f}'),
+            ('Number of Missing Beats', missing_n),
+            ('Number of Artifactual Beats', artifact_n),
+            ('% Invalid Data', invalid_prop),
+            ('% Missing Beats', avg_missing),
+            ('% Artifactual Beats', avg_artifact),
+        ]
+    else:
+        missing_n = len(sqa_df.loc[sqa_df['N Missing'] > 0])
+        artifact_n = len(sqa_df.loc[sqa_df['N Artifact'] > 0])
+        data = [
+            ('Average Heart Rate (bpm)', f'{avg_hr}'),
+            ('Segments with Missing Beats', missing_n),
+            ('Segments with Artifactual Beats', artifact_n),
+            ('Segments with Invalid Beats', invalid_n),
+            ('% Invalid Data', invalid_prop),
+            ('Average % Missing Beats/Segment', avg_missing),
+            ('Average % Artifactual Beats/Segment', avg_artifact),
+        ]
 
     # Wrap in a dbc.Table
     rows = [
@@ -151,7 +171,7 @@ def _blank_table() -> dbc.Table:
     """Display the default blank table."""
     summary = pd.DataFrame({
         'Metric': [
-            'Average Heart Rate',
+            'Average Heart Rate (bpm)',
             'Segments with Missing Beats',
             'Segments with Artifactual Beats',
             'Segments with Invalid Beats',
