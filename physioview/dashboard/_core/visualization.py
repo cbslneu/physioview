@@ -48,12 +48,12 @@ def _cardiac_summary_table(
         artifact_n = sqa_df['N Artifact'].mean()
         data = [
             ('Average Heart Rate (bpm)', f'{avg_hr}'),
-            ('Number of Detected Beats', f'{avg_beats:.0f}'),
-            ('Number of Missing Beats', missing_n),
-            ('Number of Artifactual Beats', artifact_n),
-            ('% Invalid Data', invalid_prop),
-            ('% Missing Beats', avg_missing),
-            ('% Artifactual Beats', avg_artifact),
+            ('Average N Detected Beats', f'{avg_beats:.2f}'),
+            ('Average N Missing Beats', f'{missing_n:.2f}'),
+            ('Average N Artifactual Beats', f'{artifact_n:.2f}'),
+            ('% Invalid Segments', invalid_prop),
+            ('Average % Missing Beats', avg_missing),
+            ('Average % Artifactual Beats', avg_artifact),
         ]
     else:
         missing_n = len(sqa_df.loc[sqa_df['N Missing'] > 0])
@@ -63,7 +63,7 @@ def _cardiac_summary_table(
             ('Segments with Missing Beats', missing_n),
             ('Segments with Artifactual Beats', artifact_n),
             ('Segments with Invalid Beats', invalid_n),
-            ('% Invalid Data', invalid_prop),
+            ('% Invalid Segments', invalid_prop),
             ('Average % Missing Beats/Segment', avg_missing),
             ('Average % Artifactual Beats/Segment', avg_artifact),
         ]
