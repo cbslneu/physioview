@@ -9,19 +9,22 @@ A to-do list of planned features, improvements, and tasks for HeartView.
 - [x] **DB:** EDA processing and quality assessment functionality [@nmy2103]
 
 ## 🐛 Bugs to Fix
-- [ ] **DB:** Recreate Beat Editor files after changing the segment size 
+- [x] **DB:** Recreate Beat Editor files after changing the segment size 
   when preprocessing the same uploaded file [@nmy2103]
-- [ ] **DB:** Fix rendering mismatch of detected beats on filtered vs. raw 
+- [x] **DB:** Fix rendering mismatch of detected beats on filtered vs. raw 
   signals
-
+- [ ] **DB:** Fix number of artifact beats in the SQA bar chart after 
+  editing with 'Mark Unusable' and applying changes from the Beat Editor
 
 ## 🛠️ Improvements
 - [x] **BE:** Migrate codebase to TypeScript
 - [ ] **BE:** Document or refactor to avoid confusion in the use of undo button
-
+- [ ] **DB:** Refactor callback functions in the `dashboard.callbacks` 
+  module into a private `dashboard/_callbacks` subpackage
+- [ ] **API:** Create a Flask API for dashboard–Beat Editor communication
 
 ## 📕 Documentation
 - [ ] Write usage examples in `examples.rst` for:
-  - [ ] Data pre-processing
+  - [ ] Data pre-processing, including event-based pre-processing
   - [ ] Signal quality assessment
   - [ ] Data post-processing
