@@ -124,16 +124,60 @@ def _get_csv_headers(csv: str) -> list[str]:
     headers = initial.columns.tolist()
     return headers
 
-def _parse_event_data(contents: str) -> pd.DataFrame:
+def _validate_event_file_ext(filename: str) -> bool:
+    """Check for valid event file extensions."""
+    ext = path.splitext(filename)[1].lower()
+    if ext not in ('.csv', '.txt', '.zip'):
+        return False
+    return True
+
+def _decode_bytes(raw_bytes: bytes) -> str:
+    """Decode bytes to str, handling UTF-16, UTF-8, and Latin-1 encodings."""
+    if raw_bytes.startswith((b'\xff\xfe', b'\xfe\xff')):
+        return raw_bytes.decode('utf-16')
+    try:
+        decoded = raw_bytes.decode('utf-8-sig')
+        if '\x00' in decoded:
+            return raw_bytes.decode('utf-16-le')
+        return decoded
+    except UnicodeDecodeError:
+        return raw_bytes.decode('latin-1')
+
+def _parse_event_data(
+    contents: str,
+    filename: str
+) -> Union[dict, pd.DataFrame]:
     """Parse event timestamps uploaded with dcc.Upload component."""
     content_type, content_string = contents.split(',')
     raw = base64.b64decode(content_string)
-    buf = StringIO(raw.decode('utf-8'))
-    event_data = pd.read_csv(
-        buf,
-        sep = None,
-        engine = 'python',
-        skipinitialspace = True)
+
+    if filename.endswith('.zip'):
+        with zipfile.ZipFile(BytesIO(raw)) as zf:
+            csv_files = [f for f in zf.namelist()
+                         if f.endswith(('.csv', '.txt'))
+                         and not f.endswith('/')
+                         and not f.startswith('__MACOSX/')
+                         and '/._' not in f
+                         and not f.endswith('.DS_Store')]
+            if not csv_files:
+                return {}
+            event_data = {}
+            for csv_file in csv_files:
+                with zf.open(csv_file) as f:
+                    raw_bytes = f.read()
+                event_df = pd.read_csv(
+                    StringIO(_decode_bytes(raw_bytes)),
+                    sep = None,
+                    engine = 'python',
+                    skipinitialspace = True)
+                key = path.splitext(path.basename(csv_file))[0]
+                event_data[key] = event_df
+    else:
+        event_data = pd.read_csv(
+            StringIO(_decode_bytes(raw)),
+            sep = None,
+            engine = 'python',
+            skipinitialspace = True)
     return event_data
 
 def _parse_temp_csv(contents: str) -> pd.DataFrame:
