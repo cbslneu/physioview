@@ -406,7 +406,7 @@ class Empatica:
                 raise ValueError('No "BVP.csv" file found.')
             with archive.open(bvp_file) as bvp_file:
                 bvp, bvp_start, bvp_fs = self._get_e4_data(
-                    bvp_file, name = 'BVP')
+                    bvp_file, name = 'PPG')
             bvp_data = self.Data(**{'bvp': bvp,
                                     'start': bvp_start,
                                     'fs': bvp_fs})
@@ -676,7 +676,7 @@ class Empatica:
                 bvp = self.get_bvp().bvp
                 fs = self.get_bvp().fs
                 ppg_beats = BeatDetectors(fs, False).adaptive_threshold(
-                    bvp['BVP'])
+                    bvp['PPG'])
                 sqa = Cardio(fs)
                 artifact_beats = sqa.identify_artifacts(
                     ppg_beats, 'both', initial_hr, 6, 5, 1)
@@ -766,7 +766,7 @@ class Empatica:
                     fs = data.bvp_fs
                     seg_start = int((segment - 1) * fs * seg_size)
                     seg_end = seg_start + int(fs * seg_size)
-                    signal_name = 'ACC' if dtypes[n] == 'acc' else 'BVP'
+                    signal_name = 'ACC' if dtypes[n] == 'acc' else 'PPG'
                     color = 'forestgreen' if dtypes[n] == 'acc' else '#3562bd'
                     if dtypes[n] == 'acc':
                         ylabel = 'm/s²'
@@ -775,7 +775,7 @@ class Empatica:
                     else:
                         ylabel = 'bvp'
                         x = df['Timestamp'].iloc[seg_start:seg_end]
-                        y = df['BVP'].iloc[seg_start:seg_end]
+                        y = df['PPG'].iloc[seg_start:seg_end]
                 else:
                     df = data.eda
                     fs = data.eda_fs
@@ -829,15 +829,15 @@ class Empatica:
                 seg_start = int((segment - 1) * fs * seg_size)
                 seg_end = seg_start + int(fs * seg_size)
                 if dtypes[n] in ('acc', 'bvp'):
-                    signal_name = 'ACC' if dtypes[n] == 'acc' else 'BVP'
+                    signal_name = 'ACC' if dtypes[n] == 'acc' else 'PPG'
                     color = 'forestgreen' if dtypes[n] == 'acc' else '#3562bd'
-                    ylabel = 'm/s²' if dtypes[n] == 'acc' else 'BVP'
+                    ylabel = 'm/s²' if dtypes[n] == 'acc' else 'PPG'
                     if dtypes[n] == 'acc':
                         x = data.acc['Timestamp'].iloc[seg_start:seg_end]
                         y = data.acc['Magnitude'].iloc[seg_start:seg_end]
                     else:
                         x = data.bvp['Timestamp'].iloc[seg_start:seg_end]
-                        y = data.bvp['BVP'].iloc[seg_start:seg_end]
+                        y = data.bvp['PPG'].iloc[seg_start:seg_end]
                 else:
                     signal_name = 'EDA' if dtypes[n] == 'eda' else 'Temperature'
                     color = '#43c9de' if dtypes[n] == 'eda' else '#8b3ac9'
@@ -1482,6 +1482,9 @@ def plot_signal(
                     else pd.Series(False, index = sig_seg.index)
 
                 x_vals = sig_seg[ax_x]
+                col_in_signal = bool(pd.to_numeric(
+                    signal[col], errors = 'coerce').eq(1).any()) \
+                    if col in signal.columns else False
                 if col == 'Unusable':
                     # Draw a line only where Unusable == 1
                     y_vals = sig_seg[ycol].where(unus_mask, np.nan)
@@ -1489,7 +1492,7 @@ def plot_signal(
                         go.Scatter(
                             x = x_vals, y = y_vals,
                             connectgaps = False,
-                            showlegend = True,
+                            showlegend = col_in_signal,
                             hovertemplate = hover,
                             **style
                         ),
@@ -1502,7 +1505,7 @@ def plot_signal(
                         go.Scatter(
                             x = x_vals, y = y_vals,
                             connectgaps = False,
-                            showlegend = True,
+                            showlegend = col_in_signal,
                             hovertemplate = hover,
                             **style
                         ),
@@ -1717,7 +1720,7 @@ def process_beat_edits(
     processed : pandas.DataFrame
         A copy of `orig_data` with the following additional columns:
 
-        - 'Edited': 1 where all final beats are, otherwise `NaN`
+        - 'Edited Beat': 1 where all final beats are, otherwise `NaN`
         - 'Deleted Beat': 1 where beats were deleted, otherwise `NaN`
         - 'Added Beat': 1 where beats were added, otherwise `NaN`
         - 'Unusable': 1 where segments are marked unusable, otherwise `NaN`
@@ -1728,7 +1731,7 @@ def process_beat_edits(
         raise ValueError("`edits` must include columns 'editType'.")
 
     processed = orig_data.copy()
-    processed['Edited'] = processed['Beat'].values
+    processed['Edited Beat'] = processed['Beat'].values
     beat_edits = pd.DataFrame()
     unusable_edits = pd.DataFrame()
     if 'x' in edits.columns:
@@ -1824,9 +1827,9 @@ def process_beat_edits(
     additions_ix = processed[processed['editType'] == 'ADD'].index.values
     processed.loc[deletions_ix, 'Deleted Beat'] = 1
     processed.loc[additions_ix, 'Added Beat'] = 1
-    processed.loc[deletions_ix, 'Edited'] = np.nan
+    processed.loc[deletions_ix, 'Edited Beat'] = np.nan
     if 'Unusable' in processed.columns:
-        processed.loc[processed['Unusable'].eq(1), 'Edited'] = np.nan
-    processed.loc[additions_ix, 'Edited'] = 1
+        processed.loc[processed['Unusable'].eq(1), 'Edited Beat'] = np.nan
+    processed.loc[additions_ix, 'Edited Beat'] = 1
     processed = processed.drop(columns = ['x', 'editType'], errors = 'ignore')
     return processed
