@@ -1668,11 +1668,6 @@ def get_callbacks(app):
                         del data_edited['Artifact']
                     data_edited.loc[artifacts_edited, 'Artifact'] = 1
 
-                    # Save edited data
-                    data_edited.to_csv(
-                        str(temp_path / f'{selected_subject}_edited.csv'),
-                        index = False)
-
                     # Recompute IBIs with edited beats for rendering
                     ibi_edited = physioview.compute_ibis(
                         data_edited, fs, data_edited_beats_ix, ts_col)
@@ -1686,7 +1681,7 @@ def get_callbacks(app):
                             ends = [unusable_ix[-1]]
                         else:
                             starts = np.insert(unusable_ix[breaks + 1], 0, unusable_ix[0])
-                            ends = np.insert(unusable_ix[breaks], 0, unusable_ix[-1])
+                            ends = np.append(unusable_ix[breaks], unusable_ix[-1])
 
                         unusable_bounds = list(zip(starts, ends))
                         for s, e in unusable_bounds:
@@ -1706,7 +1701,12 @@ def get_callbacks(app):
                                 ibi_edited.loc[ibi_post_ix] = np.nan
                             if artif_post_ix is not None:
                                 data_edited.loc[artif_post_ix, 'Artifact'] = np.nan
-
+                    
+                    # Save edited data
+                    data_edited.to_csv(
+                        str(temp_path / f'{selected_subject}_edited.csv'),
+                        index = False)
+                    
                     # Render updated signal plots
                     signal_plots = physioview.plot_signal(
                         signal = data_edited, signal_type = data_type,
