@@ -333,7 +333,6 @@ def _downsample_data(
         # Convert to positional indices
         beats_ix = __ix_to_pos(beats_ix, df.index)
         artifacts_ix = __ix_to_pos(artifacts_ix, df.index)
-        corrected_beats_ix = None
         if corrected_beats_ix is not None:
             corrected_beats_ix = __ix_to_pos(corrected_beats_ix, df.index)
 
@@ -550,7 +549,8 @@ def _make_zip(
             with open(file_path, 'rb') as f:
                 zf.writestr(file_name, f.read())
 
-                # If set_progress, update progress
+            # If set_progress, update progress
+            if set_progress is not None:
                 remaining = max(total_progress - progress_start, 0)
                 frac = (i + 1) / n_files
                 progress = (progress_start + remaining
