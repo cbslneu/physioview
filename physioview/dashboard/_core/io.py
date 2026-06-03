@@ -170,6 +170,8 @@ def _parse_event_data(
                     sep = None,
                     engine = 'python',
                     skipinitialspace = True)
+                # Replace underscores with spaces
+                event_data['event'] = event_data['event'].str.replace('_', ' ')
                 key = path.splitext(path.basename(csv_file))[0]
                 event_data[key] = event_df
     else:
@@ -178,6 +180,9 @@ def _parse_event_data(
             sep = None,
             engine = 'python',
             skipinitialspace = True)
+        # Replace underscores with spaces
+        event_data['event'] = event_data['event'].str.replace('_', ' ')
+    
     return event_data
 
 def _parse_temp_csv(contents: str) -> pd.DataFrame:
