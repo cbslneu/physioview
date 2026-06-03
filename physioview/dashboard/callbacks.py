@@ -2009,7 +2009,6 @@ def get_callbacks(app):
         # Populate event name dropdown
         if segment_by_event:
             event_drop_disabled = False
-            dropdown_icon = html.I(className = 'fa-solid fa-calendar')
             filenames = sorted(
                 [p.name for p in render_dir.iterdir() if (p.is_dir())])
             event_names = sorted(
