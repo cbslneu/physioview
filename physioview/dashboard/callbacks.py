@@ -2257,8 +2257,8 @@ def get_callbacks(app):
 
             trig = ctx.triggered_id
 
-            # Reset selected_segment to 1 when new data is loaded
-            if trig == 'memory-db':
+            # Reset selected_segment to 1 when new data is loaded or event changes
+            if trig in ('memory-db', 'event-dropdown'):
                 selected_segment = 1
                 beat_correction_status = {}
 
