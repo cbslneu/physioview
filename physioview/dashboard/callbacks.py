@@ -1288,7 +1288,7 @@ def get_callbacks(app):
 
             # Check for event data
             if event_toggle_on:
-                if event_times is None and len(event_times) == 0:
+                if event_times is None or len(event_times) == 0:
                     event_file_error = True
                     return _errors()
             memory['segment by event'] = event_toggle_on
