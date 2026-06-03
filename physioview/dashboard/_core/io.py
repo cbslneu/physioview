@@ -171,7 +171,7 @@ def _parse_event_data(
                     engine = 'python',
                     skipinitialspace = True)
                 # Replace underscores with spaces
-                event_data['event'] = event_data['event'].str.replace('_', ' ')
+                event_df['event'] = event_df['event'].str.replace('_', ' ')
                 key = path.splitext(path.basename(csv_file))[0]
                 event_data[key] = event_df
     else:
