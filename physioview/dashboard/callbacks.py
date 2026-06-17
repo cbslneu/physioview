@@ -2486,9 +2486,11 @@ def get_callbacks(app):
                 signal_types = [data_type]
 
                 # Add temperature to subplots if data was provided
-                if temp_data is not None:
+                # Fall back to the uploaded temperature store when the
+                # uploaded data does not already contain it
+                if temp_data is not None and 'Temp' not in signal.columns:
                     signal['Temp'] = temp_data['Temp']
-                if temp_data is not None or 'Temp' in signal.columns:
+                if 'Temp' in signal.columns:
                     signal_types.append('TEMP')
                     eda_subplots['TEMP'] = 'Temp'
 
