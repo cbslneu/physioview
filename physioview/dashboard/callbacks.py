@@ -872,7 +872,6 @@ def get_callbacks(app):
          Output('temp-uploader', 'children', allow_duplicate = True),
          Output('sampling-rate', 'value', allow_duplicate = True),
          Output('by-event-help', 'style'),
-         Output('by-event-tooltip', 'className'),
          Output('seg-size', 'value', allow_duplicate = True),
          Output('beat-detectors', 'options', allow_duplicate = True),
          Output('beat-detectors', 'value', allow_duplicate = True),
@@ -923,13 +922,7 @@ def get_callbacks(app):
         eda_min = 0.2
         eda_max = 40
 
-        # Default data segmentation options
-        segment_by = [
-            {'label': 'by time', 'value': 'time'},
-            {'label': 'by event', 'value': 'event', 'disabled': False}
-        ]
         by_event_help = {}
-        hide_seg_by_tooltip = ''
         beat_detectors = []
         default_beat_detector = None
 
@@ -981,11 +974,6 @@ def get_callbacks(app):
                 if toggle_config_on:
                     pass
                 else:
-                    # Disable event-based segmentation
-                    segment_by[1]['disabled'] = True
-                    by_event_help = {'display': 'none'}
-                    hide_seg_by_tooltip = 'd-none'
-
                     session_path = Path(memory['filename']).parent
                     extract_dir = session_path / 'batch'
                     with zipfile.ZipFile(memory['filename'], 'r') as zf:
@@ -1089,7 +1077,7 @@ def get_callbacks(app):
             # temperature data upload
             temp_uploader_disabled, temp_uploader_text,
 
-            fs, by_event_help, hide_seg_by_tooltip, seg_size,
+            fs, by_event_help, seg_size,
             beat_detectors, default_beat_detector, artifact_method,
             artifact_tol, filter_on, scr_detector, eda_min, eda_max
         )
