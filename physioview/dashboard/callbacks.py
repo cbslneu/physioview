@@ -661,21 +661,24 @@ def get_callbacks(app):
 
         return [open_modal, hide_empty_param_error, hide_lowcut_highcut_error]
 
-    # === Read event timestamps file if provided ==============================
+    # === Validate event timestamps file if provided =========================
     @app.callback(
         [Output('event-load', 'data'),
-         Output('event-file-check', 'children'),
+         Output('event-file-check', 'children', allow_duplicate = True),
          Output('event-uploader', 'children')],
         Input('event-uploader', 'contents'),
         State('event-uploader', 'filename'),
+        State('memory-load', 'data'),
         prevent_initial_call = True
     )
-    def db_get_event_timestamps(contents, filename):
+    def db_get_event_timestamps(contents, filename, load_data):
         """Read and store event timestamps to memory."""
         if not contents:
             raise PreventUpdate
 
         file_check = []
+        uploaded_file_type = load_data['source']
+        filepath = load_data['filename']
 
         # Check for valid file extensions
         if not _core.io._validate_event_file_ext(filename):
@@ -686,6 +689,36 @@ def get_callbacks(app):
 
         event_data = _core.io._parse_event_data(contents, filename)
         is_batch = isinstance(event_data, dict)
+
+        # Validate that the uploaded event files match the batch data files
+        if uploaded_file_type == 'batch':
+            batch_file = Path(filepath)
+            session_path = batch_file.parent
+            batch_dir = session_path / 'batch'
+            batch = sorted([
+                f for f in batch_dir.iterdir()
+                if f.is_file() and not f.name.startswith('.') and
+                   f.suffix == '.csv'])
+
+            # Batch data requires a Zip of event files keyed by filename
+            if not is_batch:
+                file_check = [
+                    html.I(className = 'fa-solid fa-circle-xmark'),
+                    html.Span('Upload a Zip of event files for batch data.')]
+                uploaded = html.Span('Select File...')
+                return None, file_check, uploaded
+
+            batch_stems = {f.stem for f in batch}
+            event_stems = set(event_data.keys())
+            missing_event_files = batch_stems - event_stems
+            extra_event_files = event_stems - batch_stems
+            if missing_event_files or extra_event_files:
+                file_check = [
+                    html.I(className = 'fa-solid fa-circle-xmark'),
+                    html.Span('Event filenames do not match the batch data files.')]
+                uploaded = html.Span('Select File...')
+                return None, file_check, uploaded
+
         if not is_batch:
             event_data = {'single': event_data}
 
@@ -1330,15 +1363,6 @@ def get_callbacks(app):
                     f for f in batch_dir.iterdir()
                     if f.is_file() and not f.name.startswith('.') and
                        f.suffix == '.csv'])
-
-                # Validate an event file for each batch file
-                if event_toggle_on and isinstance(event_times, dict):
-                    batch_stems = {f.stem for f in batch}
-                    event_stems = set(event_times.keys())
-                    missing_event_files = batch_stems - event_stems
-                    if missing_event_files:
-                        event_file_error = True
-                        return _errors()
 
                 # Set progress bar total
                 total_progress = len(batch) + 1
