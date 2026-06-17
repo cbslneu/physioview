@@ -418,7 +418,7 @@ def compute_tonic_scl(
     else:
         # Segmented tonic SCL
         seg_len = int(seg_size * fs)
-        n_segments = len(signal) // seg_len
+        n_segments = int(np.ceil(len(signal) / seg_len))
         tonic_scl = []
         for i in range(n_segments):
             start, end = i * seg_len, (i + 1) * seg_len

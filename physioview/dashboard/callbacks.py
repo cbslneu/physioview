@@ -2153,16 +2153,10 @@ def get_callbacks(app):
             signal_col = 'Filtered' if filt_on else 'EDA'
             eda_signal = eda[signal_col].to_numpy()
             tonic_scl = compute_tonic_scl(eda_signal)
-            scr_series = eda['SCR'].values if 'SCR' in eda.columns else None
-
-            # Set segment size to entire signal if seg_size is empty
-            segment_by_event = memory['segment by event']
-            if segment_by_event and seg_size is None:
-                seg_size = len(eda_signal)
 
             # Generate EDA quality summary table
             table, quality_summary = _core.visualization._eda_summary_table(
-                sqa, tonic_scl, scr_series, seg_size)
+                sqa, tonic_scl)
 
         # Create quality_summary.txt file(s)
         if selected_event:

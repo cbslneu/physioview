@@ -2128,7 +2128,7 @@ class EDA:
         # Segmented approach
         else:
             seg_len = int(seg_size * fs)
-            n_segments = len(signal) // seg_len
+            n_segments = ceil(len(signal) / seg_len)
 
             for i in range(n_segments):
                 start, end = i * seg_len, (i + 1) * seg_len

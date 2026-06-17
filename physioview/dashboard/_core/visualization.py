@@ -87,16 +87,13 @@ def _cardiac_summary_table(
 
 def _eda_summary_table(
     sqa_df: pd.DataFrame,
-    tonic_scl: np.ndarray,
-    scr_series: Optional[np.ndarray] = None,
-    seg_size: Optional[int] = None
+    tonic_scl: np.ndarray
 ) -> Tuple[dbc.Table, list]:
     """Display the EDA SQA summary table."""
-    if scr_series is not None:
-        scr_peaks = np.nan_to_num(scr_series, nan = 0)
-        n_seg = int(np.ceil(len(scr_peaks)) / seg_size)
-        scr_segments = scr_peaks[:n_seg * seg_size].reshape(n_seg, seg_size)
-        avg_scr_seg = round(scr_segments.sum(axis = 1).mean(), 2)
+    # SCR peaks are already counted per segment during signal quality
+    # assessment, using the same segmentation as the rest of the workflow.
+    if 'N SCRs' in sqa_df.columns:
+        avg_scr_seg = round(float(sqa_df['N SCRs'].mean()), 2)
     else:
         avg_scr_seg = 'N/A'
 
