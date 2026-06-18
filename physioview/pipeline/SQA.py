@@ -99,6 +99,16 @@ class Cardio:
         ...                                 ts_col = 'Timestamp', \
         ...                                 seg_size = 60, min_hr = 40)
         """
+        def _is_invalid(row):
+            if 'Segment' not in df.columns:
+                seg_samples = int(self.fs * seg_size)
+                df['Segment'] = np.arange(len(df)) // seg_samples + 1
+            seg_samples = df[df['Segment'] == row['Segment']].shape[0]
+            duration = seg_samples / self.fs
+            return 1 if (row['N Detected'] < int(min_hr * (duration / 60)) or
+                         row['N Detected'] > int(
+                        220 * (duration / 60))) else np.nan
+
         df = data.copy()
         df.index = df.index.astype(int)
 
@@ -189,10 +199,7 @@ class Cardio:
                 artifacts = self.get_artifacts(
                     df, beats_ix, artifacts_ix, seg_size)
                 metrics = pd.merge(missing, artifacts, on = ['Segment'])
-
-        metrics['Invalid'] = metrics['N Detected'].apply(
-            lambda x: 1 if x < int(min_hr * (seg_size/60)) or \
-                           x > int(220 * (seg_size/60)) else np.nan)
+        metrics['Invalid'] = metrics.apply(_is_invalid, axis = 1)
 
         return metrics
 
@@ -241,8 +248,12 @@ class Cardio:
             df.loc[artifacts_ix, 'Artifact'] = 1
 
         # Label segments
-        seg_samples = int(self.fs * seg_size)
-        seg_labels = (pd.Series(np.arange(len(df)), index = df.index) // seg_samples) + 1
+        if 'Segment' in df.columns:
+            seg_labels = df['Segment']
+        else:
+            seg_samples = int(self.fs * seg_size)
+            seg_labels = (pd.Series(np.arange(len(df)),
+                                    index = df.index) // seg_samples) + 1
 
         # Summarize detected and artifactual beats
         n_detected = df.groupby(seg_labels)['Beat'].sum().fillna(0).astype(int)
@@ -1551,12 +1562,10 @@ class Cardio:
         invalid_x = []
         invalid_y = []
         invalid_text = []
-        for segment_num, n_detected in zip(
-                sqa_metrics['Segment'], sqa_metrics['N Detected']):
-            if n_detected < invalid_thresh:
-                invalid_x.append(segment_num)
-                invalid_y.append(
-                    n_detected + 3)
+        for _, row in sqa_metrics.iterrows():
+            if row['Invalid'] == 1:
+                invalid_x.append(row['Segment'])
+                invalid_y.append(row['N Detected'] + 3)
                 invalid_text.append('<b>!</b>')
 
         # Add scatter trace for invalid markers
@@ -1600,7 +1609,7 @@ class Cardio:
                 xanchor = 'right',
                 x = 1.0),
             font = dict(family = 'Poppins', size = 13),
-            height = 289,
+            height = 315,
             margin = dict(t = 70, r = 20, l = 40, b = 65),
             barmode = 'stack',
             template = 'simple_white',
@@ -1662,12 +1671,10 @@ class Cardio:
         invalid_x = []
         invalid_y = []
         invalid_text = []
-        for segment_num, n_detected in zip(
-                sqa_metrics['Segment'], sqa_metrics['N Detected']):
-            if n_detected < invalid_thresh:
-                invalid_x.append(segment_num)
-                invalid_y.append(
-                    n_detected + 3)
+        for _, row in sqa_metrics.iterrows():
+            if row['Invalid'] == 1:
+                invalid_x.append(row['Segment'])
+                invalid_y.append(row['N Detected'] + 3)
                 invalid_text.append('<b>!</b>')
 
         # Add scatter trace for invalid markers
@@ -1712,7 +1719,7 @@ class Cardio:
                 x = 1.0,
                 traceorder = 'reversed'),
             font = dict(family = 'Poppins', size = 13),
-            height = 289,
+            height = 315,
             margin = dict(t = 70, r = 20, l = 40, b = 65),
             barmode = 'overlay',
             template = 'simple_white',
@@ -2121,7 +2128,7 @@ class EDA:
         # Segmented approach
         else:
             seg_len = int(seg_size * fs)
-            n_segments = len(signal) // seg_len
+            n_segments = ceil(len(signal) / seg_len)
 
             for i in range(n_segments):
                 start, end = i * seg_len, (i + 1) * seg_len
@@ -2243,6 +2250,7 @@ class EDA:
         or above temp_max (Rule 3)."""
         if temp is None:
             return None
+        temp = np.asarray(temp)
         return (temp < self.temp_min) | (temp > self.temp_max)
 
     def _set_neighbors_invalid(
@@ -2322,7 +2330,9 @@ class EDA:
                     text = 'Segment',
                     font = dict(size = 16),
                     standoff = 5),
-                tickfont = dict(size = 14)
+                tickfont = dict(size = 14),
+                range = [metrics['Segment'].min() - 0.5,
+                         metrics['Segment'].max() + 0.5]
             ),
             yaxis = dict(
                 title = dict(
@@ -2400,7 +2410,9 @@ class EDA:
                     text = 'Segment',
                     font = dict(size = 16),
                     standoff = 5),
-                tickfont = dict(size = 14)
+                tickfont = dict(size = 14),
+                range = [metrics['Segment'].min() - 0.5,
+                         metrics['Segment'].max() + 0.5]
             ),
             yaxis = dict(
                 title = dict(

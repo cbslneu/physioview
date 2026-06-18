@@ -1,5 +1,5 @@
+from . import _core
 from dash import html, dcc
-from physioview.dashboard import utils
 import dash_bootstrap_components as dbc
 import dash_daq as daq
 import dash_uploader as du
@@ -13,6 +13,7 @@ layout = html.Div(id = 'main', children = [
         dcc.Store(id = 'config-memory', storage_type = 'memory'),
         dcc.Store(id = 'config-download-memory', storage_type = 'memory'),
         dcc.Store(id = 'temperature-load', storage_type = 'memory'),
+        dcc.Store(id = 'event-load', storage_type = 'memory'),
         dcc.Store(id = 'memory-db', storage_type = 'memory'),
         html.Span(className = 'h5',
                   children = ['Welcome to PhysioView']),
@@ -74,7 +75,7 @@ layout = html.Div(id = 'main', children = [
         ], hidden = True),
 
         # ============================ Setup Data ============================
-        html.Div(id = 'setup-data', hidden = True, children = [
+        html.Div(id = 'setup-data-header', hidden = True, children = [
             html.H4(children = [
                 'Setup Data',
                 html.I(className = 'fa-regular fa-circle-question',
@@ -85,6 +86,8 @@ layout = html.Div(id = 'main', children = [
                         'matching headers in your file(s) to the corresponding '
                         'data variables.',
                         target = 'data-var-help'),
+        ]),
+        html.Div(id = 'setup-data', hidden = True, children = [
             html.Div(id = 'data-type-container', children = [
                 html.Span('Data Type: '),
                 dbc.RadioItems(
@@ -144,43 +147,99 @@ layout = html.Div(id = 'main', children = [
                                      options = ['<Var>', '<Var>']))
                 ])
             ]),
-            html.Div(id = 'load-temperature', hidden = True, children = [
-                html.Div(children = [
+        ]),
+        html.Div(id = 'segment-data', hidden = True, children = [
+            html.Span('Data Segmentation:'),
+            html.Div(children = [
+                html.Div(id = 'segment-data-by-event', children = [
                     daq.BooleanSwitch(
-                        id = 'toggle-temp-data',
+                        id = 'toggle-event-segmentation',
                         color = '#ee8a78',
-                        label = 'Load Temperature Data',
+                        label = 'by event',
                         labelPosition = 'left',
                         on = False),
-                    html.I(className = 'fa-regular fa-circle-question',
-                           id = 'temp-help'),
-                    dbc.Tooltip('Optional: Upload temperature data (.csv) or '
-                                'select the matching header in your file for '
-                                'the temperature variable. Uploaded data '
-                                'must have at most one header row and one column.',
-                                style = {'--bs-tooltip-max-width': '235px'},
-                                target = 'temp-help'),
-                ], style = {'display': 'inline-flex', 'alignItems': 'center',
-                            'gap': '0.25em'}),
-                html.Div(id = 'temp-upload-section', hidden = True, children = [
-                    html.Div(id = 'temp-upload-div', children = [
-                        html.Span('Upload:'),
-                        dcc.Upload(id = 'temp-uploader',
-                            children = html.Span('Select File...'),
-                            multiple = False,
-                            disabled = True,
-                            # text_disabled = 'Enabled for single-file uploads only.',
-                            accept = '.csv'),
-                        html.I(id = 'clear-temp-upload', title = 'Clear upload',
-                               className = 'fa-solid fa-eraser'),
-                    ]),
-                    html.Div(id = 'temp-file-check', children = []),
-                    html.Div(id = 'temp-variable-mapping', children = [
-                        html.Span('Temperature:', style = {'width': '150px'}),
-                        dcc.Dropdown(id = 'temp-variable',
-                                     options = ['<Var>', '<Var>'])
-                    ])
+                    dcc.Dropdown(
+                        id = 'event-segmentation-options',
+                        options = [
+                            {'label': 'Windowed', 'value': 'windowed'},
+                            {'label': 'Entire event', 'value': 'entire'}
+                        ],
+                        value = 'windowed', clearable = False, disabled = True)
                 ]),
+                html.Div(id = 'event-file-upload-div', children = [
+                    html.Span('Upload Event File:'),
+                    html.I(className = 'fa-regular fa-circle-question',
+                           id = 'by-event-help'),
+                    dbc.Tooltip(id = 'by-event-tooltip', children = [
+                        'Event files (.csv, .txt) must contain the following ',
+                        html.Strong('required columns:'), html.Br(),
+                        '(1) ', html.Strong('event: '), 'text labels; (2) ',
+                        html.Strong('start: '), 'timestamps; (3) ',
+                        html.Strong('end: '),
+                        'timestamps. Start and end times should be datetime '
+                        'strings (e.g., "2024-01-15 14:30:00") or Unix '
+                        'timestamps in seconds  (e.g., 1705329000).'],
+                        target = 'by-event-help',
+                        style = {'--bs-tooltip-max-width': '250px'}),
+                    dcc.Upload(
+                        id = 'event-uploader',
+                        children = html.Span('Select File...'),
+                        multiple = False,
+                        disabled = False,
+                        accept = '.csv,.txt,.zip'),
+                    html.I(id = 'clear-event-upload',
+                           title = 'Clear upload',
+                           className = 'fa-solid fa-eraser')],
+                className = 'segment-data-detailed', hidden = True),
+                html.Div(id = 'event-file-check', children = []),
+            ]),
+            html.Div(id = 'segment-data-by-time', children = [
+                html.Span('Window Size (sec):'),
+                dcc.Input(id = 'seg-size', type = 'number'),
+                html.I(className = 'fa-regular fa-circle-question',
+                       id = 'seg-data-help'),
+                dbc.Tooltip(
+                    'This sets the window size for data segmentation. If '
+                    'event-based segmentation is selected, each event '
+                    'will be further divided into windows of this size.',
+                    target = 'seg-data-help'),
+            ], className = 'segment-data-detailed', hidden = False),
+        ]),
+        html.Div(id = 'load-temperature', hidden = True, children = [
+            html.Div(children = [
+                daq.BooleanSwitch(
+                    id = 'toggle-temp-data',
+                    color = '#ee8a78',
+                    label = 'Load Temperature Data',
+                    labelPosition = 'left',
+                    on = False),
+                html.I(className = 'fa-regular fa-circle-question',
+                       id = 'temp-help'),
+                dbc.Tooltip('Optional: Upload temperature data (.csv) or '
+                            'select the matching header in your file for '
+                            'the temperature variable. Uploaded data '
+                            'must have at most one header row and one column.',
+                            style = {'--bs-tooltip-max-width': '235px'},
+                            target = 'temp-help'),
+            ], style = {'display': 'inline-flex', 'alignItems': 'center',
+                        'gap': '0.25em'}),
+            html.Div(id = 'temp-upload-section', hidden = True, children = [
+                html.Div(id = 'temp-upload-div', children = [
+                    html.Span('Upload:'),
+                    dcc.Upload(id = 'temp-uploader',
+                        children = html.Span('Select File...'),
+                        multiple = False,
+                        disabled = True,
+                        accept = '.csv'),
+                    html.I(id = 'clear-temp-upload', title = 'Clear upload',
+                           className = 'fa-solid fa-eraser'),
+                ]),
+                html.Div(id = 'temp-file-check', children = []),
+                html.Div(id = 'temp-variable-mapping', children = [
+                    html.Span('Temperature:', style = {'width': '150px'}),
+                    dcc.Dropdown(id = 'temp-variable',
+                                 options = ['<Var>', '<Var>'])
+                ])
             ]),
         ]),
         html.Div(id = 'preprocess-data', hidden = True, children = [
@@ -217,7 +276,7 @@ layout = html.Div(id = 'main', children = [
                     html.Span('Max:'),
                     dcc.Input(id = 'eda-valid-max', value = 40, type = 'number'),
                 ])
-            ], style = {'padding': '5px 0px 7px 0px'}),
+            ], style = {'padding': '0px 0px 7px 0px'}),
             html.Div(id = 'filter-data', children = [
                 html.Div(id = 'filter-settings', children = [
                     html.Div([
@@ -228,7 +287,7 @@ layout = html.Div(id = 'main', children = [
                             labelPosition = 'left',
                             on = True),
                         html.I(className = 'fa-regular fa-circle-question',
-                                id = 'filter-help'),
+                               id = 'filter-help'),
                         dbc.Tooltip('Apply a filter to remove low- and '
                                     'high-frequency noise, including baseline '
                                     'drift, powerline interference, '
@@ -269,18 +328,7 @@ layout = html.Div(id = 'main', children = [
                     ], style = {'display': 'flex', 'alignItems': 'center'})
                 ]),
             ]),
-            html.Div(id = 'segment-data', children = [
-                html.Span('Segment Size (sec):'),
-                dcc.Input(id = 'seg-size', type = 'number'),
-                html.I(className = 'fa-regular fa-circle-question',
-                       id = 'seg-data-help'),
-                dbc.Tooltip(
-                    'This sets the size of the windows into which your data '
-                    'will be segmented.',
-                    target = 'seg-data-help')
-            ]),
         ]),
-
         html.Div(id = 'run-save-buttons', children = [
             html.Button('Run', n_clicks = 0, id = 'run-data', disabled = True),
             html.Button('Stop', n_clicks = 0, id = 'stop-run', hidden = True,
@@ -400,7 +448,7 @@ layout = html.Div(id = 'main', children = [
             ])
         ], className = 'validation-error-modal', centered = True),
 
-        # Duplicate Temperature Input Modal
+        # Duplicate Temperature Input Error Modal
         dbc.Modal(id = 'duplicate-temp-error-modal', is_open = False, children = [
             dbc.ModalHeader([
                 html.I(className = 'fa-solid fa-circle-xmark'),
@@ -409,6 +457,17 @@ layout = html.Div(id = 'main', children = [
             dbc.ModalBody(className = 'popup-error', children = [
                 html.Span('Two temperature sources were given. Please use '
                           'either an uploaded file or a column mapping.')
+            ])
+        ], className = 'validation-error-modal', centered = True),
+
+        # Event File Error Modal
+        dbc.Modal(id = 'event-file-error-modal', is_open = False, children = [
+            dbc.ModalHeader([
+                html.I(className = 'fa-solid fa-circle-xmark'),
+                dbc.ModalTitle('Missing Event File')
+            ], close_button = True),
+            dbc.ModalBody(className = 'popup-error', children = [
+                html.Span('Please upload an event file or segment your data by time.')
             ])
         ], className = 'validation-error-modal', centered = True),
 
@@ -422,7 +481,7 @@ layout = html.Div(id = 'main', children = [
                 html.Span('An error occurred while processing the data. Please check the following:',
                           style = {'fontWeight': '600'}),
                 html.Ul(id = 'pipeline-error-message', children = [
-                    html.Li('The correct data type is selected..'),
+                    html.Li('The correct data type is selected.'),
                     html.Li('The sampling rate is correct.'),
                     html.Li('"Time/sample" and "Signal" are mapped correctly.'),
                     html.Li(children = [
@@ -529,46 +588,70 @@ layout = html.Div(id = 'main', children = [
 
         html.Div(id = 'qa-section', children = [
 
-            # Subject Selection Dropdown
-            html.Div(id = 'select-subject', children = [
-                html.I(className = 'fa-solid fa-user'),
-                dcc.Dropdown(
-                    id = 'subject-dropdown',
-                    placeholder = 'Select Data',
-                    options = [],
-                    value = None,
-                    disabled = True,
-                    clearable = False
-                ),
-            ]),
+            # LEFT SIDE: DATA SELECTION AND QUALITY SUMMARY
+            html.Div(id = 'qa-left', children = [
 
-            # Panel 1: Data Summary
-            html.Div(className = 'data-summary', children = [
-                html.Div(id = 'data-summary-header', children = [
-                    html.H2('Quality Summary'),
-                    html.I(className = 'fa-solid fa-pen-to-square',
-                           id = 'reload-data'),
-                    dbc.Tooltip('Reload data file', target = 'reload-data')],
-                    style = {'display': 'flex',
-                             'justifyContent': 'spaceBetween'}),
-                html.Div(className = 'data-summary-divs', id = 'summary-table',
-                         children = [utils._blank_table()]),
+                # Subject and Event Selection Dropdowns
+                html.Div(id = 'dropdown-stack', children = [
+                    html.Div(id = 'select-subject', children = [
+                        html.Span(
+                            id = 'data-dropdown-icon',
+                            children = [html.I(className = 'fa-solid fa-user')]
+                        ),
+                        dcc.Dropdown(
+                            id = 'data-dropdown',
+                            placeholder = 'Select Data',
+                            options = [],
+                            value = None,
+                            disabled = True,
+                            clearable = False
+                        ),
+                    ]),
 
-                # Data Summary Exporter
-                html.Div(children = [
-                    html.Button('Export Summary',
-                                id = 'export-summary',
-                                n_clicks = 0,
-                                disabled = True),
-                    dbc.Modal(
-                        id = 'export-modal',
-                        is_open = False,
-                        children = [
-                            dbc.ModalHeader(
-                                dbc.ModalTitle(children = [
-                                    'Export Summary',
-                                ])
-                            ),
+                    # Event Selection Dropdown
+                    html.Div(id = 'select-event', children = [
+                        html.Span(
+                            id = 'event-dropdown-icon',
+                            children = [html.I(className = 'fa-solid fa-calendar')]
+                        ),
+                        dcc.Dropdown(
+                            id = 'event-dropdown',
+                            placeholder = 'Select Event',
+                            options = [],
+                            value = None,
+                            disabled = True,
+                            clearable = False
+                        ),
+                    ]),
+                ]),
+
+
+                # Panel 1: Data Summary
+                html.Div(className = 'data-summary', children = [
+                    html.Div(id = 'data-summary-header', children = [
+                        html.H2('Quality Summary'),
+                        html.I(className = 'fa-solid fa-pen-to-square',
+                               id = 'reload-data'),
+                        dbc.Tooltip('Reload data file', target = 'reload-data')],
+                        style = {'display': 'flex',
+                                 'justifyContent': 'spaceBetween'}),
+                    html.Div(className = 'data-summary-divs', id = 'summary-table',
+                             children = [_core.visualization._blank_table()]),
+
+                    # Data Summary Exporter
+                    html.Div(children = [
+                        html.Button('Export Summary',
+                                    id = 'export-summary',
+                                    n_clicks = 0,
+                                    disabled = True),
+                        dbc.Modal(
+                            id = 'export-modal',
+                            is_open = False,
+                            children = [
+                                dbc.ModalHeader(
+                                    dbc.ModalTitle(children = [
+                                        'Export Summary'])
+                                ),
                                 dbc.ModalBody(children = [
                                     html.Div(
                                         id = 'export-description',
@@ -587,7 +670,7 @@ layout = html.Div(id = 'main', children = [
                                                            id = 'export-mode-help'),
                                                     dbc.Tooltip(
                                                         "'Single' exports summary data of the current file. "
-                                                        "'Batch' exports data for all preprocessed subjects.",
+                                                        "'Batch' exports data for all preprocessed subjects/events.",
                                                         target = 'export-mode-help'),
                                                     dbc.RadioItems(
                                                         id = 'export-mode',
@@ -605,7 +688,7 @@ layout = html.Div(id = 'main', children = [
                                                     dbc.Tooltip(
                                                         "'Zip' creates a .zip file containing CSVs and a summary "
                                                         "text file. 'Excel' generates a workbook. In 'Batch' mode, all "
-                                                        "subjects' Excel files are bundled into a single .zip archive.",
+                                                        "subjects/events' Excel files are bundled into a single .zip archive.",
                                                         target = 'export-format-help',
                                                     style = {'--bs-tooltip-max-width': '225px'}),
                                                     dbc.RadioItems(
@@ -623,24 +706,24 @@ layout = html.Div(id = 'main', children = [
                                                  html.P('Summary file created.',
                                                         style = {'marginTop': '5px'})],
                                              hidden = True)]),
-                                # ]),
-                            dbc.ModalFooter(children = [
-                                html.Div(id = 'export-modal-btns',
-                                         children = [
-                                             html.Button('OK', n_clicks = 0,
-                                                         id = 'ok-export',
-                                                         disabled = True),
-                                             dcc.Download(id = 'download-summary'),
-                                             dbc.Button('Cancel', n_clicks = 0, id = 'close-export'),]),
-                                html.Div(id = 'export-close-btn',
-                                         children = [
-                                             dbc.Button('Done', n_clicks = 0, id = 'close-export2')],
-                                         hidden = True)],
-                                style = {'display': 'inline'})
-                        ], backdrop = 'static', centered = True)])
+                                dbc.ModalFooter(children = [
+                                    html.Div(id = 'export-modal-btns',
+                                             children = [
+                                                 html.Button('OK', n_clicks = 0,
+                                                             id = 'ok-export',
+                                                             disabled = True),
+                                                 dcc.Download(id = 'download-summary'),
+                                                 dbc.Button('Cancel', n_clicks = 0, id = 'close-export'),]),
+                                    html.Div(id = 'export-close-btn',
+                                             children = [
+                                                 dbc.Button('Done', n_clicks = 0, id = 'close-export2')],
+                                             hidden = True)],
+                                    style = {'display': 'inline'})
+                            ], backdrop = 'static', centered = True)])
+                ]),
             ]),
 
-            # Panel 2: Data Quality
+            # RIGHT SIDE: DATA QUALITY CHARTS
             html.Div(className = 'qa', children = [
                 html.Div(className = 'qa-charts', children = [
                     html.H2('Data Quality'),
@@ -659,7 +742,7 @@ layout = html.Div(id = 'main', children = [
                         type = 'circle', color = '#3a4952', children = [
                             dcc.Graph(
                                 id = 'sqa-plot',
-                                figure = utils._blank_fig('pending'))])
+                                figure = _core.visualization._blank_fig('pending'))])
                 ])
             ])
         ]),
@@ -732,7 +815,7 @@ layout = html.Div(id = 'main', children = [
             html.Div(className = 'figs', children = [
                 dcc.Loading(type = 'circle', color = '#3a4952', children = [
                     dcc.Graph(id = 'raw-data',
-                              figure = utils._blank_fig('pending'),
+                              figure = _core.visualization._blank_fig('pending'),
                               style = {'height': 'auto'})
                 ])
             ])
@@ -813,7 +896,7 @@ layout = html.Div(id = 'main', children = [
                                id = 'postprocess-export-mode-help'),
                         dbc.Tooltip(
                             "'Single' exports summary data of the current file. "
-                            "'Batch' exports data for all preprocessed subjects.",
+                            "'Batch' exports data for all preprocessed subjects/events.",
                             target = 'postprocess-export-mode-help'),
                         dbc.RadioItems(
                             id = 'postprocess-export-mode',
