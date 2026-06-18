@@ -2401,11 +2401,6 @@ def get_callbacks(app):
                     data_edited.insert(artifact_col_pos, 'Artifact', None)
                     data_edited.loc[artifacts_edited, 'Artifact'] = 1
 
-                    # Save edited data
-                    data_edited.to_csv(
-                        str(temp_path / f'{file}_edited.csv'),
-                        index = False)
-
                     # Recompute IBIs with edited beats for rendering
                     ibi_edited = physioview.compute_ibis(
                         data_edited, fs, data_edited_beats_ix, ts_col)
@@ -2419,7 +2414,7 @@ def get_callbacks(app):
                             ends = [unusable_ix[-1]]
                         else:
                             starts = np.insert(unusable_ix[breaks + 1], 0, unusable_ix[0])
-                            ends = np.insert(unusable_ix[breaks], 0, unusable_ix[-1])
+                            ends = np.append(unusable_ix[breaks], unusable_ix[-1])
 
                         unusable_bounds = list(zip(starts, ends))
                         for s, e in unusable_bounds:
@@ -2440,11 +2435,15 @@ def get_callbacks(app):
                             if artif_post_ix is not None:
                                 data_edited.loc[artif_post_ix, 'Artifact'] = np.nan
 
+                    # Save edited data
+                    data_edited.to_csv(
+                        str(temp_path / f'{file}_edited.csv'), index = False)
+
                     # Render updated signal plots
                     signal_plots = physioview.plot_signal(
                         signal = data_edited, signal_type = data_type,
                         axes = (x_axis_label, 'Signal'), fs = fs,
-                        peaks_map = {data_type: 'Edited Beat'},
+                        peaks_map = {data_type: 'Edited'},
                         peaks_label = 'Edited Beat',
                         peaks_color = '#71b4eb',
                         edits_map = {data_type: {'Add': 'Added Beat',
@@ -2944,8 +2943,8 @@ def get_callbacks(app):
         [Output('postprocess-modal', 'is_open', allow_duplicate = True),
          Output('postprocess-options', 'options')],
         [Input('postprocess-data', 'n_clicks'),
-         Input('cancel-postprocess', 'n_clicks')],
-        [State('data-dropdown', 'value'),
+         Input('cancel-postprocess', 'n_clicks'),
+         State('data-dropdown', 'value'),
          State('postprocess-modal', 'is_open'),
          State('memory-db', 'data')],
         prevent_initial_call = True
