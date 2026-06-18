@@ -26,9 +26,9 @@ def _cardiac_summary_table(
     n_segments = sqa_df['Segment'].max()
     invalid_n = len(sqa_df.loc[sqa_df['Invalid'] == 1])
     invalid_prop = f'{(invalid_n / n_segments) * 100:.2f}%'
-    avg_missing = sqa_df.loc[sqa_df['% Missing'] > 0, '% Missing'].mean()
+    avg_missing = sqa_df['% Missing'].mean()
     avg_missing = f'{0 if pd.isna(avg_missing) else avg_missing:.2f}%'
-    avg_artifact = sqa_df.loc[sqa_df['% Artifact'] > 0, '% Artifact'].mean()
+    avg_artifact = sqa_df['% Artifact'].mean()
     avg_artifact = f'{0 if pd.isna(avg_artifact) else avg_artifact:.2f}%'
 
     if valid_df.empty:

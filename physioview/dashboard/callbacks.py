@@ -2443,7 +2443,7 @@ def get_callbacks(app):
                     signal_plots = physioview.plot_signal(
                         signal = data_edited, signal_type = data_type,
                         axes = (x_axis_label, 'Signal'), fs = fs,
-                        peaks_map = {data_type: 'Edited'},
+                        peaks_map = {data_type: 'Edited Beat'},
                         peaks_label = 'Edited Beat',
                         peaks_color = '#71b4eb',
                         edits_map = {data_type: {'Add': 'Added Beat',
