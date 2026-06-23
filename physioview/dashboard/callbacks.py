@@ -374,6 +374,7 @@ def get_callbacks(app):
          Output('resampling-rate', 'disabled'),
          Output('load-temperature', 'hidden'),
          Output('temp-upload-section', 'hidden'),
+         Output('preprocess-data', 'hidden', allow_duplicate = True),
          Output('beat-detector-settings', 'hidden'),
          Output('artifact-settings', 'hidden'),
          Output('eda-preprocessing', 'hidden', allow_duplicate = True),
@@ -395,6 +396,7 @@ def get_callbacks(app):
         """Enable parameters specific to data types of CSV sources."""
         load_temp_hidden = True
         temp_upload_hidden = True
+        preprocess_data_hidden = True
         eda_preprocess_hidden = True
         beat_detector_settings_hidden = True
         artifact_settings_hidden = True
@@ -414,6 +416,7 @@ def get_callbacks(app):
             resample_hidden = False
             load_temp_hidden = False
             eda_preprocess_hidden = False
+            preprocess_data_hidden = False
             seg_size = 180
             if toggle_rs_on is True:
                 resample_disabled = False
@@ -432,6 +435,7 @@ def get_callbacks(app):
         if trig == 'e4-data-types' and e4_dtype == 'PPG':
             fs = 64
             eda_preprocess_hidden = True
+            preprocess_data_hidden = False
             beat_detector_settings_hidden = False
             artifact_settings_hidden = False
             beat_detectors = [
@@ -441,6 +445,7 @@ def get_callbacks(app):
         elif ctx.triggered_id == 'data-types' and dtype in ('PPG', 'ECG'):
             fs = 500
             eda_preprocess_hidden = True
+            preprocess_data_hidden = False
             beat_detector_settings_hidden = False
             artifact_settings_hidden = False
             if dtype == 'PPG':
@@ -457,7 +462,7 @@ def get_callbacks(app):
                 default_beat_detector = 'manikandan'
 
         return [fs, resample_hidden, resample_disabled,
-                load_temp_hidden, temp_upload_hidden,
+                load_temp_hidden, temp_upload_hidden, preprocess_data_hidden,
                 beat_detector_settings_hidden, artifact_settings_hidden,
                 eda_preprocess_hidden, scr_amp_thresh_hidden,
                 beat_detectors, default_beat_detector,
@@ -479,16 +484,29 @@ def get_callbacks(app):
 
     # === Set windowed/entire event segmentation ==============================
     @app.callback(
-        [Output('seg-size', 'disabled'),
+        [Output('peak-detection-mode', 'options'),
+         Output('seg-size', 'disabled'),
          Output('seg-size', 'value'),
          Output('segment-data-by-time', 'style')],
-        Input('event-segmentation-options', 'value')
+        [Input('event-segmentation-options', 'value'),
+         Input('seg-size', 'value'),
+         Input('toggle-event-segmentation', 'on')],
+        prevent_initial_call = True
     )
-    def disable_window_size(segment_event_by):
-        if segment_event_by == 'entire':
-            return True, None, {'color': '#bababa', 'fontStyle': 'italic'}
-        else:
-            return False, 60, {}
+    def handle_segmentation_params(segment_event_by, seg_size, toggle_on):
+        """Enable or disable the segment size input and 'By Segment' peak detection
+        option based on the event segmentation toggle state and selected segmentation
+        mode, greying out segment-related controls when entire-event processing is
+        active."""
+        disable = segment_event_by == 'entire' and toggle_on
+        segment_options = lambda disabled: [
+            {'label': 'Entire Signal', 'value': 'entire'},
+            {'label': 'By Segment', 'value': 'segment', 'disabled': disabled}
+        ]
+        if disable:
+            return segment_options(True), True, None, \
+                {'color': '#bababa', 'fontStyle': 'italic'}
+        return segment_options(False), False, seg_size or 60, {}
 
     # === Open advanced filter cutoff settings ================================
     @app.callback(
@@ -848,7 +866,7 @@ def get_callbacks(app):
     @app.callback(
         [Output('setup-data-header', 'hidden'),
          Output('setup-data', 'hidden'),
-         Output('preprocess-data', 'hidden'),
+         Output('preprocess-data', 'hidden', allow_duplicate = True),
          Output('eda-preprocessing', 'hidden', allow_duplicate = True),
          Output('segment-data', 'hidden'),
          Output('data-type-container', 'hidden'),     # data types div
@@ -895,7 +913,7 @@ def get_callbacks(app):
         # Default visibility
         hide_setup_header = False
         hide_setup = False
-        hide_preprocess = False
+        hide_preprocess = True
         hide_eda_preprocess = True
         hide_segment_data = False
         hide_data_types = False
@@ -933,6 +951,7 @@ def get_callbacks(app):
                 hide_setup = True
                 hide_data_types = True
                 hide_data_vars = True
+                hide_preprocess = False
                 dtype = 'ECG'
                 beat_detectors = [
                     {'label': 'Manikandan & Soman (2012)',
@@ -1225,6 +1244,7 @@ def get_callbacks(app):
             State('temperature-load', 'data'),
             State('temp-variable', 'value'),
             State('beat-detectors', 'value'),
+            State('peak-detection-mode', 'value'),
             State('seg-size', 'value'),
             State('artifact-method', 'value'),
             State('artifact-tol', 'value'),
@@ -1259,8 +1279,8 @@ def get_callbacks(app):
     )
     def run_pipeline(set_progress, n, load_data, e4_dtype, dtype, fs, rs,
                      d1, d2, d3, d4, d5, event_toggle_on, event_times,
-                     temp_data, temp_var, beat_detector, seg_size,
-                     artifact_method, artifact_tol, filt_on,
+                     temp_data, temp_var, beat_detector, beat_detection_mode,
+                     seg_size, artifact_method, artifact_tol, filter_on,
                      filter_lowcut, filter_highcut, filter_order,
                      filter_rp, filter_rs, filter_window_len, filter_len,
                      filter_window_type, scr_detector, min_peak_amp,
@@ -1372,7 +1392,8 @@ def get_callbacks(app):
 
                     # Initialize data preprocessing object for each file
                     preprocessor = _core.Preprocessor(
-                        dtype, fs, filt_on, peak_detector, event_df,
+                        dtype, fs, filter_on, peak_detector,
+                        beat_detection_mode, event_df,
                         seg_size, filter_kwargs)
 
                     # If timestamps are given
@@ -1534,8 +1555,8 @@ def get_callbacks(app):
 
                 # Initialize data preprocessing object
                 preprocessor = _core.Preprocessor(
-                    dtype, fs, filt_on, peak_detector, event_df, seg_size,
-                    filter_kwargs)
+                    dtype, fs, filter_on, peak_detector, beat_detection_mode,
+                    event_df, seg_size, filter_kwargs)
 
                 if file_type in ('Actiwave', 'E4'):
 
@@ -1590,8 +1611,8 @@ def get_callbacks(app):
 
                     # Reset preprocessor with device-specific sampling rates
                     preprocessor = _core.Preprocessor(
-                        dtype, fs, filt_on, peak_detector, event_df, seg_size,
-                        filter_kwargs)
+                        dtype, fs, filter_on, peak_detector, beat_detection_mode,
+                        event_df, seg_size, filter_kwargs)
 
                 # -- csv sources ---------------------------------------------
                 else:
@@ -1672,7 +1693,7 @@ def get_callbacks(app):
                     else:
                         try:
                             preprocessed, metrics = preprocessor.preprocess_full(
-                                data, dtype, artifact_method = artifact_method,
+                                data, artifact_method = artifact_method,
                                 artifact_tol = artifact_tol)
                         except Exception as e:
                             pipeline_error = True
@@ -1722,30 +1743,6 @@ def get_callbacks(app):
                         except RuntimeError:
                             pipeline_error = True
                             return _errors()
-                        try:
-                            preprocessed, preprocessed_by_event, \
-                                metrics_by_event = preprocessor.preprocess_event(
-                                data, rs, min_peak_amp, temp_data = temp,
-                                eda_min = eda_min, eda_max = eda_max)
-                        except Exception as e:
-                            pipeline_error = True
-                            print(traceback.format_exc())
-                            return dtype_error, map_error, pipeline_error, \
-                                event_file_error, temp_input_error, None
-
-                        for event_label, event_data in preprocessed_by_event.items():
-                            event_durations[event_label] = len(event_data) / preprocessor.fs
-                            event_data.to_csv(
-                                temp_path / f'{file}_{event_label}_EDA.csv',
-                                index = False)
-
-                            # Write downsampled event data to '_render' subdirectory
-                            _core.io._create_render(
-                                f'{file}_{event_label}', event_data, ds_acc = acc)
-
-                        # Write SQA metrics to 'temp' folder
-                        for event_label, metrics in metrics_by_event.items():
-                            metrics.to_csv(temp_path / f'{file}_{event_label}_SQA.csv', index = False)
 
                     # Segment-based EDA preprocessing
                     else:
@@ -1888,7 +1885,7 @@ def get_callbacks(app):
         prevent_initial_call = True
     )
     def create_beat_editor_files(all_subjects, selected_subject, all_events,
-                                 beat_correction_status, memory, filt_on,
+                                 beat_correction_status, memory, filter_on,
                                  prev_beats_edited):
         """Create Beat Editor _edit.json files for uploaded cardiac files and
         enable the 'Beat Editor' button."""
@@ -1910,7 +1907,7 @@ def get_callbacks(app):
             return btn_icon, 'no-spin', False
 
         fs = memory['fs']
-        signal_col = 'Filtered' if filt_on else data_type
+        signal_col = 'Filtered' if filter_on else data_type
 
         def _write_beat_editor_file(filename, batch):
             """Read CSV, downsample, and write a beat editor JSON file."""
@@ -2117,7 +2114,7 @@ def get_callbacks(app):
     )
     def update_sqa_table(memory, selected_subject, selected_event,
                          re_render_sqa_flag, all_subjects, all_events,
-                         segment_event_by, filt_on, seg_size):
+                         segment_event_by, filter_on, seg_size):
         """Update the SQA summary table and export batch options."""
         file = selected_subject
         event = selected_event
@@ -2150,7 +2147,7 @@ def get_callbacks(app):
         # Output signal quality table or EDA data
         else:
             eda = pd.read_csv(temp_path / f'{fstem}_EDA.csv')
-            signal_col = 'Filtered' if filt_on else 'EDA'
+            signal_col = 'Filtered' if filter_on else 'EDA'
             eda_signal = eda[signal_col].to_numpy()
             tonic_scl = compute_tonic_scl(eda_signal)
 
@@ -2228,7 +2225,7 @@ def get_callbacks(app):
                             accept_corrections_n, reject_corrections_n,
                             revert_corrections_n, beats_edited, all_subjects,
                             all_events, beat_correction_status, segment_size,
-                            filt_on, segments, artifact_method, artifact_tol,
+                            filter_on, segments, artifact_method, artifact_tol,
                             temp_data, eda_min):
         """Update the raw data plot based on the selected segment view."""
         if memory is None:
@@ -2243,7 +2240,7 @@ def get_callbacks(app):
             # Get render data for primary signal
             render_subdir = render_dir / file
             signal = pd.read_csv(str(render_subdir / 'signal.csv'))
-            y_axis_label = 'Filtered' if filt_on else data_type
+            y_axis_label = 'Filtered' if filter_on else data_type
             x_axis_label = 'Timestamp' if 'Timestamp' in signal.columns else \
                 'Sample'
             ts_col = 'Timestamp' if 'Timestamp' in signal.columns else None

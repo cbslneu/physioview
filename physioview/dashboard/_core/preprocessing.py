@@ -18,7 +18,10 @@ class Preprocessor:
         Whether the signal should be filtered. This corresponds to the
         state of the BooleanSwitch component with the ID 'toggle-filter'.
     peak_detector : str, optional
-            The name of peak detection algorithm to use.
+        The name of peak detection algorithm to use.
+    peak_detection_mode : str, optional
+        Whether to detect beats across the entire signal or on a
+        segment-by-segment basis. Must be either 'entire' or 'segment'.
     event_times : pd.DataFrame
         A DataFrame containing the uploaded event onsets and offsets,
         if any. If provided, must contain the columns: "event" (str),
@@ -65,6 +68,7 @@ class Preprocessor:
         fs: int,
         filter_on: bool,
         peak_detector: Optional[str] = None,
+        peak_detection_mode: str = 'entire',
         event_times: Optional[pd.DataFrame] = None,
         seg_size: Optional[int] = None,
         filter_kwargs: Optional[dict] = None
@@ -84,6 +88,9 @@ class Preprocessor:
             state of the BooleanSwitch component with the ID 'toggle-filter'.
         peak_detector : str, optional
             The name of peak detection algorithm to use.
+        peak_detection_mode : str, optional
+            Whether to detect beats across the entire signal or on a
+            segment-by-segment basis. Must be either 'entire' or 'segment'.
         event_times : pd.DataFrame
             A DataFrame containing the uploaded event onsets and offsets,
             if any. If provided, must contain the columns: "event" (str),
@@ -104,10 +111,15 @@ class Preprocessor:
         self.fs = fs
         self.filter_on = filter_on
         self.peak_detector = peak_detector or self._get_default_peak_detector()
+        self.peak_detection_mode = peak_detection_mode
         self.event_times = event_times
         self.seg_size = seg_size
         self.filter_kwargs = filter_kwargs or {}
         self.duration = None
+
+        if self.peak_detection_mode == 'segment' and self.seg_size is None:
+            raise ValueError(
+                "seg_size is required when peak_detection_mode is 'segment'.")
 
         # Initialize storage for peak and artifact indices
         self.peaks_ix = None
@@ -190,19 +202,28 @@ class Preprocessor:
             signal_col = 'Phasic'
 
         # Segment the data
-        data_segments = self._segment_data(preprocessed)
+        if self.seg_size is not None:
+            preprocessed = self._segment_data(preprocessed)
 
         # Process each segment
-        for seg_label, seg_data in data_segments.groupby('Segment'):
+        if self.peak_detection_mode == 'segment':
+            for seg_label, seg_data in preprocessed.groupby('Segment'):
 
-            # Detect peaks in the window
-            seg_peaks, peak_label = self._detect_peaks(
-                seg_data[signal_col],
-                min_peak_amp = min_peak_amp if self.dtype == 'EDA' \
-                    else None)
+                # Detect peaks in the window
+                seg_peaks, peak_label = self._detect_peaks(
+                    seg_data[signal_col],
+                    min_peak_amp = min_peak_amp if self.dtype == 'EDA' \
+                        else None)
 
-            # Add peak occurrence labels to full data
-            peak_indices = seg_data.index[seg_peaks]
+                # Add peak occurrence labels to full data
+                peak_indices = seg_data.index[seg_peaks]
+                preprocessed.loc[peak_indices, peak_label] = 1
+        else:
+            # Detect peaks in the entire signal
+            peaks_ix, peak_label = self._detect_peaks(
+                preprocessed[signal_col],
+                min_peak_amp = min_peak_amp if self.dtype == 'EDA' else None)
+            peak_indices = preprocessed.index[peaks_ix]
             preprocessed.loc[peak_indices, peak_label] = 1
 
         # Compute SQA metrics
@@ -316,7 +337,7 @@ class Preprocessor:
             event_data: pd.DataFrame
 
             # Preprocess the entire event
-            if self.seg_size is None:
+            if self.seg_size is None or self.peak_detection_mode == 'entire':
 
                 # Detect all peaks in the event
                 event_peaks, peak_label = self._detect_peaks(
@@ -329,7 +350,7 @@ class Preprocessor:
                 preprocessed.loc[peak_indices, peak_label] = 1
 
             # Preprocess each segment of the event
-            else:
+            elif self.seg_size or self.peak_detection_mode == 'segment':
 
                 # Segment each event
                 event_segments = self._segment_data(event_data)
@@ -534,6 +555,7 @@ class Preprocessor:
         data_resampled = pd.DataFrame()
         target_fs = resample_rate if resample_rate is not None \
             else (8 if self.fs > 8 else self.fs)
+        temp_rs = None
         if target_fs != self.fs:
             for col in signal_cols:
                 signal_rs = resample(data[col], self.fs, target_fs)
@@ -636,8 +658,7 @@ class Preprocessor:
         ts_col = 'Timestamp' if 'Timestamp' in data.columns else None
         has_event_times = self.event_times is not None \
                           and not self.event_times.empty
-        seg_size = (len(data) / self.fs) if \
-            (not self.seg_size and has_event_times) else self.seg_size
+        seg_size = self.seg_size if self.seg_size else (len(data) / self.fs)
 
         if self.dtype in ['ECG', 'PPG', 'BVP']:
             if not artifact_method or not artifact_tol:
