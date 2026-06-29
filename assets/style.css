@@ -85,7 +85,7 @@ h6 {
     padding: 0px 0px 5px 3px;
     /*margin-bottom: -45px;*/
 }
-#select-subject i {
+#select-subject i, #select-event i {
     font-size: 14pt;
 }
 #qa-section {
@@ -331,13 +331,40 @@ h6 {
 }
 #select-beat-detector {
     margin-top: 5px;
-    padding-bottom: 10px;
+    padding-bottom: 5px;
 }
 #select-scr-detector {
-    padding-bottom: 10px;
+    padding-bottom: 5px;
 }
-#select-beat-detector > span, #select-scr-detector > span {
+#select-beat-detector > span, #select-beat-detector > div > span,
+#select-scr-detector > span, #peak-detection-mode-div > span {
     font-weight: 600;
+    white-space: nowrap;
+}
+#beat-detectors {
+    margin-top: 5px;
+}
+#peak-detection-mode-div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    justify-content: space-between;
+}
+#peak-detection-mode {
+    display: inline-flex;
+}
+#peak-detection-mode label {
+    padding-right: 7px;
+    margin-left: 7px;
+    white-space: nowrap;
+    font-size: 10pt;
+}
+#detection-mode-help {
+    margin-left: -6px;
+    font-size: 13pt;
 }
 #event-segmentation-options, #beat-detectors, #scr-detectors {
     font-size: 10pt;

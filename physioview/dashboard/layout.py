@@ -195,7 +195,7 @@ layout = html.Div(id = 'main', children = [
             ]),
             html.Div(id = 'segment-data-by-time', children = [
                 html.Span('Window Size (sec):'),
-                dcc.Input(id = 'seg-size', type = 'number'),
+                dcc.Input(id = 'seg-size', type = 'number', min = 5, value = 60),
                 html.I(className = 'fa-regular fa-circle-question',
                        id = 'seg-data-help'),
                 dbc.Tooltip(
@@ -251,20 +251,35 @@ layout = html.Div(id = 'main', children = [
                                  options = [], clearable = False)
                 ])
             ]),
+            html.Div(id = 'select-scr-detector', hidden = True, children = [
+                html.Span('SCR Detector:'),
+                dcc.Dropdown(id = 'scr-detectors',
+                             options = [], clearable = False)
+            ]),
+            html.Div(id = 'peak-detection-mode-div', children = [
+                html.Span('Detection Mode:'),
+                html.I(className = 'fa-regular fa-circle-question',
+                       id = 'detection-mode-help'),
+                dbc.Tooltip(
+                    'Choose whether to detect peaks across the entire signal '
+                    'or segment by segment. The segment length is set '
+                    'by the \'window size\' field.',
+                    target = 'detection-mode-help'),
+                dbc.RadioItems(
+                    id = 'peak-detection-mode',
+                    options = [
+                        {'label': 'Entire Signal', 'value': 'entire'},
+                        {'label': 'By Segment', 'value': 'segment', 'disabled': False}
+                    ], value = 'entire', inline = True)
+            ]),
             html.Div(id = 'eda-preprocessing', hidden = True, children = [
-                html.Div(id = 'select-scr-detector', children = [
-                    html.Span('SCR Detector:'),
-                    dcc.Dropdown(id = 'scr-detectors',
-                                 options = [], clearable = False)
-                ]),
                 html.Div(id = 'scr-amplitude-threshold', children = [
                     html.Span('Minimum Peak Amplitude (µS):'),
-                    dcc.Input(id = 'scr-amp-thresh', value = None, type =
-                    'number'),
+                    dcc.Input(id = 'scr-amp-thresh', value = None, type = 'number'),
                     html.I(className = 'fa-regular fa-circle-question',
-                       id = 'min-peak-amp-help'),
+                           id = 'min-peak-amp-help'),
                     dbc.Tooltip(
-                        'Exclude SCR peaks with ampitudes below this '
+                        'Exclude SCR peaks with amplitudes below this '
                         'threshold. If this field is empty, no amplitude '
                         'threshold is used.',
                         target = 'min-peak-amp-help')
