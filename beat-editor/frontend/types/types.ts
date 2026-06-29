@@ -10,7 +10,7 @@ export interface Beat {
 
 export interface SavedBeat {
   editType: string;
-  segment: string
+  segment: string;
   x: number;
   y: number;
 }
@@ -45,13 +45,13 @@ export interface ChartOptions {
   initCardiacData: ChartCoordinates[];
   initBeats: ChartCoordinates[];
   initArtifacts: ChartCoordinates[];
-  addModeCoordinates: SavedBeat[];
-  deleteModeCoordinates: SavedBeat[];
   selectedSegment: string;
-  unusableSegments: SegmentObj[];
+  allUserEdits: (SavedBeat | SegmentObj)[];
   isAddMode: boolean;
   isDeleteMode: boolean;
   isMarkingUnusableMode: boolean;
-  handleChartClick: (event: ChartClickEvent) => void;
+  isRemoveEditMode: boolean;
+  removeEdit: (edit: SavedBeat) => void;
+  handleChartClick: (event: ChartClickEvent | SavedBeat) => void;
   dataTypeX: string | undefined;
 }

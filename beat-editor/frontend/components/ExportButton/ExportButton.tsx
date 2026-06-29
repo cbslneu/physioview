@@ -1,28 +1,15 @@
 import { toast } from "react-toastify";
-import { SavedBeat } from "../../types/types";
+import { SavedBeat, SegmentObj } from "../../types/types";
 
 interface ExportButtonParams {
   fileName: string;
-  addModeCoordinates: SavedBeat[];
-  deleteModeCoordinates: SavedBeat[];
-  unusableSegments: SavedBeat[];
+  allEdits: (SavedBeat | SegmentObj)[];
 }
 
-const ExportButton = (props: ExportButtonParams) => {
-  const {
-    fileName,
-    addModeCoordinates,
-    deleteModeCoordinates,
-    unusableSegments,
-  } = props;
-
+const ExportButton = ({ fileName, allEdits }: ExportButtonParams) => {
   const exportJSON = () => {
     // Just like the save function, instead we download the json
-    const data = [
-      ...addModeCoordinates,
-      ...deleteModeCoordinates,
-      ...unusableSegments,
-    ];
+    const data = [...allEdits];
 
     const jsonData = JSON.stringify(data, null, 2);
 
@@ -33,7 +20,9 @@ const ExportButton = (props: ExportButtonParams) => {
     link.download = `${fileName}_edited.json`;
     link.click();
 
-    toast.success(`${fileName}_edited.json has been exported`, { className: "custom-toast" });
+    toast.success(`${fileName}_edited.json has been exported`, {
+      className: "custom-toast",
+    });
   };
   return (
     <button className="export-button" onClick={exportJSON}>

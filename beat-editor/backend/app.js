@@ -103,15 +103,8 @@ app.post("/saved", async (req, res) => {
   );
 
   try {
-    const { addModeCoordinates, deleteModeCoordinates, unusableSegments } =
-      data;
-
     // Check if all arrays are empty
-    if (
-      addModeCoordinates.length === 0 &&
-      deleteModeCoordinates.length === 0 &&
-      unusableSegments.length === 0
-    ) {
+    if (data === 0) {
       // Delete the file instead of saving an empty file
       if (fs.existsSync(filePath)) {
         await fs.promises.unlink(filePath);
@@ -123,15 +116,8 @@ app.post("/saved", async (req, res) => {
       return;
     }
 
-    // Combining both arrays into one for the save
-    const combinedCoordinates = [
-      ...addModeCoordinates,
-      ...deleteModeCoordinates,
-      ...unusableSegments,
-    ];
-
     // Convert JSON to string
-    const jsonContent = JSON.stringify(combinedCoordinates, null, 2);
+    const jsonContent = JSON.stringify(data, null, 2);
 
     // Write to file
     await fs.promises.writeFile(filePath, jsonContent);

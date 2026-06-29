@@ -1,20 +1,40 @@
-import { ChartClickEvent, ChartOptions } from "../types/types";
+import {
+  EDIT_TYPE_ADD,
+  EDIT_TYPE_DELETE,
+  EDIT_TYPE_UNUSABLE,
+} from "../constants/constants";
+import {
+  ChartClickEvent,
+  ChartOptions,
+  SavedBeat,
+  SegmentObj,
+} from "../types/types";
 
 const createChartOptions = ({
   xAxisData,
   initCardiacData,
   initBeats,
   initArtifacts,
-  addModeCoordinates,
-  deleteModeCoordinates,
   selectedSegment,
-  unusableSegments,
+  allUserEdits,
   isAddMode,
   isDeleteMode,
   isMarkingUnusableMode,
+  isRemoveEditMode,
+  removeEdit,
   handleChartClick,
   dataTypeX,
 }: ChartOptions): Highcharts.Options => {
+  const addModeCoordinates: SavedBeat[] = allUserEdits.filter(
+    (edit) => edit.editType === EDIT_TYPE_ADD,
+  );
+  const deleteModeCoordinates: SavedBeat[] = allUserEdits.filter(
+    (edit) => edit.editType === EDIT_TYPE_DELETE,
+  );
+  const unusableSegments: SegmentObj[] = allUserEdits.filter(
+    (edit): edit is SegmentObj => edit.editType === EDIT_TYPE_UNUSABLE,
+  );
+
   return {
     chart: {
       type: "line",
@@ -79,6 +99,13 @@ const createChartOptions = ({
         from: segment.from,
         to: segment.to,
         color: "rgba(255, 0, 0, 0.2)",
+        events: {
+          click: function () {
+            if (isRemoveEditMode) {
+              removeEdit(segment);
+            }
+          },
+        },
       })),
       min: xAxisData[0],
       max: xAxisData[xAxisData.length - 1],
@@ -225,6 +252,16 @@ const createChartOptions = ({
         point: {
           events: {
             click: function (event) {
+              if (isRemoveEditMode) {
+                const clickedEdit: SavedBeat = {
+                  x: this.x,
+                  y: this.y as number,
+                  segment: selectedSegment,
+                  editType: EDIT_TYPE_ADD,
+                };
+                handleChartClick(clickedEdit);
+                return;
+              }
               const chartClickEvent: ChartClickEvent = {
                 point: { x: this.x, y: this.y as number },
                 xAxis: [{ value: this.x }],
@@ -266,6 +303,17 @@ const createChartOptions = ({
         point: {
           events: {
             click: function (event) {
+              if (isRemoveEditMode) {
+                const clickedEdit: SavedBeat = {
+                  x: this.x,
+                  y: this.y as number,
+                  segment: selectedSegment,
+                  editType: EDIT_TYPE_DELETE,
+                };
+                handleChartClick(clickedEdit);
+                return;
+              }
+
               const chartClickEvent: ChartClickEvent = {
                 point: { x: this.x, y: this.y as number },
                 xAxis: [{ value: this.x }],
