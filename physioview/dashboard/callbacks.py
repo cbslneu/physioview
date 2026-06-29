@@ -485,15 +485,18 @@ def get_callbacks(app):
     # === Set windowed/entire event segmentation ==============================
     @app.callback(
         [Output('peak-detection-mode', 'options'),
+         Output('peak-detection-mode', 'value'),
          Output('seg-size', 'disabled'),
          Output('seg-size', 'value'),
          Output('segment-data-by-time', 'style')],
         [Input('event-segmentation-options', 'value'),
          Input('seg-size', 'value'),
          Input('toggle-event-segmentation', 'on')],
+        [State('peak-detection-mode', 'value')],
         prevent_initial_call = True
     )
-    def handle_segmentation_params(segment_event_by, seg_size, toggle_on):
+    def handle_segmentation_params(segment_event_by, seg_size, toggle_on,
+                                   current_mode):
         """Enable or disable the segment size input and 'By Segment' peak detection
         option based on the event segmentation toggle state and selected segmentation
         mode, greying out segment-related controls when entire-event processing is
@@ -504,9 +507,10 @@ def get_callbacks(app):
             {'label': 'By Segment', 'value': 'segment', 'disabled': disabled}
         ]
         if disable:
-            return segment_options(True), True, None, \
+            return segment_options(True), 'entire', True, None, \
                 {'color': '#bababa', 'fontStyle': 'italic'}
-        return segment_options(False), False, seg_size or 60, {}
+        return segment_options(False), current_mode or 'entire', False, \
+            seg_size or 60, {}
 
     # === Open advanced filter cutoff settings ================================
     @app.callback(
