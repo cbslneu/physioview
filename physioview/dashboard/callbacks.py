@@ -378,6 +378,7 @@ def get_callbacks(app):
          Output('beat-detector-settings', 'hidden'),
          Output('artifact-settings', 'hidden'),
          Output('eda-preprocessing', 'hidden', allow_duplicate = True),
+         Output('select-scr-detector', 'hidden', allow_duplicate = True),
          Output('scr-amplitude-threshold', 'hidden'),
          Output('beat-detectors', 'options', allow_duplicate = True),
          Output('beat-detectors', 'value', allow_duplicate = True),
@@ -464,7 +465,9 @@ def get_callbacks(app):
         return [fs, resample_hidden, resample_disabled,
                 load_temp_hidden, temp_upload_hidden, preprocess_data_hidden,
                 beat_detector_settings_hidden, artifact_settings_hidden,
-                eda_preprocess_hidden, scr_amp_thresh_hidden,
+                eda_preprocess_hidden,   # eda-preprocessing
+                eda_preprocess_hidden,   # select-scr-detector
+                scr_amp_thresh_hidden,
                 beat_detectors, default_beat_detector,
                 scr_detectors, default_scr_detector, seg_size]
 
@@ -872,6 +875,7 @@ def get_callbacks(app):
          Output('setup-data', 'hidden'),
          Output('preprocess-data', 'hidden', allow_duplicate = True),
          Output('eda-preprocessing', 'hidden', allow_duplicate = True),
+         Output('select-scr-detector', 'hidden', allow_duplicate = True),
          Output('segment-data', 'hidden'),
          Output('data-type-container', 'hidden'),     # data types div
          Output('data-types', 'value'),
@@ -1084,7 +1088,9 @@ def get_callbacks(app):
 
         return (
             hide_setup_header, hide_setup, hide_preprocess,
-            hide_eda_preprocess,  hide_segment_data, hide_data_types, dtype,
+            hide_eda_preprocess,   # eda-preprocessing
+            hide_eda_preprocess,   # select-scr-detector
+            hide_segment_data, hide_data_types, dtype,
             hide_data_vars, hide_variable_error,
 
             # variable dropdowns
