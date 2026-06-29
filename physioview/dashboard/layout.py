@@ -248,34 +248,31 @@ layout = html.Div(id = 'main', children = [
                 html.Div(id = 'select-beat-detector', children = [
                     html.Span('Beat Detector:'),
                     dcc.Dropdown(id = 'beat-detectors',
-                                 options = [], clearable = False),
-                    html.Div(
-                        style = {'display': 'flex', 'alignItems': 'center',
-                                 'gap': '14px', 'flexWrap': 'nowrap', 'marginTop': '5px'},
-                        children = [
-                            html.Span('Detection Mode:'),
-                            html.I(className = 'fa-regular fa-circle-question',
-                                   id = 'detection-mode-help'),
-                            dbc.Tooltip(
-                                'Choose whether to detect peaks across the entire signal '
-                                'or segment by segment. The segment length is set '
-                                'by the \'window size\' field.',
-                                target = 'detection-mode-help'),
-                            dbc.RadioItems(
-                                id = 'peak-detection-mode',
-                                options = [
-                                    {'label': 'Entire Signal', 'value': 'entire'},
-                                    {'label': 'By Segment', 'value': 'segment', 'disabled': False}
-                                ], value = 'entire', inline = True)
-                        ])
+                                 options = [], clearable = False)
                 ])
             ]),
+            html.Div(id = 'select-scr-detector', hidden = True, children = [
+                html.Span('SCR Detector:'),
+                dcc.Dropdown(id = 'scr-detectors',
+                             options = [], clearable = False)
+            ]),
+            html.Div(id = 'peak-detection-mode-div', children = [
+                html.Span('Detection Mode:'),
+                html.I(className = 'fa-regular fa-circle-question',
+                       id = 'detection-mode-help'),
+                dbc.Tooltip(
+                    'Choose whether to detect peaks across the entire signal '
+                    'or segment by segment. The segment length is set '
+                    'by the \'window size\' field.',
+                    target = 'detection-mode-help'),
+                dbc.RadioItems(
+                    id = 'peak-detection-mode',
+                    options = [
+                        {'label': 'Entire Signal', 'value': 'entire'},
+                        {'label': 'By Segment', 'value': 'segment', 'disabled': False}
+                    ], value = 'entire', inline = True)
+            ]),
             html.Div(id = 'eda-preprocessing', hidden = True, children = [
-                html.Div(id = 'select-scr-detector', children = [
-                    html.Span('SCR Detector:'),
-                    dcc.Dropdown(id = 'scr-detectors',
-                                 options = [], clearable = False)
-                ]),
                 html.Div(id = 'scr-amplitude-threshold', children = [
                     html.Span('Minimum Peak Amplitude (µS):'),
                     dcc.Input(id = 'scr-amp-thresh', value = None, type = 'number'),
