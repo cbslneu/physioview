@@ -114,7 +114,9 @@ button {
   display: none !important;
 }
 
-.custom-toast {
+.custom-toast,
+.Toastify__toast,
+.Toastify__toast-body {
   font-family: 'Poppins', sans-serif !important;
 }
 
