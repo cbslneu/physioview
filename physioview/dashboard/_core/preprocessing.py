@@ -109,7 +109,9 @@ class Preprocessor:
 
         self.dtype = dtype
         self.fs = fs
-        self.filter_on = filter_on
+        # cvxEDA decomposition performs its own denoising via the model
+        # residual, so EDA is not filtered
+        self.filter_on = filter_on and dtype != 'EDA'
         self.peak_detector = peak_detector or self._get_default_peak_detector()
         self.peak_detection_mode = peak_detection_mode
         self.event_times = event_times

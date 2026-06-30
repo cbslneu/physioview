@@ -384,7 +384,8 @@ def get_callbacks(app):
          Output('beat-detectors', 'value', allow_duplicate = True),
          Output('scr-detectors', 'options'),
          Output('scr-detectors', 'value', allow_duplicate = True),
-         Output('seg-size', 'value', allow_duplicate = True)],
+         Output('seg-size', 'value', allow_duplicate = True),
+         Output('filter-data', 'hidden')],
         [Input('e4-data-types', 'value'),
          Input('data-types', 'value'),
          Input('toggle-resample', 'on'),
@@ -404,11 +405,11 @@ def get_callbacks(app):
         scr_amp_thresh_hidden = True
         resample_hidden = True
         resample_disabled = True
+        filter_hidden = False   # filtering is unavailable for EDA
         beat_detectors = no_update
         default_beat_detector = no_update
         scr_detectors = []
         default_scr_detector = None
-        data_source = loaded_data['source']
         seg_size = 60
         fs = 500
 
@@ -429,6 +430,7 @@ def get_callbacks(app):
             ]
             default_scr_detector = 'threshold'
             scr_amp_thresh_hidden = False
+            filter_hidden = True
             fs = 4
 
         # Handle cardiac components
@@ -469,7 +471,8 @@ def get_callbacks(app):
                 eda_preprocess_hidden,   # select-scr-detector
                 scr_amp_thresh_hidden,
                 beat_detectors, default_beat_detector,
-                scr_detectors, default_scr_detector, seg_size]
+                scr_detectors, default_scr_detector, seg_size,
+                filter_hidden]
 
     # === Toggle event segmentation settings ==================================
     @app.callback(
@@ -2157,8 +2160,7 @@ def get_callbacks(app):
         # Output signal quality table or EDA data
         else:
             eda = pd.read_csv(temp_path / f'{fstem}_EDA.csv')
-            signal_col = 'Filtered' if filter_on else 'EDA'
-            eda_signal = eda[signal_col].to_numpy()
+            eda_signal = eda['EDA'].to_numpy()
             tonic_scl = compute_tonic_scl(eda_signal)
 
             # Generate EDA quality summary table
@@ -2488,7 +2490,8 @@ def get_callbacks(app):
 
             # Otherwise create the EDA signal subplots
             else:
-                eda_subplots = {'EDA': ['Decomposed', y_axis_label, 'Tonic']}
+                # Plot the phasic component as the 'Decomposed' signal
+                eda_subplots = {'EDA': ['Decomposed', 'Tonic']}
                 signal_types = [data_type]
 
                 # Add temperature to subplots if data was provided
@@ -2513,26 +2516,34 @@ def get_callbacks(app):
                     acc = acc, seg_number = selected_segment,
                     seg_size = segment_size)
 
-                # Reorder traces in plot so SCRs are plotted on the phasic
-                # component
-                first_trace = None
+                # Shade the phasic area between the phasic and tonic signals
+                phasic_trace = None
+                tonic_trace = None
+                top_traces = []
                 other_traces = []
                 for trace in signal_plots.data:
                     if trace.name == 'Decomposed':
                         trace.name = 'Phasic'
-                        other_traces.append(trace)
-                    elif trace.name == y_axis_label:
-                        if y_axis_label == 'Filtered':
-                            trace.name = 'Filtered EDA'
-                        trace.line.color = 'lightgrey'
-                        first_trace = trace
+                        phasic_trace = trace
                     elif trace.name == 'Tonic':
                         trace.line.dash = 'dash'
-                        other_traces.append(trace)
+                        trace.fill = 'tonexty'
+                        trace.fillcolor = 'rgba(36, 154, 181, 0.2)'
+                        tonic_trace = trace
+                    elif trace.mode == 'markers':
+                        # SCR markers, rendered on top of the lines
+                        top_traces.append(trace)
                     else:
+                        # Secondary signals (e.g. ACC, TEMP)
                         other_traces.append(trace)
-                signal_plots.data = [first_trace] + other_traces if \
-                    first_trace else other_traces
+
+                # Order: secondary signals, then phasic
+                ordered = list(other_traces)
+                if phasic_trace is not None:
+                    ordered.append(phasic_trace)
+                if tonic_trace is not None:
+                    ordered.append(tonic_trace)
+                signal_plots.data = ordered + top_traces
 
                 beat_correction_hidden = False
                 accept_corrections_hidden = True
