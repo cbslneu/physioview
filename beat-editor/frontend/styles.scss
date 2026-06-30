@@ -96,7 +96,8 @@ button {
 
 .add-beat-active,
 .delete-beat-active,
-.mark-unusable-active {
+.mark-unusable-active,
+.remove-edit-active {
   background-color: #ee8a78;
 }
 
@@ -113,7 +114,9 @@ button {
   display: none !important;
 }
 
-.custom-toast {
+.custom-toast,
+.Toastify__toast,
+.Toastify__toast-body {
   font-family: 'Poppins', sans-serif !important;
 }
 
@@ -270,7 +273,7 @@ button {
   font-weight: 500;
 }
 
-.undo-section {
+.mark-unusable-section {
   border-top: 1px solid #ddd;
   padding-top: 10px;
   display: flex;
@@ -278,7 +281,7 @@ button {
   align-items: center;
 }
 
-.undo-option {
+.mark-unusable-option {
   display: flex;
   flex-direction: column;
   align-items: center;

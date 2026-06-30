@@ -1,33 +1,22 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-import "@fortawesome/fontawesome-free/css/all.min.css";
 
-import { SavedBeat } from "../../types/types";
+import { SavedBeat, SegmentObj } from "../../types/types";
 
 interface SaveButtonParams {
   fileName: string;
-  addModeCoordinates: SavedBeat[];
-  deleteModeCoordinates: SavedBeat[];
-  unusableSegments: SavedBeat[];
+  allEdits: (SavedBeat | SegmentObj)[];
 }
 
-const SaveButton = ({
-  fileName,
-  addModeCoordinates,
-  deleteModeCoordinates,
-  unusableSegments,
-}: SaveButtonParams) => {
+const SaveButton = ({ fileName, allEdits }: SaveButtonParams) => {
   const saveJSON = async () => {
     try {
+      console.log("Saving edits:", allEdits);
       await axios.post("http://localhost:3001/saved", {
         fileName,
-        data: { addModeCoordinates, deleteModeCoordinates, unusableSegments },
+        data: allEdits,
       });
-      if (
-        addModeCoordinates.length !== 0 ||
-        deleteModeCoordinates.length !== 0 ||
-        unusableSegments.length !== 0
-      ) {
+      if (allEdits.length !== 0) {
         toast.success(`${fileName}_edited.json has been saved`, {
           className: "custom-toast",
         });

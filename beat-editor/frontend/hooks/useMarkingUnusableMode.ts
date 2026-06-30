@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { EDIT_TYPE_UNUSABLE } from "../constants/constants";
-import { ChartCoordinates, SegmentObj } from "../types/types";
+import { ChartCoordinates, SavedBeat, SegmentObj } from "../types/types";
 import { isNull } from "lodash";
 import HighchartsReact from "highcharts-react-official";
 
@@ -12,7 +12,9 @@ interface SegmentBoundary {
 interface UseMarkingUnusableModeProps {
   isMarkingUnusableMode: boolean;
   chartRef: React.RefObject<HighchartsReact.RefObject | null>;
-  setUnusableSegments: React.Dispatch<React.SetStateAction<SegmentObj[]>>;
+  setAllUserEdits: React.Dispatch<
+    React.SetStateAction<(SegmentObj | SavedBeat)[]>
+  >;
   selectedSegment: string;
   dragStartRef: React.RefObject<number | null>;
   isDraggingRef: React.RefObject<boolean>;
@@ -24,7 +26,7 @@ interface UseMarkingUnusableModeProps {
 const useMarkingUnusableMode = ({
   isMarkingUnusableMode,
   chartRef,
-  setUnusableSegments,
+  setAllUserEdits,
   selectedSegment,
   dragStartRef,
   isDraggingRef,
@@ -130,10 +132,7 @@ const useMarkingUnusableMode = ({
               y: 0,
             };
 
-            setUnusableSegments((prevSegments) => [
-              ...prevSegments,
-              newSegment,
-            ]);
+            setAllUserEdits((prev) => [...prev, newSegment]);
           }
 
           // Reset dragging state
@@ -168,7 +167,7 @@ const useMarkingUnusableMode = ({
   }, [
     isMarkingUnusableMode,
     chartRef,
-    setUnusableSegments,
+    setAllUserEdits,
     selectedSegment,
     dragStartRef,
     isDraggingRef,

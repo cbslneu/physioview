@@ -5,11 +5,13 @@ import HighchartsMore from "highcharts/highcharts-more";
 import HighchartsReact from "highcharts-react-official";
 import mouseWheelZoom from "highcharts/modules/mouse-wheel-zoom";
 import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import "@fortawesome/fontawesome-free/css/all.min.css";
 
 import createChartOptions from "../../utils/CreateChartOptions";
-import { EDIT_TYPE_ADD, EDIT_TYPE_DELETE } from "../../constants/constants";
+import {
+  EDIT_TYPE_ADD,
+  EDIT_TYPE_DELETE,
+  EDIT_TYPE_UNUSABLE,
+} from "../../constants/constants";
 import KeyboardShortcuts from "../KeyboardShortcuts/KeyboardShortcuts";
 import useMarkingUnusableMode from "../../hooks/useMarkingUnusableMode";
 import useKeyboardShortcuts from "../../utils/key-input-utils";
@@ -40,9 +42,7 @@ interface BeatChartProps {
   fileData: Beat[];
   fileName: string;
   segmentOptions: string[];
-  addBeats: SavedBeat[];
-  deleteBeats: SavedBeat[];
-  unusableBeats: SegmentObj[];
+  allEdits: SavedBeat[];
   onRefresh: () => void;
 }
 
@@ -64,9 +64,7 @@ const BeatChart = ({
   fileData,
   fileName,
   segmentOptions,
-  addBeats,
-  deleteBeats,
-  unusableBeats,
+  allEdits,
   onRefresh,
 }: BeatChartProps) => {
   const [chartOptions, setChartOptions] = useState<Highcharts.Options | null>(
@@ -81,11 +79,10 @@ const BeatChart = ({
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [isMarkingUnusableMode, setIsMarkingUnusableMode] = useState(false);
-  const [addModeCoordinates, setAddModeCoordinates] = useState<SavedBeat[]>([]);
-  const [deleteModeCoordinates, setDeleteModeCoordinates] = useState<
-    SavedBeat[]
-  >([]);
-  const [unusableSegments, setUnusableSegments] = useState<SegmentObj[]>([]);
+  const [isRemoveEditMode, setIsRemoveEditMode] = useState(false);
+  const [allUserEdits, setAllUserEdits] = useState<(SavedBeat | SegmentObj)[]>(
+    [],
+  );
   const [selectedSegment, setSelectedSegment] = useState("1");
 
   const chartRef = useRef<HighchartsReact.RefObject>(null);
@@ -99,6 +96,10 @@ const BeatChart = ({
       to: cardiacData[cardiacData.length - 1],
     };
   }, [cardiacData]);
+
+  useEffect(() => {
+    setAllUserEdits(allEdits);
+  }, [allEdits]);
 
   useEffect(() => {
     const dataTypeX = X_AXIS_KEYS.find((data) =>
@@ -149,14 +150,14 @@ const BeatChart = ({
       initCardiacData,
       initBeats,
       initArtifacts,
-      addModeCoordinates,
-      deleteModeCoordinates,
       selectedSegment,
-      unusableSegments,
+      allUserEdits,
       isAddMode,
       isDeleteMode,
       isMarkingUnusableMode,
+      isRemoveEditMode,
       handleChartClick,
+      removeEdit,
       dataTypeX,
     });
 
@@ -166,32 +167,39 @@ const BeatChart = ({
     setBeatArtifactData(initArtifacts);
   }, [
     fileData,
+    allUserEdits,
     isAddMode,
     isDeleteMode,
-    addModeCoordinates,
-    deleteModeCoordinates,
+    isRemoveEditMode,
     selectedSegment,
-    unusableSegments,
     isMarkingUnusableMode,
   ]);
 
-  const handleChartClick = (event: ChartClickEvent) => {
+  const handleChartClick = (event: ChartClickEvent | SavedBeat) => {
     // Prevents coordinates from plotting when hitting `Reset Zoom`
     if (
       isPanning ||
-      (event.target &&
+      ("target" in event &&
+        event.target &&
         event.target instanceof Element &&
         (event.target.classList.contains("highcharts-button-box") ||
           event.target.innerHTML === "Reset zoom"))
     ) {
       return; // Ignore clicks on Reset Zoom
     }
-    const newX = !_.isUndefined(event.point)
-      ? event.point.x
-      : event.xAxis[0].value;
-    const newY = !_.isUndefined(event.point)
-      ? event.point.y
-      : event.yAxis[0].value;
+
+    const newX =
+      "point" in event && !_.isUndefined(event.point)
+        ? event.point.x
+        : "xAxis" in event
+          ? event.xAxis[0].value
+          : event.x;
+    const newY =
+      "point" in event && !_.isUndefined(event.point)
+        ? event.point.y
+        : "yAxis" in event
+          ? event.yAxis[0].value
+          : event.y;
 
     // Check if the point already exists in cardiacData (for Add Mode) or beatData (for Delete Mode)
     const isSignal = cardiacData.some(
@@ -222,10 +230,25 @@ const BeatChart = ({
     const updatedBeatData = [...beatData];
     const updateArtifactData = [...beatArtifactData];
 
-    if (isAddMode) {
-      setAddModeCoordinates((prevCoordinates) => {
-        const updateCoordinates = [
-          ...prevCoordinates,
+    setAllUserEdits((prev) => {
+      if (isDeleteMode && !(isBeatCoordinate || isArtifactCoordinate)) {
+        toast.error("This is not a beat");
+        return prev;
+      }
+
+      if (isDeleteMode) {
+        return [
+          ...prev,
+          {
+            x: newX,
+            y: newY,
+            segment: selectedSegment,
+            editType: EDIT_TYPE_DELETE,
+          },
+        ];
+      } else if (isAddMode) {
+        return [
+          ...prev,
           {
             x: newX,
             y: newY,
@@ -233,112 +256,113 @@ const BeatChart = ({
             editType: EDIT_TYPE_ADD,
           },
         ];
-        return updateCoordinates;
-      });
-    } else if (isDeleteMode) {
-      if (isBeatCoordinate || isArtifactCoordinate) {
-        setDeleteModeCoordinates((prevCoordinates) => {
-          const updateCoordinates = [
-            ...prevCoordinates,
-            {
-              x: newX,
-              y: newY,
-              segment: selectedSegment,
-              editType: EDIT_TYPE_DELETE,
-            },
-          ];
-          return updateCoordinates;
-        });
-      } else {
-        toast.error("This is not a beat");
+      } else if (isRemoveEditMode) {
+        removeEdit(event as SavedBeat);
+        return prev;
       }
-    }
+      // If neither add nor delete mode, return previous state to satisfy setter signature
+      return prev;
+    });
 
     setCardiacData(updatedCardiacData);
     setBeatData(updatedBeatData);
     setBeatArtifactData(updateArtifactData);
   };
 
-  function hasDataType({ fileData, data }: HasDataTypeParams) {
+  const hasDataType = ({ fileData, data }: HasDataTypeParams) => {
     return fileData.some((o) => o.hasOwnProperty(data));
-  }
+  };
 
-  function transformCoordinates({
+  const transformCoordinates = ({
     data,
     xAxisLabel,
     yAxisLabel,
-  }: transformCoordinatesParams) {
+  }: transformCoordinatesParams) => {
     return data.map((item) => ({
       x: item[xAxisLabel as keyof Beat] as number,
       y: item[yAxisLabel as keyof Beat] as number,
     }));
-  }
+  };
 
-  function undoLastCoordinate() {
-    if (isAddMode && addModeCoordinates.length > 0) {
-      setAddModeCoordinates((prevCoordinates) => {
-        const updatedCoordinates = prevCoordinates.slice(0, -1);
-        return updatedCoordinates;
-      });
-    } else if (isDeleteMode && deleteModeCoordinates.length > 0) {
-      setDeleteModeCoordinates((prevCoordinates) => {
-        const updatedCoordinates = prevCoordinates.slice(0, -1);
-        return updatedCoordinates;
-      });
-    } else if (isMarkingUnusableMode && unusableSegments.length > 0) {
-      setUnusableSegments((prevCoordinates) => {
-        const updateCoordinates = prevCoordinates.slice(0, -1);
-        return updateCoordinates;
-      });
-    }
-  }
+  const removeEdit = (edit: SavedBeat | SegmentObj) => {
+    setAllUserEdits((prev) =>
+      prev.filter((curr) => {
+        if (edit.editType === EDIT_TYPE_UNUSABLE) {
+          if (!("from" in edit && "to" in edit)) {
+            return true;
+          }
 
-  function toggleAddMode() {
+          return !(
+            curr.editType === EDIT_TYPE_UNUSABLE &&
+            "from" in curr &&
+            "to" in curr &&
+            curr.segment === edit.segment &&
+            curr.from === edit.from &&
+            curr.to === edit.to
+          );
+        }
+
+        return !(
+          curr.editType === edit.editType &&
+          curr.segment === edit.segment &&
+          curr.x === edit.x &&
+          curr.y === edit.y
+        );
+      }),
+    );
+  };
+
+  const toggleAddMode = () => {
     resetInteractionState();
     setIsAddMode((prev) => !prev);
     setIsDeleteMode(false);
     setIsMarkingUnusableMode(false);
-  }
+    setIsRemoveEditMode(false);
+  };
 
-  function toggleDeleteMode() {
+  const toggleDeleteMode = () => {
     resetInteractionState();
     setIsAddMode(false);
     setIsDeleteMode((prev) => !prev);
     setIsMarkingUnusableMode(false);
-  }
+    setIsRemoveEditMode(false);
+  };
 
-  function toggleMarkUnusableMode() {
+  const toggleMarkUnusableMode = () => {
     resetInteractionState();
     setIsMarkingUnusableMode((prev) => !prev);
     setIsAddMode(false);
     setIsDeleteMode(false);
-  }
+    setIsRemoveEditMode(false);
+  };
+
+  const toggleRemoveEditMode = () => {
+    resetInteractionState();
+    setIsAddMode(false);
+    setIsDeleteMode(false);
+    setIsMarkingUnusableMode(false);
+    setIsRemoveEditMode((prev) => !prev);
+  };
 
   // Reset all drag and interaction states when toggling modes
-  function resetInteractionState() {
+  const resetInteractionState = () => {
     dragStartRef.current = null;
     isDraggingRef.current = false;
     lastValidDragEnd.current = null;
     setIsPanning(false);
-  }
-
-  useEffect(() => {
-    setAddModeCoordinates(addBeats);
-    setDeleteModeCoordinates(deleteBeats);
-    setUnusableSegments(unusableBeats);
-  }, [addBeats, deleteBeats, unusableBeats]);
+  };
 
   useKeyboardShortcuts({
     toggleAddMode,
     toggleDeleteMode,
     toggleMarkUnusableMode,
-    undoLastCoordinate,
+    toggleRemoveEditMode,
   });
 
   useMarkingUnusableMode({
     isMarkingUnusableMode,
     chartRef,
-    setUnusableSegments,
+    setAllUserEdits,
     selectedSegment,
     dragStartRef,
     isDraggingRef,
@@ -346,6 +370,49 @@ const BeatChart = ({
     lastValidDragEnd,
     segmentBoundaries,
   });
+
+  const buttonObjParams = useMemo(
+    () => [
+      {
+        id: "add-beat",
+        icon: "fa-solid fa-plus",
+        label: "Add Beat",
+        className: isAddMode ? "add-beat-active" : "",
+        onClick: toggleAddMode,
+      },
+      {
+        id: "delete-beat",
+        icon: "fa-solid fa-minus",
+        label: "Delete Beat",
+        className: isDeleteMode ? "delete-beat-active" : "",
+        onClick: toggleDeleteMode,
+      },
+      {
+        id: "mark-unusable",
+        icon: "fa-solid fa-marker",
+        label: "Mark Unusable",
+        className: isMarkingUnusableMode ? "mark-unusable-active" : "",
+        onClick: toggleMarkUnusableMode,
+      },
+      {
+        id: "remove-edit",
+        icon: "fa-solid fa-times",
+        label: "Remove",
+        className: isRemoveEditMode ? "remove-edit-active" : "",
+        onClick: toggleRemoveEditMode,
+      },
+    ],
+    [
+      isAddMode,
+      isDeleteMode,
+      isMarkingUnusableMode,
+      isRemoveEditMode,
+      toggleAddMode,
+      toggleDeleteMode,
+      toggleMarkUnusableMode,
+      toggleRemoveEditMode,
+    ],
+  );
 
   return (
     <div className="beat-chart-container">
@@ -377,41 +444,21 @@ const BeatChart = ({
               </option>
             ))}
           </select>
-          <button
-            className={`${isAddMode ? "add-beat-active" : ""}`}
-            onClick={toggleAddMode}
-          >
-            <i className="fa-solid fa-plus"></i>Add Beat
-          </button>
-          <button
-            className={`${isDeleteMode ? "delete-beat-active" : ""}`}
-            onClick={toggleDeleteMode}
-          >
-            <i className="fa-solid fa-minus"></i>Delete Beat
-          </button>
-          <button
-            className={`${isMarkingUnusableMode ? "mark-unusable-active" : ""}`}
-            onClick={toggleMarkUnusableMode}
-          >
-            <i className="fa-solid fa-marker" />
-            Mark Unusable
-          </button>
-          <button className="undo-beat-entry" onClick={undoLastCoordinate}>
-            <i className="fa-solid fa-rotate-left"></i>Undo
-          </button>
-          <SaveButton
-            fileName={fileName}
-            addModeCoordinates={addModeCoordinates}
-            deleteModeCoordinates={deleteModeCoordinates}
-            unusableSegments={unusableSegments}
-          />
+          {Object.values(buttonObjParams).map((param) => {
+            return (
+              <button
+                key={param.id}
+                className={param.className}
+                onClick={param.onClick}
+              >
+                <i className={param.icon}></i>
+                {param.label}
+              </button>
+            );
+          })}
+          <SaveButton fileName={fileName} allEdits={allUserEdits} />
           <ImportEditsButton onImportSuccess={onRefresh} />
-          <ExportButton
-            fileName={fileName}
-            addModeCoordinates={addModeCoordinates}
-            deleteModeCoordinates={deleteModeCoordinates}
-            unusableSegments={unusableSegments}
-          />
+          <ExportButton fileName={fileName} allEdits={allUserEdits} />
           <KeyboardShortcuts />
         </div>
       </div>

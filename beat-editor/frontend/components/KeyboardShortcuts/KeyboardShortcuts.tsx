@@ -1,4 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from "react";
+import {
+  COMMON_CLASSNAMES,
+  TOP_ROW_SHORTCUTS,
+  MIDDLE_ROW_SHORTCUTS,
+  BOTTOM_ROW_SHORTCUTS,
+} from "./constants";
 
 const KeyboardShortcuts = () => {
   const [showKeyboardShortcut, setShowKeyboardShortcut] = useState(false);
@@ -8,6 +14,25 @@ const KeyboardShortcuts = () => {
   const toggleKeyboardShortcut = () => {
     setShowKeyboardShortcut(!showKeyboardShortcut);
   };
+
+  const {
+    shortcutItem,
+    shortcutKeys,
+    shortcutLabel,
+    markUnusableOption,
+    keybind,
+  } = COMMON_CLASSNAMES;
+
+  const {
+    uIcon,
+    plusIcon,
+    rightClickIcon,
+    rightClickKeybind,
+    markUnusableLabel,
+  } = MIDDLE_ROW_SHORTCUTS[0];
+
+  const { shiftLabel, pointerIcon, dragLabel, panLabel } =
+    BOTTOM_ROW_SHORTCUTS[0];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -23,88 +48,74 @@ const KeyboardShortcuts = () => {
     };
 
     if (showKeyboardShortcut) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showKeyboardShortcut]);
 
   return (
     <div className="keyboard-shortcuts-wrapper">
       <div>
-        <button className="shortcut-button" onClick={toggleKeyboardShortcut} ref={keyboardButtonRef}>
+        <button
+          className="shortcut-button"
+          onClick={toggleKeyboardShortcut}
+          ref={keyboardButtonRef}
+        >
           <i className="fa-solid fa-keyboard fa-xl"></i>
         </button>
       </div>
       {showKeyboardShortcut && (
-            <div className="keyboard-shortcuts-popover" ref={keyboardShortcutsRef}>
-              <div className="popover-arrow"></div>
-              <h2 className="popover-title">Keyboard Shortcuts</h2>
-              
-              <div className="shortcuts-grid">
-                <div className="shortcut-item">
-                  <div className="shortcut-keys">
-                    <i className="fa-solid fa-a keybind"></i>
+        <div className="keyboard-shortcuts-popover" ref={keyboardShortcutsRef}>
+          <div className="popover-arrow"></div>
+          <h2 className="popover-title">Keyboard Shortcuts</h2>
+
+          <div className="shortcuts-grid">
+            {TOP_ROW_SHORTCUTS.map((shortcut) => {
+              const { icon, label } = shortcut;
+              return (
+                <div className={shortcutItem}>
+                  <div className={shortcutKeys}>
+                    <i className={icon} />
                   </div>
-                  <div className="shortcut-label">Add Beat</div>
+                  <div className={shortcutLabel}>{label}</div>
                 </div>
-                
-                <div className="shortcut-item">
-                  <div className="shortcut-keys">
-                    <i className="fa-solid fa-u keybind"></i>
-                    <i className="fa-solid fa-plus plus"></i>
-                    <img src="../../public/images/right-click.png"
-                         className="rt-click-keybind" width={22} height={22}/>
-                  </div>
-                  <div className="shortcut-label">Mark Unusable</div>
-                </div>
-                
-                <div className="shortcut-item">
-                  <div className="shortcut-keys">
-                    <i className="fa-solid fa-d keybind"></i>
-                  </div>
-                  <div className="shortcut-label">Delete Beat</div>
-                </div>
+              );
+            })}
+          </div>
+
+          <div className="mark-unusable-section">
+            <div className={markUnusableOption}>
+              <div className={shortcutKeys}>
+                <i className={uIcon} />
+                <i className={plusIcon} />
+                <img
+                  src={rightClickIcon}
+                  className={rightClickKeybind}
+                  width={22}
+                  height={22}
+                />
               </div>
-              
-              <div className="undo-section">
-                <div className="undo-option">
-                  <div className="shortcut-keys">
-                    <div className="keybind">CTRL</div>
-                    <i className="fa-solid fa-plus plus"></i>
-                    <i className="fa-solid fa-z keybind"></i>
-                  </div>
-                  <div className="shortcut-label">Undo</div>
-                </div>
-                
-                <div className="or-divider">OR</div>
-                
-                <div className="undo-option">
-                  <div className="shortcut-keys">
-                    <div className="command-keybind">⌘</div>
-                    <i className="fa-solid fa-plus plus"></i>
-                    <i className="fa-solid fa-z keybind"></i>
-                  </div>
-                  <div className="shortcut-label">Undo</div>
-                </div>
-              </div>
-              
-              <div className="pan-section">
-                <div className="undo-option">
-                  <div className="shortcut-keys">
-                    <div className="keybind">SHIFT</div>
-                    <i className="fa-solid fa-plus plus"></i>
-                    <i className="fa-solid fa-arrow-pointer keybind"></i>
-                    <i className="fa-solid fa-plus plus"></i>
-                    <span>DRAG</span>
-                  </div>
-                  <div className="shortcut-label">PAN</div>
-                </div>
-              </div>
+              <div className={shortcutLabel}>{markUnusableLabel}</div>
             </div>
-          )}
+          </div>
+
+          <div className="pan-section">
+            <div className={markUnusableOption}>
+              <div className={shortcutKeys}>
+                <div className={keybind}>{shiftLabel}</div>
+                <i className={plusIcon}></i>
+                <i className={pointerIcon}></i>
+                <i className={plusIcon}></i>
+                <span className={dragLabel}>{dragLabel}</span>
+              </div>
+              <div className={shortcutLabel}>{panLabel}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
-import {
-  EDIT_TYPE_ADD,
-  EDIT_TYPE_DELETE,
-  EDIT_TYPE_UNUSABLE,
-} from "../../constants/constants";
-import { Beat, SavedBeat, SegmentObj } from "../../types/types";
+import { Beat, SavedBeat } from "../../types/types";
 
 import BeatChart from "./BeatChart";
 
@@ -14,11 +9,7 @@ function BeatChartContainer() {
   const [fileData, setFileData] = useState<Beat[]>([]);
   const [segmentOptions, setSegmentOptions] = useState<string[]>([]);
   const [fileName, setFileName] = useState("");
-  const [addBeatCoordinates, setAddBeatCoordinates] = useState<SavedBeat[]>([]);
-  const [deleteBeatCoordinates, setDeleteBeatCoordinates] = useState<
-    SavedBeat[]
-  >([]);
-  const [unusableBeats, setUnusableBeats] = useState<SegmentObj[]>([]);
+  const [allEdits, setAllEdits] = useState<SavedBeat[]>([]);
 
   const fetchFile = useCallback(async () => {
     try {
@@ -29,20 +20,7 @@ function BeatChartContainer() {
 
       if (allSavedData && allSavedData.length > 0) {
         const jsonData = allSavedData[0].data;
-
-        setAddBeatCoordinates(
-          jsonData.filter((beat: SavedBeat) => beat.editType === EDIT_TYPE_ADD),
-        );
-        setDeleteBeatCoordinates(
-          jsonData.filter(
-            (beat: SavedBeat) => beat.editType === EDIT_TYPE_DELETE,
-          ),
-        );
-        setUnusableBeats(
-          jsonData.filter(
-            (beat: SegmentObj) => beat.editType === EDIT_TYPE_UNUSABLE,
-          ),
-        );
+        setAllEdits(jsonData);
       }
 
       setFileData(allFileData[0].data);
@@ -64,9 +42,7 @@ function BeatChartContainer() {
         fileData={fileData}
         fileName={fileName}
         segmentOptions={segmentOptions}
-        addBeats={addBeatCoordinates}
-        deleteBeats={deleteBeatCoordinates}
-        unusableBeats={unusableBeats}
+        allEdits={allEdits}
         onRefresh={fetchFile}
       />
     </div>
