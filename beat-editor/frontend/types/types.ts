@@ -51,6 +51,7 @@ export interface ChartOptions {
   isDeleteMode: boolean;
   isMarkingUnusableMode: boolean;
   isRemoveEditMode: boolean;
+  isLabelOn: boolean;
   removeEdit: (edit: SavedBeat) => void;
   handleChartClick: (event: ChartClickEvent | SavedBeat) => void;
   dataTypeX: string | undefined;

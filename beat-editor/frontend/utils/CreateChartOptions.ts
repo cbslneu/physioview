@@ -21,6 +21,7 @@ const createChartOptions = ({
   isDeleteMode,
   isMarkingUnusableMode,
   isRemoveEditMode,
+  isLabelOn,
   removeEdit,
   handleChartClick,
   dataTypeX,
@@ -117,6 +118,7 @@ const createChartOptions = ({
       allowDecimals: true,
     },
     tooltip: {
+      enabled: isLabelOn,
       formatter: function () {
         const date = new Date(this.x || 0);
         const dataType = dataTypeX === "Timestamp" ? "Time" : "Sample";
