@@ -16,10 +16,10 @@ const LabelToggle = ({ isLabelOn, setIsLabelOn }: LabelToggleProps) => {
           : "border-transparent bg-[#47555e] text-white hover:bg-[#3d4951]"
       }`}
     >
-      <span>Labels</span>
+      <span>Tooltips</span>
       <span
         className={`relative h-5 w-10 overflow-hidden rounded-full transition-colors ${
-          isLabelOn ? "bg-white/30" : "bg-white/20"
+          isLabelOn ? "bg-[#ee8a78]" : "bg-white/20"
         }`}
       >
         <span

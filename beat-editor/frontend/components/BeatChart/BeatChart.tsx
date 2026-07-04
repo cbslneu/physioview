@@ -465,8 +465,10 @@ const BeatChart = ({
           <SaveButton fileName={fileName} allEdits={allUserEdits} />
           <ImportEditsButton onImportSuccess={onRefresh} />
           <ExportButton fileName={fileName} allEdits={allUserEdits} />
-          <KeyboardShortcuts />
+        </div>
+        <div className="flex flex-row ml-auto mb-5 gap-2">
           <LabelToggle isLabelOn={isLabelOn} setIsLabelOn={setIsLabelOn} />
+          <KeyboardShortcuts />
         </div>
       </div>
 
