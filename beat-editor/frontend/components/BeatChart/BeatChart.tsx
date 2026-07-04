@@ -25,6 +25,7 @@ import {
 import SaveButton from "../SaveButton/SaveButton";
 import ExportButton from "../ExportButton/ExportButton";
 import ImportEditsButton from "../ImportEditsButton/ImportEditsButton";
+import LabelToggle from "../LabelToggle/LabelToggle";
 
 Highcharts.SVGRenderer.prototype.symbols.cross = function (
   x: number,
@@ -80,6 +81,7 @@ const BeatChart = ({
   const [isPanning, setIsPanning] = useState(false);
   const [isMarkingUnusableMode, setIsMarkingUnusableMode] = useState(false);
   const [isRemoveEditMode, setIsRemoveEditMode] = useState(false);
+  const [isLabelOn, setIsLabelOn] = useState(true);
   const [allUserEdits, setAllUserEdits] = useState<(SavedBeat | SegmentObj)[]>(
     [],
   );
@@ -156,6 +158,7 @@ const BeatChart = ({
       isDeleteMode,
       isMarkingUnusableMode,
       isRemoveEditMode,
+      isLabelOn,
       handleChartClick,
       removeEdit,
       dataTypeX,
@@ -173,6 +176,7 @@ const BeatChart = ({
     isRemoveEditMode,
     selectedSegment,
     isMarkingUnusableMode,
+    isLabelOn,
   ]);
 
   const handleChartClick = (event: ChartClickEvent | SavedBeat) => {
@@ -415,11 +419,11 @@ const BeatChart = ({
   );
 
   return (
-    <div className="beat-chart-container">
-      <div className="chart-buttons-wrapper">
-        <div className="chart-buttons">
+    <div className="relative">
+      <div className="flex w-full mb-4 justify-between items-center">
+        <div className="flex flex-wrap gap-2 mb-5 items-center">
           <select
-            className="dropdown"
+            className="p-0 w-[50px] h-[40px] text-center text-[16px] border border-[#3d4951] rounded-md focus:outline-none"
             value={selectedSegment}
             onChange={(e) => {
               setSelectedSegment(e.target.value);
@@ -444,6 +448,7 @@ const BeatChart = ({
               </option>
             ))}
           </select>
+
           {Object.values(buttonObjParams).map((param) => {
             return (
               <button
@@ -456,9 +461,13 @@ const BeatChart = ({
               </button>
             );
           })}
+
           <SaveButton fileName={fileName} allEdits={allUserEdits} />
           <ImportEditsButton onImportSuccess={onRefresh} />
           <ExportButton fileName={fileName} allEdits={allUserEdits} />
+        </div>
+        <div className="flex flex-row ml-auto mb-5 gap-2">
+          <LabelToggle isLabelOn={isLabelOn} setIsLabelOn={setIsLabelOn} />
           <KeyboardShortcuts />
         </div>
       </div>
