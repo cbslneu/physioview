@@ -36,8 +36,8 @@ function BeatChartContainer() {
   }, [fetchFile]);
 
   return (
-    <div className="plot-beat-segment">
-      <div className="chart-buttons"></div>
+    <div className="mt-[-30px]">
+      <div className="flex flex-wrap gap-2 mb-5 items-center"></div>
       <BeatChart
         fileData={fileData}
         fileName={fileName}
