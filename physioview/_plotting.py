@@ -9,6 +9,7 @@ _DEFAULT_SIGNAL_PARAMS = {
     'PPG':  {'unit': 'bvp', 'color': '#3562bd', 'peak': 'Detected Beat'},
     'BVP':  {'unit': 'bvp', 'color': '#3562bd', 'peak': 'Detected Beat'},
     'EDA':  {'unit': 'µS', 'color': '#249ab5', 'peak': 'SCR'},
+    'Phasic': {'unit': 'µS', 'color': '#e76f51', 'peak': 'SCR'},
     'HR':   {'unit': 'bpm', 'color': '#3562bd', 'peak': 'Max HR'},
     'RESP': {'unit': 'a.u.', 'color': '#d16296', 'peak': 'Peak'},
     'TEMP': {'unit': '°C', 'color': '#8659c2', 'peak': 'Peak'},

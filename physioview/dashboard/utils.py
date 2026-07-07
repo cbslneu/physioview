@@ -357,7 +357,6 @@ def _preprocess_eda(
         preprocessed_data['EDA'], fs, show_progress = False)
     preprocessed_data['Phasic'] = phasic
     preprocessed_data['Tonic'] = tonic
-    preprocessed_data['Decomposed'] = phasic + tonic
 
     # Detect SCR peaks if requested
     scr_ix = EDA.detect_scr_peaks(preprocessed_data['Phasic'],

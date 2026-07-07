@@ -2490,9 +2490,9 @@ def get_callbacks(app):
 
             # Otherwise create the EDA signal subplots
             else:
-                # Plot the phasic component as the 'Decomposed' signal
-                eda_subplots = {'EDA': ['Decomposed', 'Tonic']}
-                signal_types = [data_type]
+                eda_subplots = {data_type: [data_type, 'Tonic'],
+                                'Phasic': ['Phasic']}
+                signal_types = [data_type, 'Phasic']
 
                 # Add temperature to subplots if data was provided
                 # Fall back to the uploaded temperature store when the
@@ -2506,30 +2506,38 @@ def get_callbacks(app):
                 # Check whether SCRs were detected
                 has_scr = 'SCR' in signal.columns
 
+                # Make the EDA subplot slightly taller than the others
+                primary_weights = [
+                    1.3 if stype == data_type else 1.0
+                    for stype in signal_types]
+
                 # Create EDA subplots
                 signal_plots = physioview.plot_signal(
                     signal = signal, signal_type = signal_types,
                     axes = (x_axis_label, eda_subplots),
                     fs = fs,
-                    peaks_map = {data_type: 'SCR'} if has_scr else None,
+                    peaks_map = {'Phasic': 'SCR'} if has_scr else None,
                     # hline = eda_min, hline_name = 'Min. Valid EDA',
                     acc = acc, seg_number = selected_segment,
-                    seg_size = segment_size)
+                    seg_size = segment_size,
+                    primary_weights = primary_weights)
 
-                # Shade the phasic area between the phasic and tonic signals
-                phasic_trace = None
+                # Shade the phasic area between the raw EDA and tonic signals
+                eda_trace = None
                 tonic_trace = None
+                phasic_trace = None
                 top_traces = []
                 other_traces = []
                 for trace in signal_plots.data:
-                    if trace.name == 'Decomposed':
-                        trace.name = 'Phasic'
-                        phasic_trace = trace
+                    if trace.name == data_type:
+                        eda_trace = trace
                     elif trace.name == 'Tonic':
                         trace.line.dash = 'dash'
                         trace.fill = 'tonexty'
                         trace.fillcolor = 'rgba(36, 154, 181, 0.2)'
                         tonic_trace = trace
+                    elif trace.name == 'Phasic':
+                        phasic_trace = trace
                     elif trace.mode == 'markers':
                         # SCR markers, rendered on top of the lines
                         top_traces.append(trace)
@@ -2537,12 +2545,14 @@ def get_callbacks(app):
                         # Secondary signals (e.g. ACC, TEMP)
                         other_traces.append(trace)
 
-                # Order: secondary signals, then phasic
+                # Order the EDA subplot so the tonic fill draws to the raw EDA
                 ordered = list(other_traces)
-                if phasic_trace is not None:
-                    ordered.append(phasic_trace)
+                if eda_trace is not None:
+                    ordered.append(eda_trace)
                 if tonic_trace is not None:
                     ordered.append(tonic_trace)
+                if phasic_trace is not None:
+                    ordered.append(phasic_trace)
                 signal_plots.data = ordered + top_traces
 
                 beat_correction_hidden = False

@@ -596,7 +596,7 @@ class Preprocessor:
         data: pd.DataFrame
     ) -> pd.DataFrame:
         """Decompose EDA signal into phasic and tonic components and add
-        'Phasic', 'Tonic', and 'Decomposed' columns accordingly."""
+        'Phasic' and 'Tonic' columns accordingly."""
         if self.dtype != 'EDA':
             return data
 
@@ -605,7 +605,6 @@ class Preprocessor:
             data[self.dtype].values, self.fs, show_progress = False)
         data['Phasic'] = phasic
         data['Tonic'] = tonic
-        data['Decomposed'] = phasic + tonic
         return data
 
     def _assess_signal_quality(
