@@ -2533,8 +2533,11 @@ def get_callbacks(app):
                         eda_trace = trace
                     elif trace.name == 'Tonic':
                         trace.line.dash = 'dash'
+                        # Keep the tonic component its original blue, even
+                        # though it inherits the (now orange) EDA color
+                        trace.line.color = '#249ab5'
                         trace.fill = 'tonexty'
-                        trace.fillcolor = 'rgba(36, 154, 181, 0.2)'
+                        trace.fillcolor = 'rgba(231, 111, 81, 0.2)'
                         tonic_trace = trace
                     elif trace.name == 'Phasic':
                         phasic_trace = trace
