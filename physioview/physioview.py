@@ -1008,13 +1008,13 @@ def compute_ibis(
     >>> beats_ix = physioview.ECGBeatDetectors(fs).manikandan(ecg['ECG'])
     >>> ibi = physioview.compute_ibis(ecg, fs, beats_ix, 'Timestamp')
     """
-
     df = data.copy()
     ibis = (np.diff(beats_ix) / fs) * 1000
     if ts_col is not None:
         ibi = df[[ts_col]].copy()
     else:
         ibi = pd.DataFrame({'Sample': np.arange(len(df)) + 1})
+    ibi['IBI'] = np.nan
     for n, ix in enumerate(beats_ix[1:]):
         ibi.loc[ix, 'IBI'] = ibis[n]
     return ibi
