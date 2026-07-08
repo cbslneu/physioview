@@ -570,6 +570,7 @@ def _detect_scr_nabian(
     the analysis of peripheral physiological data. IEEE Journal of
     Translational Engineering in Health and Medicine, 6, 1-11.
     """
+    phasic = np.asarray(phasic)
 
     # Differentiate phasic signal
     diff = np.diff(phasic, prepend = phasic[0])
@@ -577,7 +578,7 @@ def _detect_scr_nabian(
     # Smooth derivative with Bartlett kernel
     kernel = np.bartlett(smooth_size)
     kernel /= kernel.sum()
-    diff_smoothed = convolve(diff, kernel, mode="same")
+    diff_smoothed = convolve(diff, kernel, mode = 'same')
 
     # Find zero crossings
     def _get_zero_crossings(sig, direction = 'positive'):

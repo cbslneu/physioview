@@ -109,7 +109,9 @@ class Preprocessor:
 
         self.dtype = dtype
         self.fs = fs
-        self.filter_on = filter_on
+        # cvxEDA decomposition performs its own denoising via the model
+        # residual, so EDA is not filtered
+        self.filter_on = filter_on and dtype != 'EDA'
         self.peak_detector = peak_detector or self._get_default_peak_detector()
         self.peak_detection_mode = peak_detection_mode
         self.event_times = event_times
@@ -599,7 +601,7 @@ class Preprocessor:
         data: pd.DataFrame
     ) -> pd.DataFrame:
         """Decompose EDA signal into phasic and tonic components and add
-        'Phasic', 'Tonic', and 'Decomposed' columns accordingly."""
+        'Phasic' and 'Tonic' columns accordingly."""
         if self.dtype != 'EDA':
             return data
 
@@ -608,7 +610,6 @@ class Preprocessor:
             data[self.dtype].values, self.fs, show_progress = False)
         data['Phasic'] = phasic
         data['Tonic'] = tonic
-        data['Decomposed'] = phasic + tonic
         return data
 
     def _assess_signal_quality(

@@ -1110,7 +1110,8 @@ def plot_signal(
     seg_size: Optional[int] = 60,
     n_segments: Optional[int] = 1,
     fig_title: Optional[str] = None,
-    fig_height: Optional[int] = 450
+    fig_height: Optional[int] = 450,
+    primary_weights: Optional[List[float]] = None
 ) -> go.Figure:
     """
     Create a Plotly figure with primary and optional secondary physiological
@@ -1198,6 +1199,12 @@ def plot_signal(
         The title of the figure.
     fig_height : int, optional
         The height of the Plotly figure in pixels; by default, 450.
+    primary_weights : list of float, optional
+        Relative heights for the primary signal subplots, in the same order
+        as `signal_type`. If provided, its length must equal the number of
+        primary signals; otherwise, all primary subplots share equal height.
+        Example: ``[1.3, 1.0]`` makes the first primary subplot 30% taller
+        than the second.
 
     Returns
     -------
@@ -1255,7 +1262,8 @@ def plot_signal(
         has_acc: bool = False,
         has_ibi: bool = True,
         primary_total: float = 0.6,
-        secondary_total_each: float = 0.2
+        secondary_total_each: float = 0.2,
+        weights: Optional[list[float]] = None
     ) -> list[float]:
         """Set row_ids and row_heights for subplots with at least one primary
         signal and optional secondary signals."""
@@ -1267,8 +1275,13 @@ def plot_signal(
 
         # Add middle subplot row(s) for primary signal(s)
         if n_primary > 0:
-            primary_each = primary_total / n_primary
-            row_heights.extend([primary_each] * n_primary)
+            if weights is not None and len(weights) == n_primary:
+                total_w = sum(weights)
+                row_heights.extend(
+                    [primary_total * w / total_w for w in weights])
+            else:
+                primary_each = primary_total / n_primary
+                row_heights.extend([primary_each] * n_primary)
 
         # Add last subplot row for IBI signal, if any
         if has_ibi:
@@ -1351,7 +1364,8 @@ def plot_signal(
     # Create a subplot for each signal type(s)
     signal_type = signal_type if isinstance(signal_type, list) else [signal_type]
     n_primary = len(signal_type)
-    row_heights, row_ids = __row_params(n_primary, has_acc, has_ibi)
+    row_heights, row_ids = __row_params(
+        n_primary, has_acc, has_ibi, weights = primary_weights)
     fig = make_subplots(
         rows = n_primary + n_secondary, cols = 1,
         shared_xaxes = True, vertical_spacing = 0.02,
