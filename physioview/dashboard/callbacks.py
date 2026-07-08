@@ -1952,6 +1952,8 @@ def get_callbacks(app):
         for name in subjects:
             for event in events:
                 stem = f'{name}_{event}' if event else name
+                if not (temp_path / f'{stem}_{data_type}.csv').exists():
+                    continue
                 _write_beat_editor_file(stem, batch = batch)
 
         return btn_icon, '', False
@@ -2174,6 +2176,8 @@ def get_callbacks(app):
         else:
             fnames = sorted(all_subjects.values())
         for file in fnames:
+            if not (temp_path / f'{file}_SQA.csv').exists():
+                continue
             with open(str(temp_path / f'{file}_quality_summary.txt'), 'w') as f:
 
                 # Add filename to the first line
@@ -2708,6 +2712,8 @@ def get_callbacks(app):
                     if (temp_path / f'{f}_ACC.csv').exists():
                         files2export.append(temp_path / f'{f}_ACC.csv')
 
+            files2export = [p for p in files2export if p.exists()]
+
             # Record timestamp of export
             current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
             export = None
@@ -2834,13 +2840,14 @@ def get_callbacks(app):
         [Input('ok-beat-edits', 'n_clicks'),
          Input('cancel-beat-edits', 'n_clicks'),
          Input('data-dropdown', 'value'),
+         Input('event-dropdown', 'value'),
          State('beat-editor-modal', 'is_open'),
          State('data-dropdown', 'value'),
          State('event-dropdown', 'value'),
          State('be-edited-trigger', 'children')],
         prevent_initial_call = True
     )
-    def reflect_beat_edits(n_apply, n_cancel, subject_dropdown,
+    def reflect_beat_edits(n_apply, n_cancel, subject_dropdown, event_dropdown,
                            beat_editor_open, selected_subject,
                            selected_event, prev_beats_edited):
         """Update the Beat Editor button label, style, and trigger state
@@ -2856,8 +2863,8 @@ def get_callbacks(app):
             else selected_subject
         edited_file = saved_dir / f'{edits_stem}_edited.json'
 
-        if trig == 'data-dropdown':
-            if prev_beats_edited != edits_stem and edited_file.exists():
+        if trig in ('data-dropdown', 'event-dropdown'):
+            if edited_file.exists():
                 btn_label = 'Beats Edited'
                 btn_style = {'background': '#f1ab2a'}
                 beats_edited = edits_stem

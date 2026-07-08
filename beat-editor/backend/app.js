@@ -35,9 +35,16 @@ app.get("/fetch-file", async (req, res) => {
     const savedFiles = fs.existsSync(savedDir)
       ? await fs.promises.readdir(savedDir)
       : [];
-    // Grab the _edited.json file that matches the _edit.json file
+    // Grab the _edited.json file(s) that match the loaded _edit.json file(s)
+    const editStems = fileDirJsonFiles.map((file) =>
+      file.replace("_edit.json", ""),
+    );
     const savedDirJsonFiles = fs.existsSync(savedDir)
-      ? savedFiles.filter((file) => file.endsWith(`_edited.json`))
+      ? savedFiles.filter(
+          (file) =>
+            file.endsWith(`_edited.json`) &&
+            editStems.includes(file.replace("_edited.json", "")),
+        )
       : [];
 
     if (dataFiles.length === 0) {
@@ -55,9 +62,10 @@ app.get("/fetch-file", async (req, res) => {
       }),
     );
 
-    // If there's a '_edited.json' file, take the data in there too to replot
+    // If there's a matching '_edited.json' file, take the data in there too to
+    // replot; otherwise return null so the frontend renders the base unedited
     const allSavedData =
-      savedFiles.length !== 0
+      savedDirJsonFiles.length !== 0
         ? await Promise.all(
             savedDirJsonFiles.map(async (file) => {
               const filePath = path.join(savedDir, file);

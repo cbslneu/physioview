@@ -143,6 +143,23 @@ def _decode_bytes(raw_bytes: bytes) -> str:
     except UnicodeDecodeError:
         return raw_bytes.decode('latin-1')
 
+def _normalize_event_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename event-file columns to the canonical 'event', 'start',
+    and 'end'. Accepts 'Task' or 'Event' (for the event label) and
+    'Start'/'End', in any letter case."""
+    aliases = {
+        'event': 'event',
+        'task': 'event',
+        'start': 'start',
+        'end': 'end',
+    }
+    rename_map = {}
+    for col in df.columns:
+        canonical = aliases.get(str(col).strip().lower())
+        if canonical is not None:
+            rename_map[col] = canonical
+    return df.rename(columns = rename_map)
+
 def _parse_event_data(
     contents: str,
     filename: str
@@ -170,8 +187,9 @@ def _parse_event_data(
                     sep = None,
                     engine = 'python',
                     skipinitialspace = True)
-                # Replace underscores with spaces
-                event_df['event'] = event_df['event'].str.replace('_', ' ')
+                event_df = _normalize_event_columns(event_df)
+                if 'event' in event_df.columns:
+                    event_df['event'] = event_df['event'].str.replace('_', ' ')
                 key = path.splitext(path.basename(csv_file))[0]
                 event_data[key] = event_df
     else:
@@ -180,8 +198,9 @@ def _parse_event_data(
             sep = None,
             engine = 'python',
             skipinitialspace = True)
-        # Replace underscores with spaces
-        event_data['event'] = event_data['event'].str.replace('_', ' ')
+        event_data = _normalize_event_columns(event_data)
+        if 'event' in event_data.columns:
+            event_data['event'] = event_data['event'].str.replace('_', ' ')
     
     return event_data
 

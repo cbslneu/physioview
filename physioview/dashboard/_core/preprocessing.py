@@ -512,7 +512,12 @@ class Preprocessor:
         detector_attr = getattr(module, attr_name)
 
         if self.dtype in ['ECG', 'PPG', 'BVP']:
-            DetectorClass = detector_attr(self.fs, self.filter_on)
+            # Always treat the signal as already conditioned so the detector
+            # never applies its own internal filter. If the user enabled
+            # filtering, `signal` is the filtered signal from `_apply_filter`;
+            # if not, we honor their choice and detect on the raw signal
+            # without any filtering. This also prevents double-filtering.
+            DetectorClass = detector_attr(self.fs, True)
 
             # Get the method by name
             # - ECG: 'manikandan' (default), 'pantompkins', 'engzee', 'nabian'

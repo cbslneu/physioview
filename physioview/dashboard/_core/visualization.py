@@ -48,7 +48,9 @@ def _cardiac_summary_table(
         artifact_n = sqa_df['N Artifact'].mean()
         data = [
             ('Average Heart Rate (bpm)', f'{avg_hr}'),
-            ('Average N Detected Beats', f'{avg_beats:.2f}'),
+            ('Average N Detected Beats',
+             f'{avg_beats:.2f}' if isinstance(avg_beats, (int, float))
+             else f'{avg_beats}'),
             ('Average N Missing Beats', f'{missing_n:.2f}'),
             ('Average N Artifactual Beats', f'{artifact_n:.2f}'),
             ('% Invalid Segments', invalid_prop),
