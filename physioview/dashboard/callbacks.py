@@ -390,11 +390,13 @@ def get_callbacks(app):
          Input('data-types', 'value'),
          Input('toggle-resample', 'on'),
          Input('toggle-temp-data', 'on'),
-         State('memory-load', 'data')],
+         State('memory-load', 'data'),
+         State('toggle-config', 'on')],
         prevent_initial_call = True
     )
     def db_enable_dtype_specific_parameters(e4_dtype, dtype, toggle_rs_on,
-                                            toggle_temp_on, loaded_data):
+                                            toggle_temp_on, loaded_data,
+                                            toggle_config_on):
         """Enable parameters specific to data types of CSV sources."""
         load_temp_hidden = True
         temp_upload_hidden = True
@@ -463,6 +465,18 @@ def get_callbacks(app):
                     {'label': 'Nabian et al. (2018)', 'value': 'nabian'},
                     {'label': 'Pan & Tompkins (1985)', 'value': 'pantompkins'}]
                 default_beat_detector = 'manikandan'
+
+        # When loading a config, these values come from the config file
+        # (set by db_handle_upload_params); don't overwrite them with the
+        # data-type defaults. Visibility and dropdown options still update.
+        trig = ctx.triggered_id
+        auto_triggers = ('e4-data-types', 'data-types', 'toggle-resample',
+                         'toggle-temp-data')
+        if toggle_config_on and trig in auto_triggers:
+            fs = no_update
+            seg_size = no_update
+            default_beat_detector = no_update
+            default_scr_detector = no_update
 
         return [fs, resample_hidden, resample_disabled,
                 load_temp_hidden, temp_upload_hidden, preprocess_data_hidden,
@@ -586,10 +600,12 @@ def get_callbacks(app):
          Input('e4-data-types', 'value'),
          Input('beat-detectors', 'value'),
          Input('cancel-config-btn', 'n_clicks'),
-         Input('reset-to-default-btn', 'n_clicks')],
+         Input('reset-to-default-btn', 'n_clicks'),
+         State('toggle-config', 'on')],
         prevent_initial_call = True
     )
-    def set_default_filter_params(data, dtype, e4_dtype, beat_detector, n_cancel, n_reset):
+    def set_default_filter_params(data, dtype, e4_dtype, beat_detector,
+                                  n_cancel, n_reset, toggle_config_on):
         """Populate and show/hide filter parameter inputs based on the
         selected data type and beat detector."""
 
@@ -625,6 +641,14 @@ def get_callbacks(app):
         hide_window_len = True if window_len is None else False
         hide_filter_length = True if filter_length is None else False
         hide_window_type = True if window_type is None else False
+
+        # Prevent default filter values from overwriting config file's values
+        trig = ctx.triggered_id
+        auto_triggers = ('memory-load', 'data-types', 'e4-data-types',
+                         'beat-detectors')
+        if toggle_config_on and trig in auto_triggers:
+            lowcut = highcut = order = rp = rs = no_update
+            window_len = filter_length = window_type = no_update
 
         return [hide_lowcut, lowcut, highcut, hide_order, order,
                 hide_rp, rp, hide_rs, rs, hide_window_len, window_len,
@@ -909,7 +933,19 @@ def get_callbacks(app):
          Output('toggle-filter', 'on'),
          Output('scr-detectors', 'value', allow_duplicate = True),
          Output('eda-valid-min', 'value'),
-         Output('eda-valid-max', 'value')],
+         Output('eda-valid-max', 'value'),
+         Output('peak-detection-mode', 'value', allow_duplicate = True),
+         Output('filter-lowcut', 'value', allow_duplicate = True),
+         Output('filter-highcut', 'value', allow_duplicate = True),
+         Output('filter-order', 'value', allow_duplicate = True),
+         Output('filter-rp', 'value', allow_duplicate = True),
+         Output('filter-rs', 'value', allow_duplicate = True),
+         Output('filter-window-len', 'value', allow_duplicate = True),
+         Output('filter-length', 'value', allow_duplicate = True),
+         Output('filter-window-type', 'value', allow_duplicate = True),
+         Output('toggle-event-segmentation', 'on', allow_duplicate = True),
+         Output('event-segmentation-options', 'value',
+                allow_duplicate = True)],
         [Input('memory-load', 'data'),
          Input('config-memory', 'data'),
          State('toggle-config', 'on')],
@@ -954,6 +990,20 @@ def get_callbacks(app):
         by_event_help = {}
         beat_detectors = []
         default_beat_detector = None
+
+        # Advanced filter settings + peak detection mode are only applied when
+        # loading a config
+        peak_detection_mode = no_update
+        filter_lowcut = no_update
+        filter_highcut = no_update
+        filter_order = no_update
+        filter_rp = no_update
+        filter_rs = no_update
+        filter_window_len = no_update
+        filter_length = no_update
+        filter_window_type = no_update
+        segment_by_event = no_update
+        segment_event_by = no_update
 
         if loaded == 'memory-load':
 
@@ -1062,6 +1112,37 @@ def get_callbacks(app):
             eda_min = configs['minimum eda']
             eda_max = configs['maximum eda']
 
+            # Restore peak detection mode
+            peak_detection_mode = configs.get('peak detection mode', no_update)
+
+            # Restore the beat detector and its options for cardiac data
+            saved_detector = configs.get('beat detector')
+            if saved_detector and dtype in ('ECG', 'PPG', 'BVP'):
+                beat_detectors = [
+                    {'label': 'Manikandan & Soman (2012)',
+                     'value': 'manikandan'},
+                    {'label': 'Engels & Zeelenberg (1979)', 'value': 'engzee'},
+                    {'label': 'Nabian et al. (2018)', 'value': 'nabian'},
+                    {'label': 'Pan & Tompkins (1985)', 'value': 'pantompkins'}
+                ]
+                default_beat_detector = saved_detector
+
+            # Restore advanced filter settings, if present
+            filt = configs.get('filter settings')
+            if filt:
+                filter_lowcut = filt.get('lowcut')
+                filter_highcut = filt.get('highcut')
+                filter_order = filt.get('order')
+                filter_rp = filt.get('rp')
+                filter_rs = filt.get('rs')
+                filter_window_len = filt.get('window_len')
+                filter_length = filt.get('filter_length')
+                filter_window_type = filt.get('window_type')
+
+            # Restore event-based segmentation
+            segment_by_event = configs.get('segment by event', no_update)
+            segment_event_by = configs.get('event segmentation', no_update)
+
             if device in ('E4', 'Actiwave'):
                 hide_setup = hide_data_types = hide_data_vars = True
                 base_headers = []
@@ -1069,8 +1150,7 @@ def get_callbacks(app):
             else:
                 headers = list(configs['headers'].values())
                 base_headers = headers
-                drop_values = [[h for h in configs['headers']
-                                if h is not None] for _ in range(6)]
+                drop_values = headers + [None] * (6 - len(headers))
 
             # Populate temperature dropdown
             if temp_on:
@@ -1111,7 +1191,15 @@ def get_callbacks(app):
 
             fs, by_event_help, seg_size,
             beat_detectors, default_beat_detector, artifact_method,
-            artifact_tol, filter_on, scr_detector, eda_min, eda_max
+            artifact_tol, filter_on, scr_detector, eda_min, eda_max,
+
+            # peak detection mode + advanced filter settings
+            peak_detection_mode, filter_lowcut, filter_highcut,
+            filter_order, filter_rp, filter_rs, filter_window_len,
+            filter_length, filter_window_type,
+
+            # event-based segmentation
+            segment_by_event, segment_event_by
         )
 
     # =================== TOGGLE EXPORT CONFIGURATION MODAL ===================
@@ -1188,9 +1276,21 @@ def get_callbacks(app):
          State('data-type-dropdown-4', 'value'),
          State('data-type-dropdown-5', 'value'),
          State('seg-size', 'value'),
+         State('toggle-event-segmentation', 'on'),
+         State('event-segmentation-options', 'value'),
+         State('beat-detectors', 'value'),
+         State('peak-detection-mode', 'value'),
          State('artifact-method', 'value'),
          State('artifact-tol', 'value'),
          State('toggle-filter', 'on'),
+         State('filter-lowcut', 'value'),
+         State('filter-highcut', 'value'),
+         State('filter-order', 'value'),
+         State('filter-rp', 'value'),
+         State('filter-rs', 'value'),
+         State('filter-window-len', 'value'),
+         State('filter-length', 'value'),
+         State('filter-window-type', 'value'),
          State('toggle-temp-data', 'on'),
          State('temp-variable', 'value'),
          State('scr-detectors', 'value'),
@@ -1201,9 +1301,14 @@ def get_callbacks(app):
         prevent_initial_call = True
     )
     def write_confirm_config(n, data, dtype, fs, d1, d2, d3, d4, d5,
-                             seg_size, artifact_method, artifact_tol,
-                             filter_on, temp_on, temp_var, scr_detector,
-                             min_peak_amp, eda_min, eda_max, filename):
+                             seg_size, segment_by_event, segment_event_by,
+                             beat_detector, peak_detection_mode,
+                             artifact_method, artifact_tol, filter_on,
+                             filter_lowcut, filter_highcut, filter_order,
+                             filter_rp, filter_rs, filter_window_len,
+                             filter_length, filter_window_type, temp_on,
+                             temp_var, scr_detector, min_peak_amp, eda_min,
+                             eda_max, filename):
         """Export the configuration file."""
         if n:
             headers = None
@@ -1223,10 +1328,21 @@ def get_callbacks(app):
                     'X': d3,
                     'Y': d4,
                     'Z': d5}
+            filter_settings = {
+                'lowcut': filter_lowcut,
+                'highcut': filter_highcut,
+                'order': filter_order,
+                'rp': filter_rp,
+                'rs': filter_rs,
+                'window_len': filter_window_len,
+                'filter_length': filter_length,
+                'window_type': filter_window_type,
+            }
             json_object = _core.io._create_configs(
                 device, dtype, fs, seg_size, artifact_method, artifact_tol,
                 filter_on, scr_detector, min_peak_amp, headers, temp_on,
-                temp_var, eda_min, eda_max)
+                temp_var, eda_min, eda_max, segment_by_event, segment_event_by,
+                beat_detector, peak_detection_mode, filter_settings)
             download = {'content': json_object, 'filename': f'{filename}.json'}
             return [download, 1]
 

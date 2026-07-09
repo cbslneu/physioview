@@ -84,7 +84,12 @@ def _create_configs(
     temp_on: bool = False,
     temp_var: Optional[str] = None,
     eda_min: Optional[float] = None,
-    eda_max: Optional[float] = None
+    eda_max: Optional[float] = None,
+    segment_by_event: Optional[bool] = None,
+    segment_event_by: Optional[str] = None,
+    beat_detector: Optional[str] = None,
+    peak_detection_mode: Optional[str] = None,
+    filter_settings: Optional[dict] = None
 ) -> str:
     """Create a JSON-formatted configuration file of user SQA parameters."""
 
@@ -93,7 +98,12 @@ def _create_configs(
                'data type': dtype,
                'sampling rate': fs,
                'segment size': seg_size,
+               'segment by event': segment_by_event,
+               'event segmentation': segment_event_by,
+               'beat detector': beat_detector,
+               'peak detection mode': peak_detection_mode,
                'filters': filter_on,
+               'filter settings': filter_settings,
                'scr detector': scr_detector,
                'scr amplitude': scr_amp,
                'artifact identification method': artifact_method,
