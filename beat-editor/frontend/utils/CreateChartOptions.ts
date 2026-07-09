@@ -2,6 +2,7 @@ import {
   EDIT_TYPE_ADD,
   EDIT_TYPE_DELETE,
   EDIT_TYPE_UNUSABLE,
+  EDIT_TYPE_VALID,
 } from "../constants/constants";
 import {
   ChartClickEvent,
@@ -20,6 +21,7 @@ const createChartOptions = ({
   isAddMode,
   isDeleteMode,
   isMarkingUnusableMode,
+  isMarkValidMode,
   isRemoveEditMode,
   isLabelOn,
   removeEdit,
@@ -34,6 +36,9 @@ const createChartOptions = ({
   );
   const unusableSegments: SegmentObj[] = allUserEdits.filter(
     (edit): edit is SegmentObj => edit.editType === EDIT_TYPE_UNUSABLE,
+  );
+  const validModeCoordinates: SavedBeat[] = allUserEdits.filter(
+    (edit) => edit.editType === EDIT_TYPE_VALID,
   );
 
   return {
@@ -115,6 +120,11 @@ const createChartOptions = ({
       title: {
         text: "Signal",
       },
+      labels: {
+        style: {
+          fontSize: "0.7em",
+        },
+      },
       allowDecimals: true,
     },
     tooltip: {
@@ -149,7 +159,7 @@ const createChartOptions = ({
         point: {
           events: {
             click: function (event) {
-              if (isAddMode || isDeleteMode) {
+              if (isAddMode || isDeleteMode || isMarkValidMode) {
                 const chartClickEvent: ChartClickEvent = {
                   point: { x: this.x, y: this.y as number },
                   xAxis: [{ value: this.x }],
@@ -182,7 +192,7 @@ const createChartOptions = ({
         point: {
           events: {
             click: function (event) {
-              if (isAddMode || isDeleteMode) {
+              if (isAddMode || isDeleteMode || isMarkValidMode) {
                 const chartClickEvent: ChartClickEvent = {
                   point: { x: this.x, y: this.y as number },
                   xAxis: [{ value: this.x }],
@@ -196,7 +206,7 @@ const createChartOptions = ({
         },
       },
       {
-        name: "Artifact",
+        name: "Potential Artifact",
         data: initArtifacts,
         type: "scatter",
         color: "red",
@@ -217,7 +227,7 @@ const createChartOptions = ({
         point: {
           events: {
             click: function (event) {
-              if (isAddMode || isDeleteMode) {
+              if (isAddMode || isDeleteMode || isMarkValidMode) {
                 const chartClickEvent: ChartClickEvent = {
                   point: { x: this.x, y: this.y as number },
                   xAxis: [{ value: this.x }],
@@ -311,6 +321,54 @@ const createChartOptions = ({
                   y: this.y as number,
                   segment: selectedSegment,
                   editType: EDIT_TYPE_DELETE,
+                };
+                handleChartClick(clickedEdit);
+                return;
+              }
+
+              const chartClickEvent: ChartClickEvent = {
+                point: { x: this.x, y: this.y as number },
+                xAxis: [{ value: this.x }],
+                yAxis: [{ value: this.y as number }],
+                target: event.target,
+              };
+              handleChartClick(chartClickEvent);
+            },
+          },
+        },
+      },
+      {
+        name: "Validated Beat",
+        data: validModeCoordinates.filter((o) => o.segment === selectedSegment),
+        type: "scatter",
+        color: "#F9C669",
+        marker: {
+          symbol: "circle",
+          lineColor: "#02E337",
+          lineWidth: 2,
+        },
+        visible: validModeCoordinates.some((o) => o.segment === selectedSegment),
+        showInLegend: validModeCoordinates.some(
+          (o) => o.segment === selectedSegment,
+        ),
+        turboThreshold: 0,
+        states: {
+          hover: {
+            enabled: false,
+          },
+          inactive: {
+            enabled: false,
+          },
+        },
+        point: {
+          events: {
+            click: function (event) {
+              if (isRemoveEditMode) {
+                const clickedEdit: SavedBeat = {
+                  x: this.x,
+                  y: this.y as number,
+                  segment: selectedSegment,
+                  editType: EDIT_TYPE_VALID,
                 };
                 handleChartClick(clickedEdit);
                 return;

@@ -4,6 +4,7 @@ interface useKeyboardShortcutsProps {
   toggleAddMode: () => void;
   toggleDeleteMode: () => void;
   toggleMarkUnusableMode: () => void;
+  toggleMarkValidMode: () => void;
   toggleRemoveEditMode: () => void;
 }
 
@@ -11,6 +12,7 @@ const useKeyboardShortcuts = ({
   toggleAddMode,
   toggleDeleteMode,
   toggleMarkUnusableMode,
+  toggleMarkValidMode,
   toggleRemoveEditMode,
 }: useKeyboardShortcutsProps) => {
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -20,6 +22,8 @@ const useKeyboardShortcuts = ({
       toggleDeleteMode();
     } else if (event.key === "U" || event.key === "u") {
       toggleMarkUnusableMode();
+    } else if (event.key === "V" || event.key === "v") {
+      toggleMarkValidMode();
     } else if (event.key === "R" || event.key === "r") {
       toggleRemoveEditMode();
     }

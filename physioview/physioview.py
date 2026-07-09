@@ -1724,7 +1724,7 @@ def process_beat_edits(
         A DataFrame of edit instructions parsed from a Beat Editor
         `_edited.json` file.  Must contain:
 
-        - 'editType': one of 'ADD', 'DELETE', or 'UNUSABLE'
+        - 'editType': one of 'ADD', 'DELETE', 'UNUSABLE', or 'VALID'
         - either 'x' (edit location) or 'from' (start of unusable segment,
           with 'to' as the end), in the same time or sample units as
           `orig_data`
@@ -1738,6 +1738,12 @@ def process_beat_edits(
         - 'Deleted Beat': 1 where beats were deleted, otherwise `NaN`
         - 'Added Beat': 1 where beats were added, otherwise `NaN`
         - 'Unusable': 1 where segments are marked unusable, otherwise `NaN`
+        - 'Validated Beat': 1 where artifactual beats were manually marked as
+          valid, otherwise `NaN`. These beats are excluded from artifact
+          flagging when the artifact identification algorithm is re-run.
+        - 'Original Artifact': 1 where beats were originally flagged as
+          potential artifacts, otherwise `NaN`. Only added when beats have
+          been validated, preserving the pre-validation artifact flags.
     """
 
     # Validate edits input
@@ -1839,11 +1845,16 @@ def process_beat_edits(
     # Record final edited beat occurrences
     deletions_ix = processed[processed['editType'] == 'DELETE'].index.values
     additions_ix = processed[processed['editType'] == 'ADD'].index.values
+    valid_ix = processed[processed['editType'] == 'VALID'].index.values
     processed.loc[deletions_ix, 'Deleted Beat'] = 1
     processed.loc[additions_ix, 'Added Beat'] = 1
+    processed.loc[valid_ix, 'Validated Beat'] = 1
     processed.loc[deletions_ix, 'Edited Beat'] = np.nan
     if 'Unusable' in processed.columns:
         processed.loc[processed['Unusable'].eq(1), 'Edited Beat'] = np.nan
     processed.loc[additions_ix, 'Edited Beat'] = 1
+    if len(valid_ix) > 0 and 'Artifact' in processed.columns:
+        processed['Original Artifact'] = processed['Artifact']
+
     processed = processed.drop(columns = ['x', 'editType'], errors = 'ignore')
     return processed

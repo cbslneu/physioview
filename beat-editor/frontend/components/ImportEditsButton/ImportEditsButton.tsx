@@ -53,7 +53,7 @@ const ImportEditsButton = ({ onImportSuccess }: ImportEditsButtonProps) => {
 
   return (
     <button className="import-button" onClick={handleImport}>
-      <i className="fa-solid fa-file-import"></i>Import Edits
+      <i className="fa-solid fa-file-import"></i>Import
     </button>
   );
 };

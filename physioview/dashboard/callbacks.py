@@ -1,6 +1,6 @@
 from . import _core
 from typing import Literal, Optional, Tuple
-from dash import html, Input, Output, State, ctx, callback, no_update
+from dash import html, Input, Output, State, ctx, callback, no_update, ClientsideFunction
 from dash.exceptions import PreventUpdate
 from dash.dcc import send_bytes
 from physioview import physioview
@@ -1822,21 +1822,21 @@ def get_callbacks(app):
                       selected_subject, selected_event, segment_size):
         """Recompute signal quality metrics after beat corrections or edits."""
         trig = ctx.triggered_id
+        file = f'{selected_subject}_{selected_event}' if selected_event \
+            else selected_subject
         if trig == 'beat-correction-status':
-            if selected_subject not in beat_correction_status.keys():
+            if file not in beat_correction_status.keys():
                 return False
-            elif beat_correction_status[selected_subject] == 'suggested':
+            elif beat_correction_status[file] == 'suggested':
                 return False
         elif trig == 'be-edited-trigger':
-            if beats_edited != selected_subject:
+            if beats_edited != file:
                 return False
 
         fs = memory['fs']
         data_type = memory['data type']
         beat_editor_fs = memory['downsampled fs']
         sqa = SQA.Cardio(fs)
-        file = f'{selected_subject}_{selected_event}' if selected_event \
-            else selected_subject
 
         preprocessed_data = pd.read_csv(
             temp_path / f'{file}_{data_type}.csv')
@@ -2406,6 +2406,14 @@ def get_callbacks(app):
                     artifacts_edited = sqa.identify_artifacts(
                         data_edited_beats_ix, method = artifact_method,
                         tol = artifact_tol)
+
+                    # Exclude beats marked as valid from recomputed artifacts
+                    if 'Validated Beat' in data_edited.columns:
+                        valid_beats_ix = data_edited[
+                            data_edited['Validated Beat'] == 1].index.values
+                        artifacts_edited = np.setdiff1d(
+                            artifacts_edited, valid_beats_ix)
+
                     if 'Artifact' in data_edited.columns:
                         artifact_col_pos = data_edited.columns.get_loc('Artifact')
                         del data_edited['Artifact']
@@ -2851,7 +2859,8 @@ def get_callbacks(app):
     @app.callback(
         [Output('beat-editor-modal', 'is_open'),
          Output('beat-editor-content', 'children'),
-         Output('ok-beat-edits', 'disabled')],
+         Output('ok-beat-edits', 'disabled'),
+         Output('beat-editor-editing-label', 'children')],
         [Input('open-beat-editor', 'n_clicks'),
          Input('ok-beat-edits', 'n_clicks'),
          Input('cancel-beat-edits', 'n_clicks'),
@@ -2866,7 +2875,15 @@ def get_callbacks(app):
         clicked = ctx.triggered_id
 
         if clicked in ('cancel-beat-edits', 'ok-beat-edits'):
-            return False, None, False
+            return False, None, False, ''
+
+        # Label indicating which subject (and event, if any) is being edited
+        if selected_subject and selected_event:
+            editing_label = f'Editing: {selected_subject} — {selected_event}'
+        elif selected_subject:
+            editing_label = f'Editing: {selected_subject}'
+        else:
+            editing_label = ''
 
         data_dir = Path('beat-editor/data')
         batch_dir = data_dir / 'batch'
@@ -2938,7 +2955,7 @@ def get_callbacks(app):
         except:
             content = html.Span('No data available.')
             apply_disabled = True
-        return True, content, apply_disabled
+        return True, content, apply_disabled, editing_label
 
     # ======================= POSTPROCESESING MODAL ==========================
     # === Open/Close Postprocessing modal ====================================
@@ -3230,7 +3247,8 @@ def get_callbacks(app):
                                     inplace = True)
                         beats_col = 'Original Beat'
                     col_order = ['Segment', ts_col, data_type, 'Filtered',
-                                 beats_col, 'Artifact', 'Auto Corrected Beat',
+                                 beats_col, 'Original Artifact', 'Artifact',
+                                 'Auto Corrected Beat',
                                  'Deleted Beat',  'Added Beat',
                                  'Unusable', 'Edited Beat']
                     order = [c for c in col_order if c in data.columns]
@@ -3257,7 +3275,8 @@ def get_callbacks(app):
                             else:
                                 beats_col = 'Beat'
                             col_order = ['Segment', ts_col, data_type,
-                                         'Filtered', beats_col, 'Artifact',
+                                         'Filtered', beats_col,
+                                         'Original Artifact', 'Artifact',
                                          'Auto Corrected Beat', 'Edited Beat']
                             order = [c for c in col_order if c in data.columns]
                             data = data[order]
@@ -3428,20 +3447,8 @@ def get_callbacks(app):
 
     # ========= Clientside callback to auto-focus Beat Editor iFrame =========
     app.clientside_callback(
-        """
-        function(is_open) {
-            const KEY = "__beat_editor_focus_observer";
-            const observer = new MutationObserver((_mutations, obs) => {
-                const ifr = document.getElementById('beat-editor-iframe');
-                ifr.focus();
-                obs.disconnect();
-            });
-            
-            observer.observe(document.body, { childList: true, subtree: true });
-            
-            return window.dash_clientside.no_update;
-        }
-        """,
+        ClientsideFunction(
+            namespace = 'clientside', function_name = 'focusBeatEditor'),
         Output('beat-editor-iframe-listener', 'data'),
         Input('beat-editor-modal', 'is_open'),
         prevent_initial_call = True

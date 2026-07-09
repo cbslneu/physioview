@@ -50,6 +50,7 @@ export interface ChartOptions {
   isAddMode: boolean;
   isDeleteMode: boolean;
   isMarkingUnusableMode: boolean;
+  isMarkValidMode: boolean;
   isRemoveEditMode: boolean;
   isLabelOn: boolean;
   removeEdit: (edit: SavedBeat) => void;
