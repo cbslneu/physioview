@@ -79,7 +79,7 @@ const KeyboardShortcuts = () => {
       </div>
       {showKeyboardShortcut && (
         <div
-          className="absolute w-[380px] shadow-[0_4px_12px_rgba(0,0,0,0.15)] p-4 top-[calc(100%+15px)] left-[-140px] transform -translate-x-1/2 border border-[#47555e] rounded-lg bg-white z-[1000] text-[#47555e]"
+          className="absolute w-[420px] shadow-[0_4px_12px_rgba(0,0,0,0.15)] p-4 top-[calc(100%+15px)] left-[-160px] transform -translate-x-1/2 border border-[#47555e] rounded-lg bg-white z-[1000] text-[#47555e]"
           ref={keyboardShortcutsRef}
         >
           <div className="absolute right-[5px] top-[-11px] z-[1] h-0 w-0 -translate-x-1/2 border-x-[10px] border-x-transparent border-b-[10px] border-b-[#47555e] after:content-[''] after:absolute after:left-[-10px] after:top-[2px] after:h-0 after:w-0 after:border-x-[10px] after:border-x-transparent after:border-b-[10px] after:border-b-white" />
@@ -87,7 +87,7 @@ const KeyboardShortcuts = () => {
             Keyboard Shortcuts
           </h2>
 
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-4 gap-4 mb-4">
             {TOP_ROW_SHORTCUTS.map((shortcut) => {
               const { icon, label } = shortcut;
               return (

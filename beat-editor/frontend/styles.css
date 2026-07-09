@@ -38,14 +38,17 @@ button {
   text-transform: uppercase;
   font-family: 'Poppins', sans-serif !important;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 12px;
   letter-spacing: 2px;
-  border: 2px solid transparent !important;
+  border: 0px solid transparent !important;
   color: #ffffff;
   text-align: center;
   border-radius: 4px;
   padding: 8px;
+  height: 36px;
+  box-sizing: border-box;
   display: flex;
+  align-items: center;
   cursor: pointer;
 }
 
@@ -54,13 +57,13 @@ button:hover {
 }
 
 button i {
-    margin-top: 3px;
     margin-right: 3px;
 }
 
 .add-beat-active,
 .delete-beat-active,
 .mark-unusable-active,
+.mark-valid-active,
 .remove-edit-active {
   background-color: #ee8a78;
 }
@@ -73,6 +76,12 @@ button i {
 .Toastify__toast,
 .Toastify__toast-body {
   font-family: 'Poppins', sans-serif !important;
+  font-size: 14px;
+}
+
+.Toastify__close-button,
+.Toastify__close-button:hover {
+  background-color: transparent !important;
 }
 
 .keybind {
@@ -81,7 +90,6 @@ button i {
   padding: 5px;
   padding-left: 8px;
   padding-right: 8px;
-  margin-right: 5px;
 }
 
 .rt-click-keybind {
@@ -111,6 +119,7 @@ button i {
   font-size: 12px;
   text-align: center;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .mark-unusable-option {

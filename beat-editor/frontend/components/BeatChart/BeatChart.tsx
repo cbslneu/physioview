@@ -11,6 +11,7 @@ import {
   EDIT_TYPE_ADD,
   EDIT_TYPE_DELETE,
   EDIT_TYPE_UNUSABLE,
+  EDIT_TYPE_VALID,
 } from "../../constants/constants";
 import KeyboardShortcuts from "../KeyboardShortcuts/KeyboardShortcuts";
 import useMarkingUnusableMode from "../../hooks/useMarkingUnusableMode";
@@ -26,6 +27,7 @@ import SaveButton from "../SaveButton/SaveButton";
 import ExportButton from "../ExportButton/ExportButton";
 import ImportEditsButton from "../ImportEditsButton/ImportEditsButton";
 import LabelToggle from "../LabelToggle/LabelToggle";
+import ToolbarDivider from "../ToolbarDivider/ToolbarDivider";
 
 Highcharts.SVGRenderer.prototype.symbols.cross = function (
   x: number,
@@ -81,6 +83,7 @@ const BeatChart = ({
   const [isPanning, setIsPanning] = useState(false);
   const [isMarkingUnusableMode, setIsMarkingUnusableMode] = useState(false);
   const [isRemoveEditMode, setIsRemoveEditMode] = useState(false);
+  const [isMarkValidMode, setIsMarkValidMode] = useState(false);
   const [isLabelOn, setIsLabelOn] = useState(true);
   const [allUserEdits, setAllUserEdits] = useState<(SavedBeat | SegmentObj)[]>(
     [],
@@ -157,6 +160,7 @@ const BeatChart = ({
       isAddMode,
       isDeleteMode,
       isMarkingUnusableMode,
+      isMarkValidMode,
       isRemoveEditMode,
       isLabelOn,
       handleChartClick,
@@ -176,6 +180,7 @@ const BeatChart = ({
     isRemoveEditMode,
     selectedSegment,
     isMarkingUnusableMode,
+    isMarkValidMode,
     isLabelOn,
   ]);
 
@@ -229,6 +234,10 @@ const BeatChart = ({
     ) {
       return;
     }
+    // In Mark Valid mode, ignore clicks on non-artifact points while panning
+    if (isPanning && isMarkValidMode && !isArtifactCoordinate) {
+      return;
+    }
 
     const updatedCardiacData = [...cardiacData, { x: newX, y: newY }];
     const updatedBeatData = [...beatData];
@@ -237,6 +246,11 @@ const BeatChart = ({
     setAllUserEdits((prev) => {
       if (isDeleteMode && !(isBeatCoordinate || isArtifactCoordinate)) {
         toast.error("This is not a beat");
+        return prev;
+      }
+
+      if (isMarkValidMode && !isArtifactCoordinate) {
+        toast.error("This is not an artifactual beat");
         return prev;
       }
 
@@ -258,6 +272,16 @@ const BeatChart = ({
             y: newY,
             segment: selectedSegment,
             editType: EDIT_TYPE_ADD,
+          },
+        ];
+      } else if (isMarkValidMode) {
+        return [
+          ...prev,
+          {
+            x: newX,
+            y: newY,
+            segment: selectedSegment,
+            editType: EDIT_TYPE_VALID,
           },
         ];
       } else if (isRemoveEditMode) {
@@ -322,6 +346,7 @@ const BeatChart = ({
     setIsDeleteMode(false);
     setIsMarkingUnusableMode(false);
     setIsRemoveEditMode(false);
+    setIsMarkValidMode(false);
   };
 
   const toggleDeleteMode = () => {
@@ -330,6 +355,7 @@ const BeatChart = ({
     setIsDeleteMode((prev) => !prev);
     setIsMarkingUnusableMode(false);
     setIsRemoveEditMode(false);
+    setIsMarkValidMode(false);
   };
 
   const toggleMarkUnusableMode = () => {
@@ -338,6 +364,16 @@ const BeatChart = ({
     setIsAddMode(false);
     setIsDeleteMode(false);
     setIsRemoveEditMode(false);
+    setIsMarkValidMode(false);
+  };
+
+  const toggleMarkValidMode = () => {
+    resetInteractionState();
+    setIsAddMode(false);
+    setIsDeleteMode(false);
+    setIsMarkingUnusableMode(false);
+    setIsRemoveEditMode(false);
+    setIsMarkValidMode((prev) => !prev);
   };
 
   const toggleRemoveEditMode = () => {
@@ -345,6 +381,7 @@ const BeatChart = ({
     setIsAddMode(false);
     setIsDeleteMode(false);
     setIsMarkingUnusableMode(false);
+    setIsMarkValidMode(false);
     setIsRemoveEditMode((prev) => !prev);
   };
 
@@ -360,6 +397,7 @@ const BeatChart = ({
     toggleAddMode,
     toggleDeleteMode,
     toggleMarkUnusableMode,
+    toggleMarkValidMode,
     toggleRemoveEditMode,
   });
 
@@ -399,9 +437,16 @@ const BeatChart = ({
         onClick: toggleMarkUnusableMode,
       },
       {
+        id: "mark-valid",
+        icon: "fa-solid fa-check",
+        label: "Mark Valid Beat",
+        className: isMarkValidMode ? "mark-valid-active" : "",
+        onClick: toggleMarkValidMode,
+      },
+      {
         id: "remove-edit",
         icon: "fa-solid fa-times",
-        label: "Remove",
+        label: "Remove Edit",
         className: isRemoveEditMode ? "remove-edit-active" : "",
         onClick: toggleRemoveEditMode,
       },
@@ -410,10 +455,12 @@ const BeatChart = ({
       isAddMode,
       isDeleteMode,
       isMarkingUnusableMode,
+      isMarkValidMode,
       isRemoveEditMode,
       toggleAddMode,
       toggleDeleteMode,
       toggleMarkUnusableMode,
+      toggleMarkValidMode,
       toggleRemoveEditMode,
     ],
   );
@@ -423,7 +470,7 @@ const BeatChart = ({
       <div className="flex w-full mb-4 justify-between items-center">
         <div className="flex flex-wrap gap-2 mb-5 items-center">
           <select
-            className="p-0 w-[50px] h-[40px] text-center text-[16px] border border-[#3d4951] rounded-md focus:outline-none"
+            className="p-0 w-[50px] h-[36px] text-center text-[16px] border border-[#3d4951] rounded-md focus:outline-none"
             value={selectedSegment}
             onChange={(e) => {
               setSelectedSegment(e.target.value);
@@ -449,6 +496,9 @@ const BeatChart = ({
             ))}
           </select>
 
+          {/* Divider separating segment navigation from editing tools */}
+          <ToolbarDivider />
+
           {Object.values(buttonObjParams).map((param) => {
             return (
               <button
@@ -461,6 +511,9 @@ const BeatChart = ({
               </button>
             );
           })}
+
+          {/* Divider separating editing tools from file actions */}
+          <ToolbarDivider />
 
           <SaveButton fileName={fileName} allEdits={allUserEdits} />
           <ImportEditsButton onImportSuccess={onRefresh} />

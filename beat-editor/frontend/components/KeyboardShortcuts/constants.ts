@@ -16,8 +16,12 @@ export const TOP_ROW_SHORTCUTS = [
     label: "Delete Beat",
   },
   {
+    icon: "fa-solid fa-v keybind",
+    label: "Mark Valid Beat",
+  },
+  {
     icon: "fa-solid fa-r keybind",
-    label: "Remove",
+    label: "Remove Edit",
   },
 ];
 
