@@ -2886,7 +2886,8 @@ def get_callbacks(app):
     @app.callback(
         [Output('beat-editor-modal', 'is_open'),
          Output('beat-editor-content', 'children'),
-         Output('ok-beat-edits', 'disabled')],
+         Output('ok-beat-edits', 'disabled'),
+         Output('beat-editor-editing-label', 'children')],
         [Input('open-beat-editor', 'n_clicks'),
          Input('ok-beat-edits', 'n_clicks'),
          Input('cancel-beat-edits', 'n_clicks'),
@@ -2901,7 +2902,15 @@ def get_callbacks(app):
         clicked = ctx.triggered_id
 
         if clicked in ('cancel-beat-edits', 'ok-beat-edits'):
-            return False, None, False
+            return False, None, False, ''
+
+        # Label indicating which subject (and event, if any) is being edited
+        if selected_subject and selected_event:
+            editing_label = f'Editing: {selected_subject} — {selected_event}'
+        elif selected_subject:
+            editing_label = f'Editing: {selected_subject}'
+        else:
+            editing_label = ''
 
         data_dir = Path('beat-editor/data')
         batch_dir = data_dir / 'batch'
@@ -2973,7 +2982,7 @@ def get_callbacks(app):
         except:
             content = html.Span('No data available.')
             apply_disabled = True
-        return True, content, apply_disabled
+        return True, content, apply_disabled, editing_label
 
     # ======================= POSTPROCESESING MODAL ==========================
     # === Open/Close Postprocessing modal ====================================

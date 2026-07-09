@@ -847,7 +847,12 @@ layout = html.Div(id = 'main', children = [
                     html.Div(id = 'beat-editor-content', children = [])
                 ])
             ]),
-            dbc.ModalFooter(children = [
+            dbc.ModalFooter(style = {'justifyContent': 'space-between'},
+                            children = [
+                html.Div(id = 'beat-editor-editing-label',
+                         style = {'fontStyle': 'italic', 'fontSize': '12px',
+                                  'color': '#6c757d', 'textAlign': 'left',
+                                  'alignSelf': 'center'}),
                 html.Div(id = 'beat-editor-buttons', children = [
                     html.Button('Cancel', id = 'cancel-beat-edits'),
                     html.Button('Apply Edits', id = 'ok-beat-edits'),
