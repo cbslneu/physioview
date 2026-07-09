@@ -1822,21 +1822,21 @@ def get_callbacks(app):
                       selected_subject, selected_event, segment_size):
         """Recompute signal quality metrics after beat corrections or edits."""
         trig = ctx.triggered_id
+        file = f'{selected_subject}_{selected_event}' if selected_event \
+            else selected_subject
         if trig == 'beat-correction-status':
-            if selected_subject not in beat_correction_status.keys():
+            if file not in beat_correction_status.keys():
                 return False
-            elif beat_correction_status[selected_subject] == 'suggested':
+            elif beat_correction_status[file] == 'suggested':
                 return False
         elif trig == 'be-edited-trigger':
-            if beats_edited != selected_subject:
+            if beats_edited != file:
                 return False
 
         fs = memory['fs']
         data_type = memory['data type']
         beat_editor_fs = memory['downsampled fs']
         sqa = SQA.Cardio(fs)
-        file = f'{selected_subject}_{selected_event}' if selected_event \
-            else selected_subject
 
         preprocessed_data = pd.read_csv(
             temp_path / f'{file}_{data_type}.csv')
@@ -2406,6 +2406,14 @@ def get_callbacks(app):
                     artifacts_edited = sqa.identify_artifacts(
                         data_edited_beats_ix, method = artifact_method,
                         tol = artifact_tol)
+
+                    # Exclude beats marked as valid from recomputed artifacts
+                    if 'Validated Beat' in data_edited.columns:
+                        valid_beats_ix = data_edited[
+                            data_edited['Validated Beat'] == 1].index.values
+                        artifacts_edited = np.setdiff1d(
+                            artifacts_edited, valid_beats_ix)
+
                     if 'Artifact' in data_edited.columns:
                         artifact_col_pos = data_edited.columns.get_loc('Artifact')
                         del data_edited['Artifact']
@@ -3274,7 +3282,8 @@ def get_callbacks(app):
                                     inplace = True)
                         beats_col = 'Original Beat'
                     col_order = ['Segment', ts_col, data_type, 'Filtered',
-                                 beats_col, 'Artifact', 'Auto Corrected Beat',
+                                 beats_col, 'Original Artifact', 'Artifact',
+                                 'Auto Corrected Beat',
                                  'Deleted Beat',  'Added Beat',
                                  'Unusable', 'Edited Beat']
                     order = [c for c in col_order if c in data.columns]
@@ -3301,7 +3310,8 @@ def get_callbacks(app):
                             else:
                                 beats_col = 'Beat'
                             col_order = ['Segment', ts_col, data_type,
-                                         'Filtered', beats_col, 'Artifact',
+                                         'Filtered', beats_col,
+                                         'Original Artifact', 'Artifact',
                                          'Auto Corrected Beat', 'Edited Beat']
                             order = [c for c in col_order if c in data.columns]
                             data = data[order]
