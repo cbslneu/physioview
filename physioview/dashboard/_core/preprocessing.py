@@ -157,7 +157,7 @@ class Preprocessor:
             original rate.
         min_peak_amp : float, optional
             The minimum amplitude, in microsiemens (µS), for an SCR peak to be
-            considered valid. Used in the 'threshold' methodgy212 for EDA data;
+            considered valid. Used in the 'threshold' method for EDA data;
             defaults to 0.05 µS if not provided.
         artifact_method : Literal['cbd', 'hegarty', 'both'], optional
             The user-selected method for identifying artifactual beats.

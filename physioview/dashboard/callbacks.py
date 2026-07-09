@@ -2633,84 +2633,49 @@ def get_callbacks(app):
             return [False, None, True, False, True]
         else:
             data_type = memory['data type']
-            file_type = memory['file type']
+
+            def _augment_quality_summary(stem):
+                """Append 'Auto corrected' and 'Edited' details to a file's
+                quality summary output."""
+                if data_type not in ('ECG', 'PPG', 'BVP'):
+                    return
+                txt_path = temp_path / f'{stem}_quality_summary.txt'
+                if not txt_path.exists():
+                    return
+
+                # Check whether beats were edited or auto-corrected
+                signal_path = temp_path / f'{stem}_{data_type}.csv'
+                auto_corrected = False
+                if signal_path.exists():
+                    cols = pd.read_csv(signal_path, nrows = 0).columns
+                    auto_corrected = 'Original Beat' in cols
+                edited = (temp_path / f'{stem}_edited.csv').exists()
+                lines = [
+                    ln for ln in txt_path.read_text().rstrip('\n').splitlines()
+                    if not ln.startswith(('Auto corrected:', 'Edited:'))]
+                lines.append(f'\nAuto corrected: {"YES" if auto_corrected else "NO"}')
+                lines.append(f'Edited: {"YES" if edited else "NO"}')
+                txt_path.write_text('\n'.join(lines) + '\n')
+
             if export_mode == 'Single':
                 file = f'{selected_subject}_{selected_event}' if selected_event \
                     else selected_subject
-                files2export = [temp_path / f'{file}_SQA.csv']
-                if data_type == 'BVP':  # if data is from the Empatica E4
-                    files2export.extend([
-                        temp_path / f'{file}_BVP.csv',
-                        temp_path / f'{file}_IBI.csv',
-                        temp_path / f'{file}_EDA.csv',
-                        temp_path / f'{file}_quality_summary.txt'
-                    ])
-                elif data_type == 'Actiwave':
-                    files2export.extend([
-                        temp_path / f'{file}_ECG.csv',
-                        temp_path / f'{file}_IBI.csv',
-                        temp_path / f'{file}_quality_summary.txt'])
-                elif data_type == 'PPG':
-                    files2export.extend([
-                        temp_path / f'{file}_PPG.csv',
-                        temp_path / f'{file}_IBI.csv',
-                        temp_path / f'{file}_quality_summary.txt'])
-                elif data_type == 'ECG':
-                    files2export.extend([
-                        temp_path / f'{file}_ECG.csv',
-                        temp_path / f'{file}_IBI.csv',
-                        temp_path / f'{file}_quality_summary.txt'])
-                elif data_type == 'EDA':
-                    files2export.extend([
-                        temp_path / f'{file}_EDA.csv',
-                        temp_path / f'{file}_quality_summary.txt'])
-                    if file_type == 'E4':
-                        files2export.extend([
-                            temp_path / f'{file}_TEMP.csv'
-                        ])
-                if (temp_path / f'{file}_ACC.csv').exists():
-                    files2export.append(temp_path / f'{file}_ACC.csv')
+                _augment_quality_summary(file)
+                files2export = [
+                    temp_path / f'{file}_SQA.csv',
+                    temp_path / f'{file}_quality_summary.txt'
+                ]
 
             else:  # if export_mode == 'Batch'
                 fnames = sorted([s + '_' + e for s in all_subjects.values()
                                  for e in all_events.values()])
-                files2export = [temp_path / f'{f}_SQA.csv' for f in fnames]
+                files2export = []
                 for f in fnames:
-                    if data_type == 'BVP':  # if data is from the Empatica E4
-                        files2export.extend([
-                            temp_path / f'{f}_BVP.csv',
-                            temp_path / f'{f}_IBI.csv',
-                            temp_path / f'{f}_EDA.csv',
-                            temp_path / f'{f}_quality_summary.txt'
-                        ])
-                    elif data_type == 'Actiwave':
-                        files2export.extend([
-                            temp_path / f'{f}_ECG.csv',
-                            temp_path / f'{f}_IBI.csv',
-                            temp_path / f'{f}_quality_summary.txt'
-                        ])
-                    elif data_type == 'PPG':
-                        files2export.extend([
-                            temp_path / f'{f}_PPG.csv',
-                            temp_path / f'{f}_IBI.csv',
-                            temp_path / f'{f}_quality_summary.txt'
-                        ])
-                    elif data_type == 'ECG':
-                        files2export.extend([
-                            temp_path / f'{f}_ECG.csv',
-                            temp_path / f'{f}_IBI.csv',
-                            temp_path / f'{f}_quality_summary.txt'
-                        ])
-                    elif data_type == 'EDA':
-                        files2export.extend([
-                            temp_path / f'{f}_EDA.csv',
-                            temp_path / f'{f}_quality_summary.txt'])
-                        if file_type == 'E4':
-                            files2export.extend([
-                                temp_path / f'{f}_TEMP.csv'
-                            ])
-                    if (temp_path / f'{f}_ACC.csv').exists():
-                        files2export.append(temp_path / f'{f}_ACC.csv')
+                    _augment_quality_summary(f)
+                    files2export.extend([
+                        temp_path / f'{f}_SQA.csv',
+                        temp_path / f'{f}_quality_summary.txt'
+                    ])
 
             files2export = [p for p in files2export if p.exists()]
 
@@ -2755,7 +2720,7 @@ def get_callbacks(app):
                             # Group files by subject
                             if filename.endswith('_quality_summary.txt'):
                                 subject = filename.replace(
-                                    '_quality_summary.txt', '')
+                                   ' _quality_summary.txt', '')
                             else:
                                 subject = filename.rsplit('_', 1)[0]
 
@@ -3385,7 +3350,7 @@ def get_callbacks(app):
             if want_sqa:
                 if data_type in ('ECG', 'PPG', 'BVP'):
                     sqa_txt_path = temp_path / f'{s}_quality_summary.txt'
-                    c = 'YES' if 'Auto Corrected' in data.columns else 'NO'
+                    c = 'YES' if 'Auto Corrected Beat' in data.columns else 'NO'
                     e = 'YES' if has_edits else 'NO'
                     with open(sqa_txt_path, 'a') as f:
                         f.write(f'\nAuto corrected: {c}')
