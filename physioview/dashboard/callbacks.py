@@ -1,6 +1,6 @@
 from . import _core
 from typing import Literal, Optional, Tuple
-from dash import html, Input, Output, State, ctx, callback, no_update
+from dash import html, Input, Output, State, ctx, callback, no_update, ClientsideFunction
 from dash.exceptions import PreventUpdate
 from dash.dcc import send_bytes
 from physioview import physioview
@@ -3463,20 +3463,8 @@ def get_callbacks(app):
 
     # ========= Clientside callback to auto-focus Beat Editor iFrame =========
     app.clientside_callback(
-        """
-        function(is_open) {
-            const KEY = "__beat_editor_focus_observer";
-            const observer = new MutationObserver((_mutations, obs) => {
-                const ifr = document.getElementById('beat-editor-iframe');
-                ifr.focus();
-                obs.disconnect();
-            });
-            
-            observer.observe(document.body, { childList: true, subtree: true });
-            
-            return window.dash_clientside.no_update;
-        }
-        """,
+        ClientsideFunction(
+            namespace = 'clientside', function_name = 'focusBeatEditor'),
         Output('beat-editor-iframe-listener', 'data'),
         Input('beat-editor-modal', 'is_open'),
         prevent_initial_call = True
