@@ -6,7 +6,7 @@ from physioview.pipeline.SQA import Cardio as CardioQA, EDA as EDAQA
 from physioview.pipeline.ECG import Filters as ECGFilters, BeatDetectors as ECGBeatDetectors
 from physioview.pipeline.PPG import Filters as PPGFilters, BeatDetectors as PPGBeatDetectors
 from physioview.pipeline.EDA import Filters as EDAFilters
-from physioview.pipeline import ECG, PPG, EDA, SQA
+from physioview.pipeline import ACC, ECG, PPG, EDA, SQA
 
 # Import public symbols from physioview.py
 from physioview.physioview import *
@@ -18,6 +18,7 @@ def compute_eda_features(signal, fs, window_size, step_size):
 
 # Expose classes and methods
 __all__ = [
+    'ACC',
     'CardioQA',
     'EDAQA',
     'ECGFilters',
